@@ -30,6 +30,24 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 .hidden-internal{display:none!important}.footer{padding:22px 0 0;text-align:center;font-size:11px;color:#a2acb8}
 @media(max-width:850px){.workspace{padding:23px 14px 42px}.site-header{padding:0 16px}.intro-title{font-size:22px}.model-control{width:100%;min-width:0}.section-fields{grid-template-columns:1fr}.spec-section,.features-panel,.project-box{padding-left:16px;padding-right:16px}.section-heading{margin-left:-16px;margin-right:-16px;padding:18px 16px;font-size:18px}.project-grid{grid-template-columns:1fr}.action-panel{padding:14px}.toolbar{align-items:stretch}.toolbar>.btn,.export-buttons{flex:1}.export-buttons .btn{flex:1}.feature-line{grid-template-columns:74px 1fr 28px;gap:8px}.brand-side{display:none}}
 @media(max-width:530px){.toolbar-sep{display:none}.export-buttons{width:100%}.export-buttons .btn{font-size:12px;padding:9px 7px}.spec-row.multi .spec-row-inputs{grid-template-columns:1fr}.feature-line .fdesc{font-size:12px}}
+
+.obs-inline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.obs-preview-btn{white-space:nowrap;background:#fff;color:#245b8f;border-color:#bdd2e7}
+.obs-preview-btn:disabled{opacity:.55}
+#ny40-popup{position:fixed;inset:0;z-index:70;background:rgba(10,26,45,.55);display:none;align-items:center;justify-content:center;padding:16px}
+#ny40-popup.show{display:flex}
+.ny40-dialog{width:min(760px,100%);max-height:94vh;overflow:auto;background:#fff;border:1px solid #dbe6ef;border-radius:12px;box-shadow:0 22px 70px rgba(16,35,58,.28)}
+.ny40-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid #e7edf3}
+.ny40-tag{display:inline-block;background:#eaf4ff;color:#235f98;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:6px}
+.ny40-head h3{margin:0;color:#18314a;font-size:20px}.ny40-close{border:0;background:#f0f4f8;border-radius:8px;width:34px;height:34px;font-size:22px;line-height:1}
+.ny40-body{padding:18px 20px}.ny40-imagewrap{display:flex;justify-content:center;align-items:center;min-height:280px;border:1px solid #e2eaf1;border-radius:10px;background:linear-gradient(#f9fcff,#edf4fa)}
+.ny40-imagewrap img{max-width:96%;max-height:250px;object-fit:contain}
+.ny40-desc{margin-top:14px;border:1px solid #deebf6;background:#eef6ff;border-radius:10px;padding:12px 14px}
+.ny40-desc strong{display:block;color:#17324c;font-size:15px}.ny40-desc span{display:block;color:#577089;font-size:13px;margin-top:4px}
+.ny40-choices{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:16px}.ny40-choice{border:1px solid #dce7f0;background:#fff;border-radius:10px;padding:7px;min-width:0}.ny40-choice.active{border:2px solid #2d6da8;background:#eaf4ff;padding:6px}.ny40-choice img{width:100%;height:82px;object-fit:contain}.ny40-choice b{display:block;font-size:12px;color:#20384f;margin-top:4px}.ny40-foot{display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #e7edf3}
+@media(max-width:850px){.obs-inline{grid-template-columns:1fr}.obs-preview-btn{width:100%}.ny40-choices{grid-template-columns:repeat(3,minmax(0,1fr))}.ny40-imagewrap{min-height:230px}.ny40-imagewrap img{max-height:205px}}
+@media(max-width:530px){.ny40-head,.ny40-body,.ny40-foot{padding:14px}.ny40-head h3{font-size:18px}.ny40-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.ny40-choice img{height:72px}}
+
 </style>
 <link rel="stylesheet" href="responsive-ui.css">
 </head>
@@ -47,6 +65,22 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <div class="footer">MITSUBISHI ELECTRIC VIETNAM · SPEC ENGINEERING</div>
 <div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div>
 </main>
+
+<div id="ny40-popup" aria-hidden="true">
+  <div class="ny40-dialog" role="dialog" aria-modal="true" aria-labelledby="ny40-title">
+    <div class="ny40-head">
+      <div><span class="ny40-tag">Glass arrangements</span><h3 id="ny40-title">NY-40A — Quan sát</h3></div>
+      <button type="button" class="ny40-close" id="ny40-close" aria-label="Đóng">×</button>
+    </div>
+    <div class="ny40-body">
+      <div class="ny40-imagewrap"><img id="ny40-image" src="assets/NY-40A.png" alt="NY-40A"></div>
+      <div class="ny40-desc"><strong id="ny40-vi">Kính phía sau và hai bên</strong><span id="ny40-en">Rear & both sides</span></div>
+      <div class="ny40-choices" id="ny40-choices"></div>
+    </div>
+    <div class="ny40-foot"><button type="button" class="btn btn-secondary" id="ny40-ok">Đóng</button><button type="button" class="btn btn-primary" id="ny40-apply" style="margin-left:8px">Áp dụng mẫu</button></div>
+  </div>
+</div>
+
 <script src="vendor/jszip.min.js"></script>
 <script src="embedded-data.js"></script>
 <script src="workbooks.js"></script>

@@ -42,7 +42,15 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(x.value){if(tracked)conditionCount.pass++;verified.push(reference);details.push({ref:reference,state:'PASS'});return true;}
    if(tracked)conditionCount.fail++;
    let row=Number(/\d+$/.exec(addr)[0]);let source=base(db.sheets.DataTable['C'+row]);let msg=source||`Rule ${reference} returned FALSE`;
-   let field=cellForCondition(row);issue(reference,field,msg,'Calculated FALSE from workbook formula ='+db.sheets[sheet][addr]?.f);
+   let field=cellForCondition(row);
+   if(model==='MRL'&&sheet==='DataTable'&&row===525){
+    const obs=value('SpecForm','D14'),gate=value('SpecForm','R14'),ceiling=value('SpecForm','D41'),handrail=value('SpecForm','D64');
+    let found=false;
+    if(!gate.ok||gate.value!==true){issue(reference+' / upstream','D14','Mẫu cabin quan sát không phù hợp tải trọng hoặc loại cửa.');found=true;}
+    if(ceiling.ok&&String(ceiling.value)==='FL1'){issue(reference+' / ceiling','D41','Trần FL1 không phù hợp với cabin quan sát.');found=true;}
+    if(handrail.ok&&String(handrail.value)!=='YH-100SL (SUS304)'){issue(reference+' / handrail','D64','Cabin quan sát yêu cầu tay vịn YH-100SL (SUS304).');found=true;}
+    if(!found)issue(reference,'D14',msg);
+   }else issue(reference,field,msg,'Calculated FALSE from workbook formula ='+db.sheets[sheet][addr]?.f);
    details.push({ref:reference,state:'FAIL',message:msg,cell:field});return false;
   }
   verified.push(reference);details.push({ref:reference,state:'PASS',value:x.value});return x.value;

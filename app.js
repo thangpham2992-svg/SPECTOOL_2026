@@ -166,6 +166,49 @@ const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS)(?:\b|\s|\-)
 function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell===addr)?.value??''}
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
 function selectedCapacity(){return current.capacity.find(c=>String(c.EleCapacityName)===String(currentValue('D13')))||{}}
+
+const NY40_POPUP_DATA={
+ 'NY-40A':{vi:'Kính phía sau và hai bên',en:'Rear & both sides',img:'assets/NY-40A.png'},
+ 'NY-40B':{vi:'Kính phía sau',en:'Rear',img:'assets/NY-40B.png'},
+ 'NY-40C':{vi:'Kính hai bên',en:'Both sides',img:'assets/NY-40C.png'},
+ 'NY-40D':{vi:'Kính phía sau và một bên',en:'Rear & one side',img:'assets/NY-40D.png'},
+ 'NY-40E':{vi:'Kính phía sau và một bên',en:'Rear & one side',img:'assets/NY-40E.png'}
+};
+let ny40Active='NY-40A';
+function syncObservationButton(input){
+ const field=input?.closest('.field');const btn=field?.querySelector('.obs-preview-btn');
+ if(!btn)return;const active=/^NY-40/i.test(String(input.value||''));btn.disabled=!active;btn.title=active?'Xem minh họa kiểu kính':'Chỉ dùng khi chọn NY-40';
+}
+function selectNy40Option(value){
+ const data=NY40_POPUP_DATA[value]||NY40_POPUP_DATA['NY-40A'];ny40Active=data===NY40_POPUP_DATA[value]?value:'NY-40A';
+ $('ny40-title').textContent=ny40Active+' — Quan sát';
+ $('ny40-image').src=data.img;$('ny40-image').alt=ny40Active;
+ $('ny40-vi').textContent=data.vi;$('ny40-en').textContent=data.en;
+ for(const el of $('ny40-choices').children)el.classList.toggle('active',el.dataset.value===ny40Active);
+}
+function openNy40Popup(value){
+ if(!/^NY-40/i.test(String(value||'')))return;
+ const overlay=$('ny40-popup');if(!overlay)return;
+ if(!$('ny40-choices').children.length){
+  for(const key of Object.keys(NY40_POPUP_DATA)){
+   const b=document.createElement('button');b.type='button';b.className='ny40-choice';b.dataset.value=key;
+   b.innerHTML='<img src="'+NY40_POPUP_DATA[key].img+'" alt="'+key+'"><b>'+key+'</b>';
+   b.onclick=()=>selectNy40Option(key);
+   $('ny40-choices').append(b);
+  }
+ }
+ // Only the upstream car/door/entrance conditions restrict NY-40 choices.
+ // Ceiling and handrail choices are validated later by Check Spec, not by this popup.
+ const allowed=new Set(allowedObservationCodes());
+ for(const b of $('ny40-choices').children){
+  b.disabled=!allowed.has(b.dataset.value);
+  b.title=b.disabled?'Không phù hợp tải trọng hoặc loại cửa':'';
+ }
+ selectNy40Option(value);
+ overlay.classList.add('show');overlay.setAttribute('aria-hidden','false');
+}
+
+function closeNy40Popup(){const overlay=$('ny40-popup');if(overlay){overlay.classList.remove('show');overlay.setAttribute('aria-hidden','true');}}
 // Workbook-governed output fields: selected capacity fixes MR counterweight position;
 // COP model is an Excel formula, not a user-entered choice.
 function refreshCalculatedOutputs(){
@@ -461,9 +504,15 @@ function row(field,displayName='',compact=false){
    refreshSideDrop();
    refreshLocks();
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
+   if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
  });
- box.append(name,input);return box;
+ if($('model').value==='MRL'&&field.cell==='D14'){
+  const wrap=document.createElement('div');wrap.className='obs-inline';
+  const btn=document.createElement('button');btn.type='button';btn.className='btn btn-small obs-preview-btn';btn.textContent='Xem mô tả';
+  btn.onclick=()=>openNy40Popup(input.value);
+  wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
+ }else box.append(name,input);return box;
 }
 function capacityUpdate(capacity){
  let row=current.capacity.find(c=>String(c.EleCapacityName)===capacity);if(!row)return;
@@ -476,15 +525,24 @@ function capacityUpdate(capacity){
   el.value=v;changes[f.cell]=v;el.classList.add('dirty');
  }
 }
+function allowedObservationCodes(){
+ if($('model').value!=='MRL')return [];
+ const db=workbookEngineData();
+ if(db&&window.SpecExcelSourceEngine?.SourceEngine){
+  const e=new window.SpecExcelSourceEngine.SourceEngine(db,changes);
+  const gate=e.safe('SpecForm','R13');
+  if(!gate.ok||gate.value!==true)return [];
+ }
+ const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
+ if(entrance==='1D-1G')return Object.keys(NY40_POPUP_DATA);
+ if(entrance==='1D-2G' && (/^P11-CO/.test(cap)||/^P13W-CO/.test(cap)) && String(currentValue('D60'))==='Front')return ['NY-40C'];
+ return [];
+}
 function technicalOptions(field){
  if($('model').value!=='MRL')return field.options||[];
  const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
  if(field.cell==='D16')return /^(P08|P11|P13|P17D|P21D)/.test(cap)?['1D-1G','1D-2G']:['1D-1G'];
- if(field.cell==='D14'){
-  if(entrance==='1D-1G')return ['No','NY-40A','NY-40B','NY-40C','NY-40D','NY-40E'];
-  if(entrance==='1D-2G' && (/^P11-CO/.test(cap)||/^P13W-CO/.test(cap)) && String(currentValue('D60'))==='Front')return ['No','NY-40C'];
-  return ['No'];
- }
+ if(field.cell==='D14')return ['No',...allowedObservationCodes()];
  return field.options||[];
 }
 function updateConditional(){
@@ -687,7 +745,9 @@ function renderSourceCheck(result){
  wrap.replaceChildren();if(!failed)return;
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
  const primaries=result.errors.filter(x=>!aggregates.test(x.id));
- const issues=primaries.length?primaries:result.errors;
+ const detailedObservation=primaries.some(x=>String(x.id).startsWith('DataTable!D525 /'));
+ const filtered=detailedObservation?primaries.filter(x=>!(x.id==='SpecForm!B209'&&/Observation/i.test(x.message))):primaries;
+ const issues=filtered.length?filtered:result.errors;
  const fields=new Map();
  const features=sourceFeatureRows();
  for(const err of issues){
@@ -814,5 +874,16 @@ $('file').addEventListener('change',async(e)=>{const file=e.target.files[0];if(!
  const bytes=new Uint8Array(await file.arrayBuffer());await applyWorkbook(model,file.name,bytes);
  }catch(err){status('Không nạp được Excel / Load failed: '+err.message,'error')}
 });
+$('ny40-close')?.addEventListener('click',closeNy40Popup);
+$('ny40-ok')?.addEventListener('click',closeNy40Popup);
+$('ny40-apply')?.addEventListener('click',()=>{
+ const input=activeInput('D14');
+ if($('model').value!=='MRL'||!input||!allowedObservationCodes().includes(ny40Active))return;
+ input.value=ny40Active;
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+ closeNy40Popup();
+});
+$('ny40-popup')?.addEventListener('click',e=>{if(e.target.id==='ny40-popup')closeNy40Popup()});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')closeNy40Popup()});
 load();
 if(/^https?:$/.test(window.location.protocol))loadRepositoryDatabase($('model').value,true).catch(e=>status('Đã dùng Database tích hợp / Embedded fallback: '+e.message));
