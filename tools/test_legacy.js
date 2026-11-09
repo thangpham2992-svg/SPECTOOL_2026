@@ -1,0 +1,2 @@
+const fs=require('fs'),vm=require('vm');const cx={window:{},console};vm.createContext(cx);for(const f of ['engine-database.js','source-engine.js','legacy-step1.js'])vm.runInContext(fs.readFileSync(__dirname+'/../'+f,'utf8'),cx,{filename:f});
+for(const m of ['MR','MRL']){const t=Date.now();const res=cx.window.SPEC_LEGACY_STEP1(m,{},cx.window.SPEC_ENGINE_DATABASE[m]);console.log(m,JSON.stringify(res,null,2),Date.now()-t+'ms');}
