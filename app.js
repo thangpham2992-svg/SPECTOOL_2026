@@ -150,6 +150,8 @@ function sourceFeatureRows(){
  return fromSource.length?fromSource:xrules().features||[];
 }
 const lockedNames=new Set(['K7_DoorType','K17_CarW','K17_CarD','K18_CarJJ']);
+// MRL: K18_CarJJ is selectable; the capacity row gives a default, not a fixed value.
+function capacityLockedField(name){return name!=='K18_CarJJ'||$('model').value==='MR'}
 // Material-dependent inputs. Field names are stable workbook-defined names (MR/MRL may use different cells).
 const finishDependents=[
  ['K23_WallFinish','K23_WallPaintedColor','K23_WallPattern'],
@@ -258,7 +260,7 @@ function refreshLocks(){
   el.disabled=false;delete el.dataset.cfLocked;el.closest('.field')?.classList.remove('cf-locked','locked');
  }
  const fixed=Boolean(selectedCapacity().DoorType);
- for(const key of lockedNames){const f=current.fields.find(f=>f.name===key);if(!f)continue;let el=activeInput(f.cell);if(!el)continue;el.disabled=fixed;el.closest('.field')?.classList.toggle('locked',fixed);el.title=fixed?'Tự động theo Capacity (Fixed by selected capacity)':''}
+ for(const key of lockedNames){const f=current.fields.find(f=>f.name===key);if(!f)continue;let el=activeInput(f.cell);if(!el)continue;const isFixed=fixed&&capacityLockedField(key);el.disabled=isFixed;el.closest('.field')?.classList.toggle('locked',isFixed);el.title=isFixed?'Tự động theo tải trọng':''}
  for(const [parentName,colorName,patternName] of finishDependents){
   const parent=current.fields.find(f=>f.name===parentName);if(!parent)continue;
   const finish=String(currentValue(parent.cell));
@@ -299,6 +301,19 @@ function capacityKg(){
  const cap=String(currentValue('D13'));
  const m=cap.match(/\((\d{3,4})\s*KG\)/i);
  return m?Number(m[1]):null;
+}
+function eligibleJJ(){
+ if($('model').value!=='MRL')return [];
+ const cap=selectedCapacity(),db=workbookEngineData();if(!cap.EleCapacityName)return [];
+ const list=[];const add=v=>{const n=Number(v);if(Number.isFinite(n)&&n>0)list.push(n)};
+ add(cap.JJ); // Default JJ comes from the capacity table.
+ // Extra choices are maintained in the Excel DataTable (CA1080:CB1100), not hardcoded.
+ const sh=db?.sheets?.DataTable||{};
+ for(let r=1081;r<=1100;r++){
+  const entry=sh['CA'+r],choice=sh['CB'+r];
+  if(String(entry??'')===String(cap.EleCapacityName))add(choice);
+ }
+ return [...new Set(list)].sort((a,b)=>a-b).map(String);
 }
 function eligibleSideDrops(){
  const db=workbookEngineData();const source=db?.sheets?.DataTable;let vals=($('model').value==='MRL'&&source)?[921,922,923,924].map(r=>source['C'+r]).filter(v=>typeof v==='string'&&v.trim()):[];if(!vals.length)vals=(xrules().sideDrop||[]).filter(Boolean);
@@ -448,9 +463,10 @@ function workbookChoices(field,engine=null){
  }
  if(!field.validation&& !supplementalListSources[field.name])list=technicalOptions(field);
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
+ if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
-function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL')}
+function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
 function syncDropdownOptions(){
  const workbook=workbookEngineData();if(!workbook||!window.SpecExcelSourceEngine)return;
  const engine=new window.SpecExcelSourceEngine.SourceEngine(workbook,changes);
@@ -517,7 +533,10 @@ function row(field,displayName='',compact=false){
 function capacityUpdate(capacity){
  let row=current.capacity.find(c=>String(c.EleCapacityName)===capacity);if(!row)return;
  // Mirrors mapped parameters from the base prototype, not yet a complete C# rule port.
- const map={K7_DoorType:'DoorType',K17_CarW:'AA',K17_CarD:'BB',K18_CarJJ:'JJ',K19_CarAH:'AH-CWT1',K19_CarBH:'BH-CWT1',K20_CarAM:'AM',K20_CarBM:'BM',K21_CarOH:'OH',K21_CarPD:'PD'};
+ const fireField=current.fields.find(f=>f.name==='K36_FireproofDoor');
+ const fireValue=String(fireField?currentValue(fireField.cell):'Not supplied');
+ const fireProvided=fireValue!=='Not supplied';
+ const map={K7_DoorType:'DoorType',K17_CarW:'AA',K17_CarD:'BB',K18_CarJJ:'JJ',K19_CarAH:fireProvided?'AH-CWT1-FIRE':'AH-CWT1',K19_CarBH:fireProvided?'BH-CWT1-FIRE':'BH-CWT1',K20_CarAM:'AM',K20_CarBM:'BM',K21_CarOH:'OH',K21_CarPD:'PD'};
  for(let [fieldName,tableCol] of Object.entries(map)){
   const f=current.fields.find(f=>f.name===fieldName);if(!f||row[tableCol]===''||row[tableCol]===undefined)continue;
   const el=document.querySelector('[data-cell="'+f.cell+'"]');if(!el)continue;
@@ -780,16 +799,28 @@ async function buildFinalExport(){
   const project=String(evaluation.cells.B8||'Project').replace(/[^A-Za-z0-9_-]+/g,'_').slice(0,35);
   return {model,evaluation,data,filename:'Specification_'+model+'_'+project};
 }
+function canExportBriefly(){
+ try{
+  const model=$('model').value;
+  const result=window.SPEC_SOURCE_CHECK?.(model,changes,workbookEngineData());
+  if(result?.status==='PASS')return true;
+  renderSourceCheck(result||{status:'INCOMPLETE',errors:[]});
+  alert('Spec có lỗi. Vui lòng sửa lại spec.');
+  return false;
+ }catch(error){console.error('Kiểm tra trước Export:',error);alert('Spec có lỗi. Vui lòng sửa lại spec.');return false;}
+}
 async function exportFinalExcel(){
+ if(!canExportBriefly())return;
  const button=$('final-xlsx');button.disabled=true;
  try{status('Đang tạo SpecFormExport từ logic Tool.exe / Building final export...');
   const result=await buildFinalExport();
   download(result.data,result.filename+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   status('Đã xuất Excel SpecFormExport theo source C# / Excel ready. '+result.evaluation.includedFeatures.length+' features applied; '+result.evaluation.removedFeatures.length+' removed; '+result.evaluation.hiddenHall+' hall rows hidden; '+result.evaluation.totalFormulaUnresolved+' formula(s) excluded in unused feature rows.','ok');
- }catch(error){status('Không thể xuất Excel / Excel export blocked: '+error.message,'error');console.error(error)}
+ }catch(error){console.error('Excel Export:',error);alert('Không thể xuất file. Vui lòng kiểm tra lại spec.')}
  finally{button.disabled=false;}
 }
 async function exportFinalPdf(){
+ if(!canExportBriefly())return;
  const button=$('final-pdf');button.disabled=true;
  // Create window in direct click handler to avoid browser popup blockers during async processing.
  const popup=window.open('','_blank');
@@ -801,8 +832,7 @@ async function exportFinalPdf(){
   popup.document.open();popup.document.write(html);popup.document.close();
   popup.focus();
   status('Đã mở bản in A4 dọc theo bố cục SpecFormExport. Chọn In / Save as PDF để lưu tài liệu.','ok');
- }catch(error){if(popup&&!popup.closed){popup.document.body.textContent='EXPORT BLOCKED: '+error.message;}
-  status('Không thể xuất A4 PDF / A4 export blocked: '+error.message,'error');console.error(error)}
+ }catch(error){if(popup&&!popup.closed)popup.close();console.error('PDF Export:',error);alert('Không thể xuất file. Vui lòng kiểm tra lại spec.')}
  finally{button.disabled=false;}
 }
 async function exportWorking(){

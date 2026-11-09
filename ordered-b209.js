@@ -14,9 +14,7 @@ window.SPEC_MRL_B209=function(context, priorChecks={}){
   if(!success)errors.push(cell+': ['+ref+'] '+reason);
  };
  const one=selected('SDE - One Side'),both=selected('SDE - Both Sides');
- const specialFinish=x=>/^SUS-HL/i.test(x)&&(/DSJ1/i.test(x)||/Large window/i.test(x));
- const susError=v('D40')!=='SUS304'&&['D46','E73','E74'].some(c=>specialFinish(v(c)));
- record('SpecForm!B209 / SUS304',!susError,'D40','DSJ1/Large Window với SUS-HL bắt buộc chọn SUS304 tại D40 / SUS304 is required for SUS-HL DSJ1/Large Window.');
+ // DSJ1/Large Window uses SUS304 at the selected door only; overall D40 may remain SUS Standard.
  // Exact second branch of the supplied B209 formula.
  const invalidSde=(/DSJ1/i.test(v('D46'))&&((v('D15')==='CO'&&one)||(v('D15')==='2S'&&both)))||(/DS1/i.test(v('D46'))&&(one||both));
  record('SpecForm!B209 / SDE',!invalidSde,'A118/A119','SDE không hợp lệ: CO-DSJ1 chỉ None/Both; 2S-DSJ1 chỉ None/One; DS1 chỉ None / Invalid door-edge option.');
@@ -46,7 +44,7 @@ window.SPEC_MRL_B209=function(context, priorChecks={}){
  }
  // The priority selector can show its first certain failure; unresolved earlier branches mean
  // later errors cannot be asserted as the *first* one from B209, although still listed as failures.
- const priority=['SpecForm!B209 / SUS304','SpecForm!B209 / SDE','DataTable!D520','DataTable!D523','DataTable!D525','DataTable!D524'];
+ const priority=['SpecForm!B209 / SDE','DataTable!D520','DataTable!D523','DataTable!D525','DataTable!D524'];
  const first=priority.find(p=>checked[p]===false);
  if(first)verified.push('SpecForm!B209 – detected '+first);
  else unverified.push('SpecForm!B209 – first-failing-condition selection incomplete until DataTable!D490:D527 is fully evaluated');

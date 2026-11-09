@@ -23,9 +23,7 @@ window.SPEC_FORMULA_CHECK=function(model,getValue,capacityKg,selectedFeature){
   let r23=null;
   if(kg!==null && Number.isFinite(kg)) r23=kg<=1000?/BWH-620[DE]$/.test(side):kg>=1275?/BWH-720[FG]$/.test(side):false;
   if(r23!==null){yes('R23',r23,'SpecForm R23 / DataTable D524: Side drop không phù hợp tải trọng / Wrong side-drop capacity family');verified.push('SpecForm!R23');}else unverified.push('SpecForm!R23');
-  // First branch of B209: SUS304 required on SUS-HL DSJ1 / Large Window.
-  const special=[v('D46'),v('E73'),v('E74')].some(s=>s.startsWith('SUS-HL')&&(contains(s,'DSJ1')||contains(s,'Large window')));
-  yes('B209',!special||v('D40')==='SUS304','SpecForm B209: Cửa SUS-HL có DSJ1/Large Window phải chọn SUS304 ở D40 / SUS304 required');verified.push('SpecForm!B209 – SUS304 branch');
+  // SUS304 is applied only to special doors by the Excel export formulas.
   // Formula R14 / D525 also depends on R13 and selected handrail and ceiling.
   if(v('D14')==='No'){checked.D525=true;verified.push('DataTable!D525 (Observation = No)')}
   else {

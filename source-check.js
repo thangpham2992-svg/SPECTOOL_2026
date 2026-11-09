@@ -42,7 +42,7 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(x.value){if(tracked)conditionCount.pass++;verified.push(reference);details.push({ref:reference,state:'PASS'});return true;}
    if(tracked)conditionCount.fail++;
    let row=Number(/\d+$/.exec(addr)[0]);let source=base(db.sheets.DataTable['C'+row]);let msg=source||`Rule ${reference} returned FALSE`;
-   let field=cellForCondition(row);
+   let field=sheet==='DataTable'&&addr==='AP5'?'D61':cellForCondition(row);
    if(model==='MRL'&&sheet==='DataTable'&&row===525){
     const obs=value('SpecForm','D14'),gate=value('SpecForm','R14'),ceiling=value('SpecForm','D41'),handrail=value('SpecForm','D64');
     let found=false;
@@ -73,7 +73,7 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  }
  if(model==='MR'){
   for(const n of [2,3,4,5,10]){
-   const a='AP'+n,raw=db.sheets.DataTable[a];if(raw&&typeof raw==='object'&&raw.f){const r=checkRule('DataTable',a,'boolean',false);if(r===false){const msg=n===10?'SDE One Side không phù hợp cửa CO với DSJ1/Large Window / Invalid SDE for special CO door':n===5?'Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit':'Điều kiện cửa/vật liệu không đạt / Door finish or weight condition failed';issue('DataTable!'+a,n===10?featureByCode['sde - one side']||'D50':'D50',msg);}}}
+   const a='AP'+n,raw=db.sheets.DataTable[a];if(raw&&typeof raw==='object'&&raw.f){const r=checkRule('DataTable',a,'boolean',false);if(r===false){const msg=n===10?'SDE One Side không phù hợp cửa CO với DSJ1/Large Window / Invalid SDE for special CO door':n===5?'Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit':'Điều kiện cửa/vật liệu không đạt / Door finish or weight condition failed';issue('DataTable!'+a,n===10?featureByCode['sde - one side']||'D50':n===5?'D61':'D50',msg);}}}
   const result=value('DataTable','D512');
   const b207=value('SpecForm','B207');if(!b207.ok)unverified.push('SpecForm!B207: '+b207.error);
   else if(typeof b207.value==='string'&&/^Err\s*-/i.test(b207.value)){issue('SpecForm!B207','D50',b207.value);}
@@ -140,6 +140,27 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   if(isOn&&String(option.value).trim().toUpperCase()==='X')issue('SpecForm!E'+r,addr,`${db.sheets.SpecForm['B'+r]} không được áp dụng trong Group Control hiện tại / Feature unavailable (Option X)`);
   verified.push('SpecForm!E'+r);
  }
+ // MRL JJ: the configured width is selectable, but only among supported values.
+ // Other capacities use the default width declared in TblK5_Capacity.
+ if(model==='MRL'){
+  const capRes=value('SpecForm','D13'),jjRes=value('SpecForm','D31');
+  if(!capRes.ok||!jjRes.ok)unverified.push('SpecForm!D31 — cannot evaluate JJ/Capacity');
+  else {
+   const cap=String(capRes.value),jj=Number(jjRes.value);
+   const t=db.tables?.TblK5_Capacity,match=/^([A-Z]+)(\d+):[A-Z]+(\d+)$/.exec(t?.ref||'');
+   if(!match)unverified.push('DataTable!TblK5_Capacity — missing JJ defaults');
+   else{
+    const low=Number(match[2])+1,high=Number(match[3]);let base=null;
+    for(let r=low;r<=high;r++)if(String(db.sheets.DataTable['B'+r])===cap){base=Number(db.sheets.DataTable['G'+r]);break;}
+    if(!Number.isFinite(base))unverified.push('DataTable!TblK5_Capacity — no JJ value for '+cap);
+    else{
+     const allowed=[base];for(let ri=1081;ri<=1100;ri++){if(String(db.sheets.DataTable['CA'+ri]??'')===cap){const v=Number(db.sheets.DataTable['CB'+ri]);if(Number.isFinite(v))allowed.push(v);}}
+     if(!allowed.includes(jj))issue('SpecForm!D31','D31','Chiều rộng cửa JJ không phù hợp với tải trọng đã chọn.');
+     else verified.push('SpecForm!D31 — JJ theo Capacity');
+    }
+   }
+  }
+ }
  // Additional non-formula CheckSpecStep1 checks recovered from the legacy C# source.
  // The original hatch-pattern UI state cannot be reconstructed from formula values alone,
  // so its coverage is explicitly distinguished from the 37 Excel Condition results.
@@ -161,5 +182,5 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  const unique=[];const seen=new Set();for(const issueItem of issues){const key=issueItem.id+'|'+issueItem.message;if(!seen.has(key)){unique.push(issueItem);seen.add(key)}}
  const status=unique.length?'FAIL':unverified.length?'INCOMPLETE':'PASS';
  return {status,pass:status==='PASS',errors:unique,warnings,verified:[...new Set(verified)],unverified:[...new Set(unverified)],details,conditions:conditionCount,source:'Excel DataTable & SpecForm + legacy C# Step1 checks',excelConditionsPass:conditionCount.fail===0&&conditionCount.unknown===0,legacyVerified:!!legacy,legacyGaps:legacy?.unverified||[],calls:eng.callCount};
- function guessB209Cell(message){if(/SDE|door edge/i.test(message))return featureByCode['sde - one side']||'D46';if(/SUS304/.test(message))return 'D40';if(/OH\/PD|Pit /i.test(message))return 'D37';if(/SETS-L/.test(message))return featureByCode['sets-l']||'D17';if(/Observation/.test(message))return 'D14';if(/Additional inputs/.test(message))return 'D23';return 'D13';}
+ function guessB209Cell(message){if(/SDE|door edge/i.test(message))return featureByCode['sde - one side']||'D46';if(/SUS304/.test(message))return 'D46';if(/OH\/PD|Pit /i.test(message))return 'D37';if(/SETS-L/.test(message))return featureByCode['sets-l']||'D17';if(/Observation/.test(message))return 'D14';if(/Additional inputs/.test(message))return 'D23';return 'D13';}
 };

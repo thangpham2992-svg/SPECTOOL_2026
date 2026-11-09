@@ -98,3 +98,16 @@ v2.3 thay đổi giao diện và engine trình bày PDF. Không thay đổi các
 - NEXIEZ-MRL Version02: mẫu COP tự động theo công thức tại `SpecForm!F59`, phụ thuộc nút COP và mã COP; khóa chỉnh sửa.
 - NEXIEZ-MR: mẫu COP tự động theo công thức tại `SpecForm!F63`, giữ khóa theo workbook.
 - MRL Side drop BWH-620D/E và BWH-720F/G vẫn chọn được trong nhóm tải trọng hợp lệ.
+
+
+## Cập nhật v3.1 – DSJ1 / Large Window và SUS304
+- Có thể giữ SUS Standard cho vách và chi tiết cabin khi chọn cửa SUS-HL với DSJ1/Large Window.
+- Cửa cabin và cửa tầng được chọn là SUS-HL + DSJ1/Large Window tự mô tả vật liệu SUS304.
+- Chỉ sửa phạm vi SUS304 trong Check Spec; các điều kiện cửa, SDE, kích thước và tính năng khác giữ nguyên.
+- Các file Excel Database đi kèm đã đồng bộ với công thức Webtool offline.
+
+## Cập nhật v3.3 – Capacity và JJ
+- NEXIEZ-MRL Version02: JJ là dropdown, không còn khóa. Đối với P08-CO 630 kg, dùng 800 hoặc 900 mm theo danh sách trong `DataTable!CA1080:CB1082`; những model khác căn cứ dòng Capacity trong DataTable và các lựa chọn bổ sung được khai báo sau này.
+- NEXIEZ-MR P10 700 kg: Check Spec chỉ rõ lỗi khối lượng trang trí thay vì hiển thị nhầm Capacity. Giới hạn khối lượng vẫn lấy theo công thức Excel, không bỏ qua lỗi kỹ thuật.
+- Danh sách cửa chống cháy EN81-58(II) 120 phút của hai model vẫn giữ nguyên.
+- Xem `QA_v3.3.md` để biết phạm vi kiểm tra và giới hạn.

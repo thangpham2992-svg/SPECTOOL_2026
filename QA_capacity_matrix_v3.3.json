@@ -1,0 +1,1265 @@
+[
+  {
+    "model": "MR",
+    "capacity": "P6-CO (450 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P6-CO (450 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P6C3-CO (450 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Rule DataTable!AP5 returned FALSE"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit"
+      },
+      {
+        "cell": "B207",
+        "id": "SpecForm!B208",
+        "message": "B208 = 1: Có lỗi trong TblSpecFailure / Original workbook failure counter is not zero"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP20",
+        "message": "Khối lượng trang trí vượt giới hạn: Decoration weight check: used 101.0 kg; allowable 88.0 kg. Check ceiling, door and car options."
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P8-CO (550 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P8-CO (550 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P9-CO (600 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P9-CO (600 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P10-CO (700 KG)-CWT Rear",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Rule DataTable!AP5 returned FALSE"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit"
+      },
+      {
+        "cell": "B207",
+        "id": "SpecForm!B208",
+        "message": "B208 = 1: Có lỗi trong TblSpecFailure / Original workbook failure counter is not zero"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP20",
+        "message": "Khối lượng trang trí vượt giới hạn: Decoration weight check: used 125.0 kg; allowable 116.0 kg. Check ceiling, door and car options."
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P10-CO (700 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Rule DataTable!AP5 returned FALSE"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP5",
+        "message": "Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit"
+      },
+      {
+        "cell": "B207",
+        "id": "SpecForm!B208",
+        "message": "B208 = 1: Có lỗi trong TblSpecFailure / Original workbook failure counter is not zero"
+      },
+      {
+        "cell": "D61",
+        "id": "DataTable!AP20",
+        "message": "Khối lượng trang trí vượt giới hạn: Decoration weight check: used 125.0 kg; allowable 116.0 kg. Check ceiling, door and car options."
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P11-CO (750 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P11-CO (750 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P11C1-CO (750 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P11C3-CO (750 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P11C3-CO (750 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P13-CO (900 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P13-CO (900 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15-CO (1000 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15-CO (1000 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15W-CO (1000 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15W-CO (1000 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15D-2S (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C1-CO (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C2-CO (1000 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C2-CO (1000 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C8-CO (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C10-CO (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C11-CO (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P15C11-2S (1000 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17-CO (1150 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17-CO (1150 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17W-CO (1150 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17W-CO (1150 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17C4-CO (1150 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17C5-CO (1150 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P17C5-2S (1150 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20-CO (1350 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20-CO (1350 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20W-CO (1350 KG)-CWT Rear",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20W-CO (1350 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C4-CO (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C4-2S (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C5-CO (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C6-CO (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C7-CO (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C7-2S (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C8- CO (1350 KG)-CWT Side",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D510",
+        "message": "COP not applied on Front return panel."
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "Rule DataTable!D512 returned FALSE"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MR",
+    "capacity": "P20C9-CO (1350 KG)-CWT Side",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P06-2S (450 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P08-CO (630 KG)",
+    "result": "PASS",
+    "errors": [],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P08-2S (630 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P11-CO (825 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P11-2S (825 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P13W-CO (1000 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P13W-2S (1000 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P13D-CO (1000 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P13D-2S (1000 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B209",
+        "message": "Err - DataTable!D522: AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 1: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P17W-CO (1275 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P17D-CO (1275 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P17D-2S (1275 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P18-CO (1350 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P21W-CO (1600 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P21D-CO (1600 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P21D-2S (1600 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  },
+  {
+    "model": "MRL",
+    "capacity": "P24-CO (1800 KG)",
+    "result": "FAIL",
+    "errors": [
+      {
+        "cell": "D13",
+        "id": "DataTable!D512",
+        "message": "CheckSpec Step1: an active technical condition failed"
+      },
+      {
+        "cell": "D33",
+        "id": "DataTable!D522",
+        "message": "AH/BH below minimum or invalid gate/JJ/fire configuration"
+      },
+      {
+        "cell": "D37",
+        "id": "DataTable!D523",
+        "message": "OH and PD below minimum by speed, capacity, travel and regulation"
+      },
+      {
+        "cell": "D23",
+        "id": "DataTable!D524",
+        "message": "CWT type or door finish is incompatible with the selected model"
+      },
+      {
+        "cell": "D13",
+        "id": "DataTable!D527",
+        "message": "All Step1 conditions including Observation"
+      },
+      {
+        "cell": "D37",
+        "id": "SpecForm!B209",
+        "message": "Err - OH/PD below minimum: Pit 1330 / Min 1650 mm; OH 3750 / Min 3800 mm"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B210",
+        "message": "B210 = 3: Có điều kiện FALSE / One or more false conditions"
+      },
+      {
+        "cell": "D13",
+        "id": "SpecForm!B206",
+        "message": "Check Spec = MISTAKE (không đạt / not approved)"
+      }
+    ],
+    "unknown": []
+  }
+]
