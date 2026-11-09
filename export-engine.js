@@ -143,34 +143,8 @@
        instead of destructive shift, to preserve all merged cell geometry and print areas. */}
    }
    for(const row of all(x,'row')){const num=+(row.getAttribute('r')||0);if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}}
-   // Source C# marks optional/special Feature descriptions in tan, not Standard (S).
-   const styleFile=zip.file('xl/styles.xml');
-   if(styleFile){
-     const styles=parse(await styleFile.async('string'));
-     const fills=all(styles,'fills')[0],xfs=all(styles,'cellXfs')[0];
-     if(fills&&xfs){
-       const newFill=styles.createElementNS(n,'fill');
-       const pattern=styles.createElementNS(n,'patternFill');pattern.setAttribute('patternType','solid');
-       const foreground=styles.createElementNS(n,'fgColor');foreground.setAttribute('rgb','FFD2B48C');
-       const background=styles.createElementNS(n,'bgColor');background.setAttribute('indexed','64');
-       pattern.append(foreground,background);newFill.appendChild(pattern);
-       const tanFillIndex=Array.from(fills.children).length;fills.appendChild(newFill);fills.setAttribute('count',String(tanFillIndex+1));
-       const baseXf=Array.from(xfs.children),styleMemo=new Map();
-       const tanStyle=index=>{
-         if(styleMemo.has(index))return styleMemo.get(index);
-         const orig=baseXf[index]||baseXf[0];if(!orig)return index;
-         const clone=orig.cloneNode(true);clone.setAttribute('fillId',String(tanFillIndex));clone.setAttribute('applyFill','1');
-         const id=Array.from(xfs.children).length;xfs.appendChild(clone);xfs.setAttribute('count',String(id+1));styleMemo.set(index,id);return id;
-       };
-       const optionalRows=new Set(doc.includedFeatures.filter(f=>f.option!=='S').flatMap(f=>f.exportRows));
-       for(const c of cellNodes){const addr=c.getAttribute('r');if(!addr)continue;
-         if(/^[ABC]\d+$/.test(addr)&&optionalRows.has(cellRow(addr))&&!doc.hiddenRows.has(cellRow(addr))){
-           c.setAttribute('s',String(tanStyle(Number(c.getAttribute('s')||0))));
-         }
-       }
-       zip.file('xl/styles.xml',serial(styles));
-     }
-   }
+   // Print/export neutral: do NOT add tan/brown highlights to optional feature rows.
+   // Feature type remains available in doc.includedFeatures; no workbook styles are changed.
    // Hide helper columns D/E; Source C# blanks them after evaluating Option status.
    const cols=all(x,'cols')[0];if(cols){for(const col of all(cols,'col')){
        let min=+col.getAttribute('min'),max=+col.getAttribute('max');

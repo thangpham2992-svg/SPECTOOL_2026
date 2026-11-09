@@ -45,6 +45,8 @@
    let target=attr(rel,'Target').replace(/^\//,'');if(!target.startsWith('xl/'))target='xl/'+target;
    const data=parse(await zip.file(target).async('string'));
    const styles=styleBook(parse(await zip.file('xl/styles.xml').async('string')).documentElement);
+   // Prevent legacy brown/tan fill from appearing in the PDF export.
+   for(const xf of styles.xfs){if(['#d2b48c','#c19a6b','#deb887','#a52a2a'].includes(String(xf.fill||'').toLowerCase()))xf.fill='transparent';}
    const strings=zip.file('xl/sharedStrings.xml')?qa(parse(await zip.file('xl/sharedStrings.xml').async('string')),'si').map(si=>qa(si,'t').map(t=>t.textContent).join('')):[];
    const sheetData=q(data.documentElement,'sheetData'),rows=Array.from(sheetData?.children||[]).filter(x=>x.localName==='row');
    const visibleRows=new Map(),cells=new Map();let largest=0;
@@ -63,6 +65,19 @@
      if(!validRows.length||!visibleRows.has(a.row))continue;
      const key=colAddr(a.col)+a.row;merges.set(key,{colspan:b.col-a.col+1,rowspan:validRows.length});
      for(const vr of validRows)for(let col=a.col;col<=b.col;col++){const k=colAddr(col)+vr;if(k!==key)covered.add(k)}
+   }
+   // The workbook has heading texts in A but often does not define A:C merged cells
+   // for individual feature groups. Merge these visual rows in the PDF/print view only.
+   // Keep the exported XLSX's native merge structure and all regular data rows intact.
+   const groupTitle=/^\s*[-–]\s*Tính năng\b/i;
+   for(const [rn] of visibleRows){
+     const a=String(cells.get('A'+rn)?.value||'');
+     const b=String(cells.get('B'+rn)?.value||'');
+     const c=String(cells.get('C'+rn)?.value||'');
+     if(!groupTitle.test(a)||b.trim()||c.trim())continue;
+     if(merges.has('A'+rn))continue;
+     merges.set('A'+rn,{colspan:3,rowspan:1});
+     covered.add('B'+rn);covered.add('C'+rn);
    }
    // Improve print legibility of the two original header lines without altering XLSX cells.
    // The company/address text is in A1/A2 and B1/B2 are blank, so span these on paper.
