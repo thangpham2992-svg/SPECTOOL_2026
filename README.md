@@ -121,3 +121,6 @@ GQXL2P: DataTable DA3:DL164 is the authoritative, normalized view of the unchang
 - Both Excel and PDF exports keep blue I/II/III/IV section headers; detailed Feature rows do not receive brown backgrounds.
 - OH/PD/AH/BH errors show current value, actual source minimum/maximum and whether too small or too large; the link opens the correct field.
 - The package bundles unchanged MR and MRL Excel Databases from v3.7. See `QA_v3.9.md` and `CHANGELOG_v3.9.md` for verification.
+
+## v4.1 – ITP / Interphone type
+When ITP is selected in Features → Signal, choose the corresponding system type under the ITP checkbox. The options are read from `DataTable!DN:DP` in the MR/MRL Excel Database and depend on Group Control Operation. For 1C-2BC with FE (including FE Hong Kong), `6V Single – 3 Master Stations` is mandatory. Unselected ITP type triggers `Vui lòng chọn loại ITP` in Check Spec and blocks Export. The selected type is exported in the Vietnamese and English ITP descriptions.

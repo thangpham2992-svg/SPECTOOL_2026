@@ -128,3 +128,12 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
  .spec-section{padding-bottom:12px}
  .section-heading,.features-panel .section-heading{background:#edf6ff!important}
 }
+
+/* Service floor advisory: information only, does not affect PASS/FAIL or Export. */
+#check-issues .check-led-warning{grid-column:1/-1;background:#edf6ff;border:1px solid #cbdff0;border-left:3px solid #4d90bb;border-radius:5px;color:#245878;padding:10px 12px;font-size:13px;line-height:1.5;font-weight:600}
+
+/* ITP is a required dependent input, never an independent feature. */
+.feature-itp-config{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;min-width:0;margin:7px 0 2px 0;padding:12px 14px;background:#f2f8fe;border:1px solid #d3e5f7;border-left:3px solid #ba2028;border-radius:6px}
+.feature-itp-config label{font-size:12px;font-weight:650;color:#26465f}
+.feature-itp-config select{width:100%;max-width:620px;min-height:38px;font-size:13px}
+.feature-itp-config small{font-size:11px;color:#586f87}

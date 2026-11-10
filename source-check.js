@@ -23,6 +23,10 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
    if(row===514)return 'D35';if(row===515)return 'D18';if(row===516)return 'D41';if(row===517||row===518)return 'D13';
   }else{
+   // MR: DSJ1/SDE failures belong to the selected SDE feature, not Capacity.
+   if(row===487)return featureByCode['sde - both sides']||'A117';
+   if(row===488)return featureByCode['sde - one side']||'A116';
+   if(row===489)return featureByCode['sde - both sides']||'A117';
    if(row===513)return 'D45';if(row===514||row===515||row===516)return 'D31';
    if(row===517)return 'D39';if(row===518)return 'D15';
   }
@@ -57,7 +61,17 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(x.value){if(tracked)conditionCount.pass++;verified.push(reference);details.push({ref:reference,state:'PASS'});return true;}
    if(tracked)conditionCount.fail++;
    let row=Number(/\d+$/.exec(addr)[0]);let source=base(db.sheets.DataTable['C'+row]);let msg=source||`Rule ${reference} returned FALSE`;
-   let field=sheet==='DataTable'&&addr==='AP5'?'D61':cellForCondition(row);
+   // These AP helpers validate door/weight inputs. Their row numbers are NOT
+   // Capacity rules (AP2 means car-door applicability, AP5 decoration weight).
+   const mrAPFields={AP2:'D50',AP3:'E76',AP4:'E77',AP5:'D61',AP10:'D32'};
+   let field=model==='MR'&&sheet==='DataTable'&&mrAPFields[addr]
+    ?mrAPFields[addr]
+    :cellForCondition(row);
+   if(model==='MR'&&sheet==='DataTable'&&addr==='AP2')msg='Cửa cabin DSJ1 / Large Window không phù hợp mã cửa hoặc cấu hình đã chọn.';
+   if(model==='MR'&&sheet==='DataTable'&&addr==='AP3')msg='Cửa tầng chính không phù hợp kiểu cửa hoặc cấu hình hiện tại.';
+   if(model==='MR'&&sheet==='DataTable'&&addr==='AP4')msg='Cửa tầng khác không phù hợp kiểu cửa hoặc cấu hình hiện tại.';
+   if(model==='MR'&&sheet==='DataTable'&&addr==='AP5')msg='Khối lượng sàn và trang trí vượt giới hạn cho phép của cấu hình.';
+   if(model==='MR'&&sheet==='DataTable'&&addr==='AP10')msg='Chiều rộng cửa JJ hoặc Door Type không phù hợp Capacity.';
    if(model==='MRL'&&sheet==='DataTable'&&row===522){
     // D522 combines AH and BH. Show the exact failing field and dynamic F33/F34 minimum.
     let found=false;
@@ -110,7 +124,9 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  }
  if(model==='MR'){
   for(const n of [2,3,4,5,10]){
-   const a='AP'+n,raw=db.sheets.DataTable[a];if(raw&&typeof raw==='object'&&raw.f){const r=checkRule('DataTable',a,'boolean',false);if(r===false){const msg=n===10?'SDE One Side không phù hợp cửa CO với DSJ1/Large Window / Invalid SDE for special CO door':n===5?'Khối lượng trang trí vượt giới hạn / Decoration weight exceeds limit':'Điều kiện cửa/vật liệu không đạt / Door finish or weight condition failed';issue('DataTable!'+a,n===10?featureByCode['sde - one side']||'D50':n===5?'D61':'D50',msg);}}}
+   const a='AP'+n,raw=db.sheets.DataTable[a];
+   if(raw&&typeof raw==='object'&&raw.f)checkRule('DataTable',a,'boolean',false);
+  }
   const result=value('DataTable','D512');
   const b207=value('SpecForm','B207');if(!b207.ok)unverified.push('SpecForm!B207: '+b207.error);
   else if(typeof b207.value==='string'&&/^Err\s*-/i.test(b207.value)){issue('SpecForm!B207','D50',b207.value);}
@@ -187,6 +203,30 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   if(isOn&&String(option.value).trim().toUpperCase()==='X')issue('SpecForm!E'+r,addr,`${db.sheets.SpecForm['B'+r]} không được áp dụng trong Group Control hiện tại / Feature unavailable (Option X)`);
   verified.push('SpecForm!E'+r);
  }
+ // ITP selection: a required and operation-dependent option whenever ITP feature is enabled.
+ // Values and FE/FE Hong Kong constraint are sourced from DataTable!DN:DP.
+ {
+  const itpRow=model==='MR'?175:177,itpInput='H'+itpRow;
+  const selected=value('SpecForm','A'+itpRow),kind=value('SpecForm',itpInput);
+  const operation=value('SpecForm',model==='MR'?'D21':'D22');
+  const feRow=featureByCode['fe'],feActive=feRow?value('SpecForm',feRow):{ok:false};
+  if(!selected.ok||!kind.ok||!operation.ok||!feActive.ok)unverified.push('SpecForm!'+itpInput+' — ITP input could not be evaluated');
+  else if(selected.value===1||selected.value===true||String(selected.value).toUpperCase()==='V'){
+   const group=String(operation.value).trim(),choice=String(kind.value||'').trim();
+   const options=[];
+   for(let r=2;r<=24;r++){
+    const op=String(db.sheets.DataTable['DN'+r]??'').trim();if(!op)break;
+    if(op!==group)continue;
+    options.push({name:String(db.sheets.DataTable['DO'+r]??'').trim(),mandatory:String(db.sheets.DataTable['DP'+r]??'').toUpperCase()==='Y'});
+   }
+   if(!options.length)issue('ITP!Operation',itpInput,'Hệ điều khiển chưa có lựa chọn ITP hợp lệ');
+   else if(!choice)issue('ITP!Required',itpInput,'Vui lòng chọn loại ITP');
+   else if(!options.some(x=>x.name===choice))issue('ITP!Option',itpInput,'Loại ITP không phù hợp hệ điều khiển hiện tại');
+   else if(group==='1C-2BC'&&(feActive.value===1||feActive.value===true||String(feActive.value).toUpperCase()==='V')&&!options.some(x=>x.name===choice&&x.mandatory))
+    issue('ITP!FE',itpInput,'FE / FE Hong Kong yêu cầu 6V Single – 3 Master Stations');
+   else verified.push('SpecForm!'+itpInput+' — ITP/Operation/FE');
+  }
+ }
  // MRL JJ: the configured width is selectable, but only among supported values.
  // Other capacities use the default width declared in TblK5_Capacity.
  if(model==='MRL'){
@@ -225,9 +265,36 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  const hatch=window.SPEC_CF_CHECK?.(model,changes,db,eng);
  if(hatch){for(const x of hatch.errors)issues.push(x);for(const u of hatch.unknown)unverified.push(u);for(const v of hatch.verified)verified.push(v);}
  else unverified.push('Conditional Formatting / LightUp checker not loaded');
+ // Non-blocking notification based exclusively on the original DataTable floor-name support.
+ // Service floor remains free text; no syntax/count validation and no automatic selection.
+ const floorLedNames=[];
+ const ftable=db.tables?.TblK10_SFloor;
+ const floorNameRef=db.names?.local?.SpecForm?.K10_SFloor;
+ const floorCell=/SpecForm!\$?([A-Z]+)\$?(\d+)/.exec(floorNameRef||'');
+ const serviceFloor=floorCell?value('SpecForm',floorCell[1]+floorCell[2]):{ok:false};
+ const fref=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ftable?.ref||'');
+ if(ftable?.sheet==='DataTable'&&fref&&ftable.columns&&serviceFloor.ok){
+  const columnNumber=letters=>[...letters].reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
+  const letters=num=>{let text='';while(num){num--;text=String.fromCharCode(65+num%26)+text;num=Math.floor(num/26)}return text;};
+  const baseCol=columnNumber(fref[1]);
+  const floorIx=ftable.columns.indexOf('FloorNameButton'),segmentIx=ftable.columns.indexOf('SegmentLED'),dotIx=ftable.columns.indexOf('DotLED');
+  const input=String(serviceFloor.value??'');
+  if(floorIx>=0&&segmentIx>=0&&dotIx>=0&&input.trim()){
+   const escapeRe=text=>text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+   const already=new Set();
+   for(let row=Number(fref[2])+1;row<=Number(fref[4]);row++){
+    const getCol=ix=>String(db.sheets.DataTable[letters(baseCol+ix)+row]??'').trim();
+    const floor=getCol(floorIx);
+    if(!floor||getCol(segmentIx).toUpperCase()!=='N'||getCol(dotIx).toUpperCase()!=='Y')continue;
+    // Match complete names in arbitrary text, never substrings of T10, P60, etc.
+    const re=new RegExp('(^|[^\\p{L}\\p{N}])'+escapeRe(floor)+'(?=$|[^\\p{L}\\p{N}])','iu');
+    if(re.test(input)&&!already.has(floor.toUpperCase())){already.add(floor.toUpperCase());floorLedNames.push(floor);}
+   }
+  }
+ }
  // No silent full PASS: errors in unknown cells make verification INCOMPLETE / BLOCKED.
  const unique=[];const seen=new Set();for(const issueItem of issues){const key=issueItem.id+'|'+issueItem.message;if(!seen.has(key)){unique.push(issueItem);seen.add(key)}}
  const status=unique.length?'FAIL':unverified.length?'INCOMPLETE':'PASS';
- return {status,pass:status==='PASS',errors:unique,warnings,verified:[...new Set(verified)],unverified:[...new Set(unverified)],details,conditions:conditionCount,source:'Excel DataTable & SpecForm + legacy C# Step1 checks',excelConditionsPass:conditionCount.fail===0&&conditionCount.unknown===0,legacyVerified:!!legacy,legacyGaps:legacy?.unverified||[],calls:eng.callCount};
+ return {status,pass:status==='PASS',errors:unique,warnings,dotLedFloorNames:floorLedNames,verified:[...new Set(verified)],unverified:[...new Set(unverified)],details,conditions:conditionCount,source:'Excel DataTable & SpecForm + legacy C# Step1 checks',excelConditionsPass:conditionCount.fail===0&&conditionCount.unknown===0,legacyVerified:!!legacy,legacyGaps:legacy?.unverified||[],calls:eng.callCount};
  function guessB209Cell(message){if(/SDE|door edge/i.test(message))return featureByCode['sde - one side']||'D46';if(/SUS304/.test(message))return 'D46';if(/OH\/PD|Pit /i.test(message))return 'D37';if(/SETS-L/.test(message))return featureByCode['sets-l']||'D17';if(/Observation/.test(message))return 'D14';if(/Additional inputs/.test(message))return 'D23';return 'D13';}
 };

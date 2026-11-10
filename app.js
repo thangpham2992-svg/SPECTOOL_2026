@@ -420,9 +420,48 @@ function renderFeatures(){
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
-  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
-  let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);main.append(line)
+  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='ITP')renderFeatures();invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
+  let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line)
  }
+}
+
+
+// ITP choices always come from DataTable!DN:DP of the current workbook.
+function itpCell(model=$('model').value){return model==='MR'?'H175':'H177'}
+function itpFeatureCell(model=$('model').value){return model==='MR'?'A175':'A177'}
+function itpOptions(model=$('model').value){
+ const db=workbookEngineData(),group=String(currentValue(model==='MR'?'D21':'D22')).trim();
+ const fe=sourceFeatureRows().find(x=>x.code==='FE');
+ const feOn=!!fe && ['1','TRUE','V','✓'].includes(String(changes[fe.cell]??fe.apply).toUpperCase());
+ const rows=[];
+ for(let r=2;r<=24;r++){
+  const c=String(db?.sheets?.DataTable?.['DN'+r]??'').trim();
+  if(!c)break;
+  if(c!==group)continue;
+  const label=String(db.sheets.DataTable['DO'+r]??'').trim();
+  if(!label)continue;
+  const compulsory=String(db.sheets.DataTable['DP'+r]??'').trim().toUpperCase()==='Y';
+  if(feOn&&group==='1C-2BC'&&!compulsory)continue;
+  rows.push(label);
+ }
+ return rows;
+}
+function renderITPOptions(line){
+ const cell=itpCell();const options=itpOptions();
+ const area=document.createElement('div');area.className='feature-itp-config';
+ const label=document.createElement('label');label.htmlFor='itp-type';label.textContent='Loại liên lạc nội bộ / Interphone type';
+ const select=document.createElement('select');select.id='itp-type';select.dataset.cell=cell;
+ const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='— Chọn loại ITP —';select.appendChild(placeholder);
+ for(const value of options){const o=document.createElement('option');o.value=value;o.textContent=value;select.appendChild(o)}
+ const source=workbookEngineData()?.sheets?.SpecForm?.[cell];
+ const fromDb=source&&typeof source==='object'?source.v??'':source??'';
+ let current=String(changes[cell]??fromDb);
+ if(current&&!options.includes(current)){current='';changes[cell]=''}
+ select.value=current;
+ select.onchange=()=>{changes[cell]=select.value;invalidateCheck();status('Đã cập nhật loại ITP. Vui lòng chạy lại Check Spec.')};
+ area.append(label,select);
+ if(options.length===1){const hint=document.createElement('small');hint.textContent='FE / FE Hong Kong: bắt buộc chọn loại 3 Master Stations.';area.append(hint)}
+ line.append(area);
 }
 
 // Dropdowns are resolved from the *active* workbook (including conditional Excel formulas).
@@ -703,7 +742,7 @@ function issueDetails(raw){
  return {cell,reason,label,value,action,feature};
 }
 function focusIssue(cell){
- const feature=sourceFeatureRows().find(x=>x.cell===cell);
+ const feature=sourceFeatureRows().find(x=>x.cell===cell||(x.code==='ITP'&&cell===('H'+x.cell.slice(1))));
  if(feature&&activeFeatureTable!==feature.table){activeFeatureTable=feature.table;renderFeatures()}
  const input=Array.from(document.querySelectorAll('[data-cell]')).find(x=>x.dataset.cell===cell);
  if(!input)return;
@@ -781,7 +820,15 @@ function renderSourceCheck(result){
  if(top){top.textContent=failed?'Không đạt':incomplete?'Chưa xác minh':'Đạt';
   top.className='check-top '+(failed?'fail':incomplete?'partial':'source-pass')}
  if(!wrap)return;
- wrap.replaceChildren();if(!failed)return;
+ wrap.replaceChildren();
+ const addFloorLedWarning=()=>{
+  if(!Array.isArray(result.dotLedFloorNames)||result.dotLedFloorNames.length===0)return;
+  const notice=document.createElement('div');notice.className='check-led-warning';notice.setAttribute('role','note');
+  notice.textContent='Tồn tại tên tầng cần phải sử dụng bảng gọi Dotled';
+  notice.title='Tên tầng theo DataTable: '+result.dotLedFloorNames.join(', ');
+  wrap.append(notice);
+ };
+ if(!failed){addFloorLedWarning();return;}
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
  const primaries=result.errors.filter(x=>!aggregates.test(x.id));
  const detailedObservation=primaries.some(x=>String(x.id).startsWith('DataTable!D525 /'));
@@ -801,6 +848,8 @@ function renderSourceCheck(result){
   const f=current.fields.find(x=>x.cell===cell),feature=features.find(x=>x.cell===cell);
   let name=vietnameseFieldName(xrules().labels?.[cell]||f?.label||feature?.vi||feature?.code||'Thông số kỹ thuật');
   if(isDimension(cell))name=sizeLabel[cell]||name;
+  if(String(err.id)==='ITP!Required')name='Vui lòng chọn loại ITP';
+  if(String(err.id).startsWith('ITP!')&&String(err.id)!=='ITP!Required')name=String(err.message||'Loại ITP không hợp lệ');
   if(!name||name===cell)name='Thông số kỹ thuật';
   const message=isDimension(cell)?String(err.message||'').trim():'';
   const priority=isDimension(cell)?dimensionPriority(err):0;
@@ -808,7 +857,7 @@ function renderSourceCheck(result){
   if(!old||priority>old.priority)fields.set(cell,{name,message,priority});
  }
  if(top&&failed)top.textContent=`Không đạt — ${fields.size||1} lỗi`;
- if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);return}
+ if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);addFloorLedWarning();return}
  let index=0;
  for(const [cell,item] of fields){
   const link=document.createElement('button');link.type='button';link.className='check-error-row';
@@ -823,6 +872,7 @@ function renderSourceCheck(result){
   link.onclick=()=>focusIssue(cell);
   wrap.append(link);
  }
+ addFloorLedWarning();
 }
 
 function download(bytes,name,type){let blob=new Blob([bytes],{type});let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
