@@ -55,7 +55,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 .check-error-explanation{display:block;color:#a32d34;font-size:12px;line-height:1.55;font-weight:500;white-space:normal}
 
 </style>
-<link rel="stylesheet" href="responsive-ui.css?v=4.2">
+<link rel="stylesheet" href="responsive-ui.css?v=5.1">
 <link rel="stylesheet" href="design-guide.css?v=4.4">
 </head>
 <body>
@@ -113,10 +113,12 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <script src="legacy-step1.js"></script>
 <script src="conditional-check.js"></script>
 <script src="source-check.js?v=4.8"></script>
-<script src="export-engine.js?v=4.2"></script>
+<script src="feature-v02.js?v=5.2"></script>
+<script src="mirror-rules.js?v=5.3"></script>
+<script src="export-engine.js?v=5.3"></script>
 <script src="print-layout.js"></script>
-<script src="design-guide.js?v=4.4"></script>
-<script src="app.js?v=5.0"></script>
+<script src="design-guide.js?v=5.3"></script>
+<script src="app.js?v=5.3"></script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>

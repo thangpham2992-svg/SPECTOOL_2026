@@ -144,3 +144,21 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 .cwt-minimum-hint{display:block;font-size:11px;line-height:1.5;color:#45667d;margin-top:4px}
 .cwt-minimum-error{color:#a62929;font-weight:650}
 .cwt-below-minimum{outline:2px solid #bd3838;outline-offset:1px}
+
+/* v5.1 – Hall indicator fields regrouped in floor-specific cards. */
+.hall-choice-panel{grid-column:1/-1;min-width:0;padding:18px;background:#f8fbfe;border:1px solid #cfddeb;border-radius:9px;margin:12px 0;}
+.hall-choice-title{font-size:14px;color:#254864;font-weight:800;margin:0 0 13px;}
+.hall-floor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,265px),1fr));gap:12px;align-items:start}
+.hall-floor-card{min-width:0;border:1px solid #d5e3f1;border-radius:8px;background:#fff;overflow:hidden}
+.hall-floor-title{margin:0;background:#eaf4ff;color:#245172;font-size:13px;line-height:1.4;padding:11px 13px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #d7e6f3}
+.hall-floor-marker{background:#fff;border:1px solid #d2e2f0;color:#53799d;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:750}
+.hall-floor-options{display:flex;flex-direction:column;gap:0;padding:4px 13px 8px}
+.hall-choice-item{min-width:0;padding:9px 0 11px;border-bottom:1px solid #e9eff5;display:grid;gap:5px}
+.hall-choice-item:last-child{border-bottom:0}
+.hall-choice-label{font-size:11.7px;line-height:1.45;font-weight:650;color:#415a72}
+.hall-choice-item .field{display:block;min-width:0;width:100%}
+.hall-choice-item .field .nm{display:none!important}
+.hall-choice-item .field input,.hall-choice-item .field select{width:100%;min-width:0}
+@media(max-width:740px){.hall-choice-panel{padding:12px 10px}.hall-floor-grid{grid-template-columns:1fr}.hall-choice-title{font-size:13px}.hall-floor-options{padding:3px 12px 7px}}
+
+.mirror-weight-hint{display:block;padding:7px 10px;margin-top:5px;color:#21527b;border-left:3px solid #80a9ca;background:#f1f7fc;font-size:12px;line-height:1.4;}

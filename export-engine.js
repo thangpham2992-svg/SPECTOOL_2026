@@ -106,6 +106,60 @@
      if(a)cells[a]='';
    }
    Object.assign(cells,overrides);
+   // SUS-HL/SUS-M are material FINISHES, never paint codes.
+   // Override only ceiling bilingual description rows; leave all paint colors intact.
+   const finishCell=model==='MR'?'D46':'D42',ceilingCell=model==='MR'?'D45':'D41';
+   const ceilingName=text(eng.safe('SpecForm',ceilingCell).value).trim();
+   const ceilingFinish=text(eng.safe('SpecForm',finishCell).value).trim().toUpperCase();
+   const ceilingOutputRow=model==='MR'?46:45;
+   if(ceilingName && /^(SUS-HL|SUS-M)$/.test(ceilingFinish)){
+     const mirror=ceilingFinish==='SUS-M';
+     cells['C'+ceilingOutputRow]=`Trần phòng thang kiểu ${ceilingName}, ${mirror?'inox gương':'inox sọc nhuyễn'} (${ceilingFinish}).`;
+     cells['C'+(ceilingOutputRow+1)]=`(Car ceiling model ${ceilingName}, ${mirror?'mirror-finish':'hairline-finish'} stainless steel ceiling (${ceilingFinish})).`;
+   }
+   // The adjustment from AES13-006 Table 11-C applies to permitted decoration weight, not rated payload.
+   if(model==='MR' && window.SPEC_MIRROR_RULES){
+     const cap=text(eng.safe('SpecForm','D13').value),mir=text(eng.safe('SpecForm','D69').value);
+     const delta=window.SPEC_MIRROR_RULES.adjustment(cap,mir),output=63;
+     if(delta!==null && !/^Not supplied/i.test(mir)){
+       const fmt=(delta>=0?'+':'')+delta.toString().replace('.',',');
+       cells['C'+output]+=` Hiệu chỉnh khối lượng trang trí cho phép: ${fmt} kg / Permissible decoration-weight adjustment: ${fmt.replace(',','.')} kg (AES13-006, Table 11-C).`;
+     }else if(/^By local$/i.test(mir)){
+       cells['C'+output]+=' Khối lượng gương cung cấp tại Việt Nam cần tính vào khối lượng trang trí / Include locally supplied mirror mass in decoration weight.';
+     }
+   }
+   // MR FE-Hongkong (FE-C30): the historical template omits a dedicated row.
+   // In this variant the existing FE bilingual export slot represents FE-C30.
+   // Avoid adding rows to the XLSX layout or mislabeling standard FE.
+   if(model==='MR' && ['1','TRUE','V','✓'].includes(text(changes.FE_C30).toUpperCase())){
+     hiddenRows.delete(93);hiddenRows.delete(94);
+     cells.A93='(FE-C30) FE-Hongkong with MELCO switch';
+     cells.C93='Firefighter emergency operation — Hong Kong configuration with MELCO switch (FE-C30).';
+     cells.A94='Vận hành khẩn cấp chữa cháy FE Hongkong (FE-C30)';
+     cells.C94='Vận hành cứu hỏa theo cấu hình FE Hongkong, sử dụng công tắc MELCO (FE-C30).';
+     includedFeatures.push({group:'Emergency',code:'FE-C30',row:null,option:'A',exportRows:[93,94]});
+   }
+   // Supplemental features present in Manual Version02 but absent from Version01 SpecForm table.
+   // They are emitted in a separate clearly identified appendix; not silently discarded.
+   if(model==='MRL' && window.SPEC_V52_FEATURES){
+     const v52=window.SPEC_V52_FEATURES;
+     const op=text(eng.safe('SpecForm','D22').value);
+     const extras=v52.virtual(model,db);
+     let pos=312,started=false;
+     for(const f of extras){
+       const st=v52.status(model,f.code,op,db);
+       const enabled=Object.hasOwn(changes,f.cell)?on(changes[f.cell]):st==='S';
+       if(st==='X'||!enabled)continue;
+       if(!started){cells['A'+pos]='VI. Tính năng bổ sung theo Manual Version02 / Additional features';pos++;started=true;}
+       cells['A'+pos]='('+f.code+') '+f.en;
+       cells['C'+pos]='Feature listed in NEXIEZ-MRL Alpha Package Version02 manual. Application: '+(st==='S'?'Standard':'Available option')+'.';
+       pos++;
+       cells['A'+pos]=f.vi;
+       cells['C'+pos]='Tính năng theo Manual NEXIEZ-MRL Version02. Trạng thái: '+(st==='S'?'Tiêu chuẩn.':'Tùy chọn.');
+       includedFeatures.push({group:f.table.replace('TblFeature_',''),code:f.code,row:null,option:st,exportRows:[pos-1,pos]});
+       pos++;
+     }
+   }
    // v4.2: Remove the legacy decorative-weight exclusion note from any export.
    for(const addr of Object.keys(cells))if(typeof cells[addr]==='string')cells[addr]=cells[addr]
      .replace(/\s*[-–]?\s*Trừ\s*:\s*Handrail\s*&\s*mirror\s*nhập khẩu\s*;\s*sàn\s*\(By local\)/gi,'');
@@ -144,6 +198,26 @@
      if(Object.hasOwn(doc.cells,addr)){updateCell(x,c,doc.cells[addr]);freezeCount++}
      if(doc.hiddenRows.has(cellRow(addr))){/* Source C# deletes these two-row features. Hide rows
        instead of destructive shift, to preserve all merged cell geometry and print areas. */}
+   }
+   // Include new, bilingual Version02 manual appendix rows, preserving original sheet content.
+   const sheetData=all(x,'sheetData')[0];
+   const existing=new Set(cellNodes.map(c=>c.getAttribute('r')));
+   const addByRow=new Map();
+   for(const [addr,val] of Object.entries(doc.cells)){
+      if(!/^[ABC]\d+$/.test(addr)||existing.has(addr)||val===null||val===undefined||val==='')continue;
+      const rn=cellRow(addr);if(!addByRow.has(rn))addByRow.set(rn,[]);addByRow.get(rn).push([addr,val]);
+   }
+   if(sheetData){
+     for(const rn of [...addByRow.keys()].sort((a,b)=>a-b)){
+       let row=Array.from(sheetData.children).find(el=>el.localName==='row'&&+el.getAttribute('r')===rn);
+       if(!row){row=x.createElementNS(n,'row');row.setAttribute('r',String(rn));
+          const later=Array.from(sheetData.children).find(el=>el.localName==='row'&&+el.getAttribute('r')>rn);
+          if(later)sheetData.insertBefore(row,later);else sheetData.appendChild(row);
+       }
+       for(const [addr,val] of addByRow.get(rn)){
+         const cell=x.createElementNS(n,'c');cell.setAttribute('r',addr);cell.setAttribute('s','0');updateCell(x,cell,val);row.appendChild(cell);
+       }
+     }
    }
    for(const row of all(x,'row')){const num=+(row.getAttribute('r')||0);if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}}
    // v3.8: highlight only Roman-numbered specification section headings (I., II., III., IV., etc.).

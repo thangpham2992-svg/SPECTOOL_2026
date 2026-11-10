@@ -158,7 +158,8 @@ window.SPEC_DESIGN_GUIDE={
   ],
   mirror:[
    {code:'YZ-52A',title:'YZ-52A',subtitle:'Gương nửa thân / Half-size',desc:'Gương đặt ở nửa trên vách sau cabin.',images:['assets/design/mr_yz52a.png']},
-   {code:'YZ-53A',title:'YZ-53A',subtitle:'Bộ 2 gương / 2-mirror set',desc:'Bộ hai mảng gương được bố trí trên vách sau.',images:['assets/design/mr_yz53a.png']}
+   {code:'YZ-53A',title:'YZ-53A',subtitle:'Bộ 2 gương / 2-mirror set',desc:'Bộ hai mảng gương được bố trí trên vách sau.',images:['assets/design/mr_yz53a.png']},
+   {code:'YZ-55SN',title:'YZ-55SN',subtitle:'Gương toàn chiều cao / Full-height mirror-finish',desc:'Bề mặt inox gương SUS304 toàn chiều cao vách sau cabin.',images:['assets/design/mr_yz55sn.png']}
   ]
  }
 };

@@ -131,6 +131,7 @@ const roots={},cells={},rawCells={};for(const [sheet,path] of Object.entries(pat
 return {layout,model:'Imported Excel',fields,validations,capacity:tableRows('TblK5_Capacity'),table_count:Object.keys(tables).length,name_count:Object.keys(names).length,engineData:{sheets:rawCells,tables,names:namesScoped,order:sheetOrder,conditional}};
 }
 
+let featureTouched = new Set();
 let activeFeatureTable='';
 function xrules(){return window.SPEC_RULES?.[$('model').value]||{labels:{},features:[],sideDrop:[]}}
 // Add missing MR 2C-2BC ITP variants to the in-use source database, including when
@@ -150,6 +151,8 @@ function workbookEngineData(){
    }
   }
  }
+ window.SPEC_V52_FEATURES?.fixDatabase(model,db);
+ window.SPEC_MIRROR_RULES?.fixDatabase(model,db);
  return db;
 }
 function sourceFeatureRows(){
@@ -165,6 +168,15 @@ function sourceFeatureRows(){
    fromSource.push({table:name,cell:'A'+r,code,en:String(src('C'+r)||''),vi:String(src('D'+r)||''),option:String(src('E'+r)||''),suggestion:String(src('F'+r)||''),apply:src('A'+r)});
   }
  }
+ // The supplied MR source rule contains FE-C30, but older generated DB tables
+ // may omit its row. Show this selectable variant without re-numbering source cells.
+ if($('model').value==='MR' && fromSource.length && !fromSource.some(f=>f.code==='FE-C30')){
+  const def=(xrules().features||[]).find(f=>f.code==='FE-C30');
+  if(def){const idx=fromSource.findIndex(f=>f.code==='FE');
+   fromSource.splice(idx>=0?idx+1:0,0,{...def,cell:'FE_C30',virtual:true,apply:0,table:'TblFeature_Emergency'});
+  }
+ }
+ if($('model').value==='MRL') fromSource.push(...(window.SPEC_V52_FEATURES?.virtual('MRL',db)||[]));
  return fromSource.length?fromSource:xrules().features||[];
 }
 const lockedNames=new Set(['K7_DoorType','K17_CarW','K17_CarD','K18_CarJJ']);
@@ -459,15 +471,27 @@ function ensureITPDefault(features){
   if(options.length)changes[cell]=options[0];else delete changes[cell];
  }
 }
+function ensureFreeFeatureDefaults(features){
+ const model=$('model').value,ctl=String(currentValue(model==='MR'?'D21':'D22')||'');
+ const v52=window.SPEC_V52_FEATURES;if(!v52)return;
+ const db=workbookEngineData();
+ for(const f of features){
+  const code=v52.canonical(f.code),status=v52.status(model,code,ctl,db);
+  if(v52.complimentary.has(code)){
+   if(status==='X'){changes[f.cell]='0';featureTouched.delete(f.cell)}
+   else if(status&&status!=='X'&&!featureTouched.has(f.cell))changes[f.cell]='1';
+  }else if(f.virtual&&status==='X'){changes[f.cell]='0';featureTouched.delete(f.cell)}
+ }
+}
 function renderFeatures(){
- const features=sourceFeatureRows();const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();ensureITPDefault(features);
+ const features=sourceFeatureRows();ensureFreeFeatureDefaults(features);const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();ensureITPDefault(features);
  if(!tables.length){main.textContent='Chưa trích xuất được bảng Features / Features unavailable';return}
  if(!tables.includes(activeFeatureTable))activeFeatureTable=tables[0];
  tables.forEach(t=>{let b=document.createElement('button');b.className='btn'+(t===activeFeatureTable?' red':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
-  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='FE'||f.code==='ITP'){if(f.code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();}invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
+  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';if(f.code==='FE-C30'&&chk.checked)changes.A93='0';if(f.code==='FE'&&chk.checked)changes.FE_C30='0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='FE'||f.code==='FE-C30'||f.code==='ITP'){if(f.code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();}invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
   let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line)
  }
 }
@@ -562,6 +586,10 @@ function workbookChoices(field,engine=null){
  if(!field.validation&& !supplementalListSources[field.name])list=technicalOptions(field);
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
+ if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
+   const model=$('model').value;
+   list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'));
+ }
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
 function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
@@ -717,6 +745,7 @@ function row(field,displayName='',compact=false){
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
+   if(field.name==='K5_Capacity' || field.name==='K17_CarW')refreshMirrorWeightHint();
    // A new ceiling model immediately changes its finish choices, instead of
    // falsely flagging the old paint color when switching to SUS-HL.
    if(field.name==='K22_CeilingModel'&&window.SPEC_CEILING_FINISH){
@@ -728,6 +757,7 @@ function row(field,displayName='',compact=false){
    refreshSideDrop();
    refreshLocks();
    refreshDesignHints();
+   refreshMirrorWeightHint();
    if($('model').value==='MRL'){
     refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));
     if(['D13','D17','D31','D16','D84','D23'].includes(field.cell))refreshMRLShaftMinimum();
@@ -743,6 +773,9 @@ function row(field,displayName='',compact=false){
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
+ if(field.name==='K33_Mirror'){
+  const hint=document.createElement('small');hint.className='mirror-weight-hint';hint.dataset.mirrorHint='1';box.append(hint);
+ }
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
   const hint=document.createElement('small');hint.className='fan-guidance';
   hint.textContent='Theo Sales Manual G11L1P: Plasma Quad™ là quạt tuần hoàn tùy chọn riêng (từ 825 kg, còn tùy kích thước cabin), không phải tên khác của quạt thông gió tiêu chuẩn.';
@@ -868,6 +901,16 @@ function fieldRole(field){
  return xrules().labels[field.cell]||field.label||n.replace(/^K\d+_/,'').replaceAll('_',' ');
 }
 function headingText(label){return String(label||'').replace(/\s+/g,' ').trim().replace(/\s*:\s*$/,'');}
+function refreshMirrorWeightHint(){
+ const el=document.querySelector('[data-mirror-hint]');if(!el||!window.SPEC_MIRROR_RULES)return;
+ const m=$('model').value,mr=m==='MR',cap=currentValue('D13');const val=String(currentValue(mr?'D69':'D66')||'');
+ if(mr){const delta=window.SPEC_MIRROR_RULES.adjustment(cap,val);
+  el.textContent=delta===null?(val==='By Local'?'Gương Local: nhập riêng khối lượng vật tư vào khối lượng trang trí. / Local mirror mass must be included in decoration input.':'Chưa có bảng hiệu chỉnh cho cấu hình này. / Mirror weight table not available.'):
+   'Điều chỉnh mức khối lượng trang trí cho phép / Permissible decoration-weight adjustment: '+(delta>=0?'+':'')+delta.toLocaleString('vi-VN')+' kg (AES13-006, Table 11-C).';
+ }else{
+  el.textContent='Điều kiện AA / Width restrictions: YZ-52A/YZ-53A 1000–2200 mm; YZ-55SN 1100–2100 mm. Local: enter actual decoration mass separately.';
+ }
+}
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
@@ -905,6 +948,48 @@ function renderAllSpecRows(){
   }
   sectionRow.append(text,area);sectionRows.append(sectionRow);
  }
+ // Consolidate hall call / indicator fields by floor, rather than by Excel source row.
+ // The original input nodes and their data-cell bindings are MOVED, not cloned.
+ const hallFields = $('model').value==='MRL' ? [
+  {key:'TopFloor',vi:'Tầng trên cùng',en:'Top floor',cells:['E75','E76','E77']},
+  {key:'OtherFloor',vi:'Tầng khác',en:'Other floors',cells:['E81','E82','E83']},
+  {key:'MainFloor',vi:'Tầng chính',en:'Main floor',cells:['E78','E79','E80']}
+ ] : [
+  {key:'OtherFloor',vi:'Tầng khác',en:'Other floors',cells:['E81','E82']},
+  {key:'MainFloor',vi:'Tầng chính',en:'Main floor',cells:['E78','E79','E80']}
+ ];
+ const entranceSection=[...root.querySelectorAll('.spec-section')].find(x=>x.dataset.section==='IV');
+ const landingRows=entranceSection?.querySelector('.section-fields');
+ if(landingRows){
+  const panel=document.createElement('div');panel.className='hall-choice-panel';
+  const title=document.createElement('h3');title.className='hall-choice-title';title.textContent='Bảng gọi tầng và hiển thị / Hall indicators & buttons';panel.append(title);
+  const grid=document.createElement('div');grid.className='hall-floor-grid';
+  for(const group of hallFields){
+   const card=document.createElement('section');card.className='hall-floor-card';card.dataset.floor=group.key;
+   const head=document.createElement('h4');head.className='hall-floor-title';
+   const index=document.createElement('span');index.className='hall-floor-marker';index.textContent=String(grid.children.length+1).padStart(2,'0');
+   head.append(index,document.createTextNode(group.vi+' / '+group.en));card.append(head);
+   const content=document.createElement('div');content.className='hall-floor-options';
+   const labels=['Hiển thị & nút bấm (PIV) / Hall indicators & buttons', 'Nút gọi tầng (HBV) / Hall buttons','Hiển thị tầng (PIH/PID) / Hall position indicators'];
+   for(let i=0;i<group.cells.length;i++){
+    const cell=group.cells[i],input=landingRows.querySelector('[data-cell="'+cell+'"]');
+    if(!input)continue;
+    const wrapper=input.closest('.field'),oldRow=input.closest('.spec-row');
+    if(!wrapper||!oldRow)continue;
+    const item=document.createElement('div');item.className='hall-choice-item';item.dataset.sourceRow=oldRow.dataset.row;
+    const label=document.createElement('label');label.className='hall-choice-label';label.textContent=labels[i];
+    item.append(label,wrapper);content.append(item);oldRow.remove();
+   }
+   if(content.children.length){card.append(content);grid.append(card)}
+  }
+  panel.append(grid);
+  if(grid.children.length){
+   const firstHallRow=landingRows.querySelector('[data-row="'+($('model').value==='MRL'?75:78)+'"]');
+   // Insert before fireproof-door selector to keep entrance design in workbook order.
+   const fireRow=landingRows.querySelector('[data-row="'+($('model').value==='MRL'?84:83)+'"]');
+   landingRows.insertBefore(panel,fireRow||null);
+  }
+ }
  // Build a compact section navigator without changing any workbook inputs or source-cell bindings.
  const nav=$('spec-nav');if(nav){nav.replaceChildren();
   const headings=[...root.querySelectorAll('.spec-section')];
@@ -918,7 +1003,7 @@ function renderAllSpecRows(){
   const features=document.querySelector('.features-panel');if(features){features.id='spec-section-features';const link=document.createElement('a');link.href='#spec-section-features';link.innerHTML='<b>V</b> <span>Tính năng / Features</span>';nav.append(link)}
  }
  $('numfields').textContent=String(rendered);
- const missing=rows.filter(x=>x.row>=10 && /^([IVX]+)\.\s*/.test(String(x.B||''))===false && (byRow.get(x.row)||[]).length && !document.querySelector('[data-row="'+x.row+'"]'));
+ const missing=rows.filter(x=>x.row>=10 && /^([IVX]+)\.\s*/.test(String(x.B||''))===false && (byRow.get(x.row)||[]).length && !document.querySelector('[data-row="'+x.row+'"]') && !document.querySelector('.hall-choice-item[data-source-row="'+x.row+'"]'));
  if(missing.length)status('Thiếu trường trong giao diện: '+missing.map(x=>x.row).join(', '),'error');
 }
 function invalidateCheck(){
@@ -926,7 +1011,7 @@ function invalidateCheck(){
  const top=$('check-top');if(top){top.className='check-top partial';top.textContent='Đã thay đổi — cần kiểm tra lại';}
  const issues=$('check-issues');if(issues)issues.replaceChildren();
 }
-function load(){window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1006,6 +1091,10 @@ function check(){
  const engineData=workbookEngineData();
  const result=window.SPEC_SOURCE_CHECK?.(model,changes,engineData);
  if(!result)throw Error('Source Check Engine chưa được tải / Calculation engine not loaded');
+ if(window.SPEC_MIRROR_RULES){
+  const mr=model==='MR',val=currentValue(mr?'D69':'D66'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue(mr?'D29':'D28'),val);
+  if(!check.ok){result.errors.push({id:'Mirror!Eligibility',cell:mr?'D69':'D66',message:check.message});result.status='FAIL';}
+ }
  renderSourceCheck(result);
  window.__lastCheck=result;
  status(result.status==='PASS'?'PASS — Đạt':result.status==='FAIL'?`FAIL — ${result.errors.length} lỗi`:'CHƯA XÁC MINH',result.status==='FAIL'?'error':'');
