@@ -21,7 +21,13 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D23';
    if(row===525)return 'D14';if(row===526)return 'D62';
    if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
-   if(row===514)return 'D35';if(row===515)return 'D18';if(row===516)return 'D41';if(row===517||row===518)return 'D13';
+   if(row===514)return 'D35';if(row===515)return 'D18';if(row===516||row===517||row===518)return 'D41';
+   // COP failures are NOT rated-load errors: map them to the user-editable COP inputs.
+   if(row===502||row===503||row===505)return 'D59';
+   if(row===509)return 'D60'; // COP at Front vs remaining return-panel width
+   if(row===510)return 'D61'; // COP code
+   if(row===526)return 'D62'; // Accessible/wheelchair COP
+   if(row===512||row===527)return ''; // aggregated result: no invented Capacity error
   }else{
    // MR: attribute the failed option to its own field, not the general rated capacity.
    const mapped={487:featureByCode['sde - both sides']||'A117',488:featureByCode['sde - one side']||'A116',489:featureByCode['sde - both sides']||'A117',
@@ -64,7 +70,8 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(tracked)conditionCount.fail++;
    // D512 is only AND(D482:D511). Every child rule is already checked above.
    // Do not create a misleading "Group Control"/Capacity error from this aggregate.
-   if(model==='MR'&&sheet==='DataTable'&&addr==='D512'){
+   if(sheet==='DataTable'&&((model==='MR'&&addr==='D512')||
+       (model==='MRL'&&(addr==='D512'||addr==='D527')))){
     details.push({ref:reference,state:'FAIL',message:'Aggregate failed; see individual option failures',cell:''});
     return false;
    }
@@ -198,9 +205,19 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   for(const a of ['B209','B210','B206']){
    const r=value('SpecForm',a);if(!r.ok)unverified.push(`SpecForm!${a} — `+r.error);
    else{verified.push('SpecForm!'+a);details.push({ref:'SpecForm!'+a,state:'CALCULATED',value:r.value});
-    if(a==='B209'&&typeof r.value==='string'&&r.value.startsWith('Err -'))issue('SpecForm!B209',guessB209Cell(r.value),r.value,db.sheets.SpecForm.B209?.f||'');
-    if(a==='B210'&&(typeof r.value!=='number'||r.value!==0))issue('SpecForm!B210','D13',`B210 = ${r.value}: Có điều kiện FALSE / One or more false conditions`);
-    if(a==='B206'&&r.value!=='NO MISTAKE')issue('SpecForm!B206','D13',`Check Spec = ${r.value} (không đạt / not approved)`);
+    if(a==='B209'&&typeof r.value==='string'&&r.value.startsWith('Err -')){
+     const match=/DataTable!D(\d{3})/.exec(r.value);
+     const existing=match&&issues.some(x=>x.id==='DataTable!D'+match[1]);
+     if(!existing){
+      const target=match?cellForCondition(Number(match[1])):guessB209Cell(r.value);
+      if(target)issue('SpecForm!B209',target,r.value,db.sheets.SpecForm.B209?.f||'');
+      else warnings.push('SpecForm!B209: '+r.value);
+     }
+    }
+    if(a==='B210'&&(typeof r.value!=='number'||r.value!==0)&&!issues.length)
+     issue('SpecForm!B210','',`B210 = ${r.value}: có điều kiện FALSE chưa xác định được ô / Unattributed workbook failure`);
+    if(a==='B206'&&r.value!=='NO MISTAKE'&&!issues.length)
+     issue('SpecForm!B206','',`Check Spec = ${r.value}; cần kiểm tra công thức nguồn / Review source formulas`);
    }
   }
  }
@@ -272,6 +289,28 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    }
   }
  }
+ // MRL COP: check each input independently using the source workbook's own
+ // DataTable choice ranges. Do not treat a wrong fixture as invalid rated capacity.
+ if(model==='MRL'){
+  const sh=db.sheets?.DataTable||{};
+  const btn=value('SpecForm','D59'),pos=value('SpecForm','D60'),code=value('SpecForm','D61');
+  if(btn.ok){
+   const allowed=['CBV1','CBV2','CBV3','CBV4','CBV5','CBV6'];
+   if(!allowed.includes(String(btn.value)))issue('COP!Button','D59','Nút bấm COP không thuộc danh sách cho phép / Invalid COP button type');
+  }else unverified.push('SpecForm!D59 — '+btn.error);
+  if(pos.ok&&code.ok){
+   const position=String(pos.value),column=position==='Front'?'A':position==='Side'?'B':null;
+   if(!column)issue('COP!Location','D60','Vị trí COP không được hỗ trợ / Invalid COP location');
+   else {
+    const supported=new Set();
+    for(let r=700;r<=730;r++){
+     const item=String(sh[column+r]??'').trim();if(item)supported.add(item);
+    }
+    if(!supported.has(String(code.value)))issue('COP!Code','D61','Mã COP không phù hợp vị trí '+position+' / COP code not available for selected location');
+    else verified.push('SpecForm!D61 — COP code/location (TblK31_COP)');
+   }
+  }else unverified.push('SpecForm!D60/D61 — '+(pos.error||code.error));
+ }
  // CWT-specific AH/BH source is authoritative, including 14 corrected original dimensions.
  if(model==='MRL'){
   if(db.__cwtDatasetMismatch)unverified.push('CWT: loaded custom workbook does not match Version02 156-row source');
@@ -326,5 +365,5 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  const unique=[];const seen=new Set();for(const issueItem of issues){const key=issueItem.id+'|'+issueItem.message;if(!seen.has(key)){unique.push(issueItem);seen.add(key)}}
  const status=unique.length?'FAIL':unverified.length?'INCOMPLETE':'PASS';
  return {status,pass:status==='PASS',errors:unique,warnings,dotLedFloorNames:floorLedNames,verified:[...new Set(verified)],unverified:[...new Set(unverified)],details,conditions:conditionCount,source:'Excel DataTable & SpecForm + legacy C# Step1 checks',excelConditionsPass:conditionCount.fail===0&&conditionCount.unknown===0,legacyVerified:!!legacy,legacyGaps:legacy?.unverified||[],calls:eng.callCount};
- function guessB209Cell(message){if(/SDE|door edge/i.test(message))return featureByCode['sde - one side']||'D46';if(/SUS304/.test(message))return 'D46';if(/OH\/PD|Pit /i.test(message))return 'D37';if(/SETS-L/.test(message))return featureByCode['sets-l']||'D17';if(/Observation/.test(message))return 'D14';if(/Additional inputs/.test(message))return 'D23';return 'D13';}
+ function guessB209Cell(message){if(/SDE|door edge/i.test(message))return featureByCode['sde - one side']||'D46';if(/SUS304/.test(message))return 'D46';if(/OH\/PD|Pit /i.test(message))return 'D37';if(/SETS-L/.test(message))return featureByCode['sets-l']||'D17';if(/Observation/.test(message))return 'D14';if(/Additional inputs/.test(message))return 'D23';if(/COP/i.test(message))return 'D60';return '';}
 };

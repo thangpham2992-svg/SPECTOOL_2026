@@ -305,15 +305,28 @@ function capacityKg(){
 function eligibleJJ(){
  if($('model').value!=='MRL')return [];
  const cap=selectedCapacity(),db=workbookEngineData();if(!cap.EleCapacityName)return [];
- const list=[];const add=v=>{const n=Number(v);if(Number.isFinite(n)&&n>0)list.push(n)};
- add(cap.JJ); // Default JJ comes from the capacity table.
- // Extra choices are maintained in the Excel DataTable (CA1080:CB1100), not hardcoded.
+ const base=Number(cap.JJ),out=[];
+ if(Number.isFinite(base)&&base>0)out.push(String(base));
+ // User's Version02 car-size table: additional JJ values in DataTable CA:CC.
+ // Do not put '(Option)' in the Excel input: the cell must remain numeric.
  const sh=db?.sheets?.DataTable||{};
  for(let r=1081;r<=1100;r++){
-  const entry=sh['CA'+r],choice=sh['CB'+r];
-  if(String(entry??'')===String(cap.EleCapacityName))add(choice);
+  if(String(sh['CA'+r]??'')!==String(cap.EleCapacityName))continue;
+  const value=Number(sh['CB'+r]);
+  if(Number.isFinite(value)&&value>0&&!out.includes(String(value)))out.push(String(value));
  }
- return [...new Set(list)].sort((a,b)=>a-b).map(String);
+ return out;
+}
+function jjOptionText(value){
+ if($('model').value!=='MRL')return String(value);
+ const cap=selectedCapacity(),db=workbookEngineData(),sh=db?.sheets?.DataTable||{};
+ const mm=String(value);
+ if(mm===String(cap.JJ))return mm;
+ for(let r=1081;r<=1100;r++){
+  if(String(sh['CA'+r]??'')===String(cap.EleCapacityName)&&String(sh['CB'+r])===mm)
+   return mm+(String(sh['CC'+r]||'').trim().toLowerCase()==='option'?' (Option)':(String(sh['CC'+r]||'').includes('Note 1')?' (Option - Note 1)':''));
+ }
+ return mm;
 }
 function eligibleSideDrops(){
  const db=workbookEngineData();const source=db?.sheets?.DataTable;let vals=($('model').value==='MRL'&&source)?[921,922,923,924].map(r=>source['C'+r]).filter(v=>typeof v==='string'&&v.trim()):[];if(!vals.length)vals=(xrules().sideDrop||[]).filter(Boolean);
@@ -547,9 +560,11 @@ function syncDropdownOptions(){
    if(!opts.length)opts=technicalOptions(f);
   }
   const before=[...el.options].map(o=>o.value);
-  if(before.length===opts.length&&before.every((v,i)=>v===opts[i]))continue;
+  const isJJ=$('model').value==='MRL'&&f.name==='K18_CarJJ';
+  if(before.length===opts.length&&before.every((v,i)=>v===opts[i]) &&
+     (!isJJ||[...el.options].every((op,i)=>op.textContent===jjOptionText(opts[i]))))continue;
   el.replaceChildren();
-  for(const v of opts){const op=document.createElement('option');op.value=v;op.textContent=v;el.append(op)}
+  for(const v of opts){const op=document.createElement('option');op.value=v;op.textContent=isJJ?jjOptionText(v):v;el.append(op)}
   if(!opts.length){
    const op=document.createElement('option');op.value='';op.textContent='Không áp dụng';el.append(op);
    if(old&&Object.prototype.hasOwnProperty.call(changes,f.cell))changes[f.cell]='';
@@ -762,7 +777,7 @@ function capacityUpdate(capacity){
  // Mirrors mapped parameters from the base prototype, not yet a complete C# rule port.
  const fireField=current.fields.find(f=>f.name==='K36_FireproofDoor');
  const fireValue=String(fireField?currentValue(fireField.cell):'Not supplied');
- const fireProvided=fireValue!=='Not supplied';
+ const fireProvided=fireValue!=='Not supplied'&&fireValue!=='GHCL E30'&&fireValue!=='';
  const map={K7_DoorType:'DoorType',K17_CarW:'AA',K17_CarD:'BB',K18_CarJJ:'JJ',K19_CarAH:fireProvided?'AH-CWT1-FIRE':'AH-CWT1',K19_CarBH:fireProvided?'BH-CWT1-FIRE':'BH-CWT1',K20_CarAM:'AM',K20_CarBM:'BM',K21_CarOH:'OH',K21_CarPD:'PD'};
  for(let [fieldName,tableCol] of Object.entries(map)){
   const f=current.fields.find(f=>f.name===fieldName);if(!f||row[tableCol]===''||row[tableCol]===undefined)continue;
@@ -1129,6 +1144,8 @@ async function applyWorkbook(model,name,bytes,quiet=false){
   const raw=parsed.engineData?.sheets?.SpecForm?.[x.cell];
   parsed.fields.push({...x,value:raw&&typeof raw==='object'?(raw.v??x.value):(raw??x.value)});
  }
+ const fire=parsed.fields.find(f=>f.name==='K36_FireproofDoor');
+ if(fire){fire.options=['Not supplied','GHCL E30','EN81-58(II)'];fire.validation='"Not supplied,GHCL E30,EN81-58(II)"';}
  parsed.fields.sort((a,b)=>split(a.cell)[1]-split(b.cell)[1]);
  // Apply the versioned CWT source table and ceiling-finish checks to imported old databases.
  window.SPEC_CWT_ENGINE?.applyDataset(parsed.engineData,model);
