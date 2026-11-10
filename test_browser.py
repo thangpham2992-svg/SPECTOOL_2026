@@ -1,0 +1,37 @@
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+ browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage','--allow-file-access-from-files'])
+ page=browser.new_page(viewport={'width':1365,'height':850})
+ errors=[]
+ page.on('pageerror',lambda e: errors.append(str(e)))
+ page.on('console',lambda m: errors.append('console '+m.text) if m.type=='error' else None)
+ page.goto('file:///mnt/data/specweb_v46/index.html',wait_until='domcontentloaded',timeout=30000)
+ page.wait_for_timeout(500)
+ print('TITLE',page.title(),'NAME',page.locator('#model').input_value())
+ print('START ERROR',errors[:5]);print('MR CEILING',page.locator('[data-cell="D45"]').count(),'MR FINISH',page.locator('[data-cell="D46"]').count())
+ # MR L210S should automatically select SUS-HL.
+ page.select_option('[data-cell="D45"]','L210S')
+ print('MR L210S finish',page.locator('[data-cell="D46"]').input_value(),'opts',page.locator('[data-cell="D46"] option').all_text_contents())
+ page.locator('#check').click();page.wait_for_timeout(300)
+ print('MR errors',page.locator('.check-error-row').all_text_contents()[:8], 'top',page.locator('#check-top').inner_text())
+ # MR COP invalid on wrong location: detect COP rather than Capacity.
+ page.select_option('[data-cell="D64"]','Side')
+ page.locator('#check').click();page.wait_for_timeout(300)
+ print('MR COP error',page.locator('.check-error-row').all_text_contents()[:10])
+ page.select_option('#model','MRL')
+ page.wait_for_timeout(200)
+ print('MRL model',page.locator('#model').input_value(),'MRL finish',page.locator('[data-cell="D42"]').input_value())
+ page.select_option('[data-cell="D41"]','DL6-C')
+ print('MRL DL6 finish',page.locator('[data-cell="D42"]').input_value(),'options',page.locator('[data-cell="D42"] option').all_text_contents())
+ page.select_option('[data-cell="D41"]','CL2-C')
+ print('MRL CL2 list',page.locator('[data-cell="D42"] option').all_text_contents())
+ page.select_option('[data-cell="D31"]','800')
+ # keep default P08, test 620E
+ side=page.locator('[data-cell="D23"]');print('MRL cwt original',side.input_value(),'options',side.locator('option').all_text_contents())
+ alt=[v for v in side.locator('option').evaluate_all('(ops)=>ops.map(x=>x.value)') if '620E' in v];print('alt options',alt)
+ if alt:page.select_option('[data-cell="D23"]',alt[0]);page.wait_for_timeout(100)
+ print('MRL min hints',page.locator('.cwt-minimum-hint').all_text_contents())
+ page.locator('#check').click();page.wait_for_timeout(400)
+ print('MRL errors',page.locator('.check-error-row').all_text_contents()[:10],'top',page.locator('#check-top').inner_text())
+ print('JS ERROR',errors[:20])
+ browser.close()

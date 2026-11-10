@@ -23,19 +23,21 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
    if(row===514)return 'D35';if(row===515)return 'D18';if(row===516)return 'D41';if(row===517||row===518)return 'D13';
   }else{
-   // MR: DSJ1/SDE failures belong to the selected SDE feature, not Capacity.
-   if(row===487)return featureByCode['sde - both sides']||'A117';
-   if(row===488)return featureByCode['sde - one side']||'A116';
-   if(row===489)return featureByCode['sde - both sides']||'A117';
-   if(row===513)return 'D45';if(row===514||row===515||row===516)return 'D31';
-   if(row===517)return 'D39';if(row===518)return 'D15';
+   // MR: attribute the failed option to its own field, not the general rated capacity.
+   const mapped={487:featureByCode['sde - both sides']||'A117',488:featureByCode['sde - one side']||'A116',489:featureByCode['sde - both sides']||'A117',
+    493:featureByCode['ns-cb']||'D65',494:featureByCode['nscr-c']||'D65',496:featureByCode['scs-b']||'D65',
+    503:'D78',504:'D78',505:'D65',506:'D78',507:'D78',508:'D71',509:'D46',510:'D64',511:'D65'};
+   if(mapped[row])return mapped[row];
   }
+  // Feature conditions refer to SpecForm G-row Apply columns or VLOOKUP feature names.
   for(const col of ['E','F','G','H','I']){
    const f=db.sheets.DataTable[col+row];if(!f||typeof f!=='object'||!f.f)continue;
+   const byRow=/SpecForm!\$?G\$?(\d+)/.exec(f.f);
+   if(model==='MR'&&byRow){const rowNumber=Number(byRow[1]);if(rowNumber>=80&&rowNumber<=180)return 'A'+rowNumber;}
    const m=Array.from(f.f.matchAll(/VLOOKUP\("([^"]+)"/g));
    for(const z of m){const code=String(z[1]).toLowerCase();if(featureByCode[code])return featureByCode[code];}
   }
-  return 'D13';
+  return model==='MR'?'D21':'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
  // All displayed dimension limits are calculated by the workbook's current formulas.
@@ -60,6 +62,12 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(typeof x.value!=='boolean'){if(tracked)conditionCount.unknown++;unverified.push(reference+' — expected TRUE/FALSE; got '+JSON.stringify(x.value));details.push({ref:reference,state:'UNKNOWN',message:'Not Boolean',cell:addr});return null;}
    if(x.value){if(tracked)conditionCount.pass++;verified.push(reference);details.push({ref:reference,state:'PASS'});return true;}
    if(tracked)conditionCount.fail++;
+   // D512 is only AND(D482:D511). Every child rule is already checked above.
+   // Do not create a misleading "Group Control"/Capacity error from this aggregate.
+   if(model==='MR'&&sheet==='DataTable'&&addr==='D512'){
+    details.push({ref:reference,state:'FAIL',message:'Aggregate failed; see individual option failures',cell:''});
+    return false;
+   }
    let row=Number(/\d+$/.exec(addr)[0]);let source=base(db.sheets.DataTable['C'+row]);let msg=source||`Rule ${reference} returned FALSE`;
    // These AP helpers validate door/weight inputs. Their row numbers are NOT
    // Capacity rules (AP2 means car-door applicability, AP5 decoration weight).
@@ -129,12 +137,13 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   }
   const result=value('DataTable','D512');
   const b207=value('SpecForm','B207');if(!b207.ok)unverified.push('SpecForm!B207: '+b207.error);
-  else if(typeof b207.value==='string'&&/^Err\s*-/i.test(b207.value)){issue('SpecForm!B207','D50',b207.value);}
+  // B207 is a concatenated summary; AP16:AP27 below identify the individual cause.
+  else if(typeof b207.value==='string'&&/^Err\s*-/i.test(b207.value))warnings.push('SpecForm!B207: '+b207.value);
   // MR uses TblSpecFailure (B206:B208), not MRL's B209/B210/B206 flow.
   const b208=value('SpecForm','B208');
   if(!b208.ok||typeof b208.value!=='number')unverified.push('SpecForm!B208 — Failed to recalculate TblSpecFailure count: '+(b208.error||'non-numeric value'));
   else {verified.push('SpecForm!B208');details.push({ref:'SpecForm!B208',state:b208.value===0?'PASS':'FAIL',value:b208.value});
-   if(b208.value>0)issue('SpecForm!B208','B207',`B208 = ${b208.value}: Có lỗi trong TblSpecFailure / Original workbook failure counter is not zero`);
+   if(b208.value>0 && !issues.some(x=>x.id.startsWith('DataTable!AP')||x.id.startsWith('DataTable!D')))unverified.push('SpecForm!B208: nguồn báo có lỗi nhưng chưa xác định được trường gây lỗi ('+b208.value+')');
   }
   // MR November workbook: OH/PD, special ceiling and SDE are evaluated in
   // DataTable!AP16:AP27, using B529/E521 (short/standard OH) and E524/E523
@@ -227,6 +236,21 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    else verified.push('SpecForm!'+itpInput+' — ITP/Operation/FE');
   }
  }
+ // Handrail checks use the source model and location tables, not Capacity.
+ // This also rejects image-reference-only styles that are not yet authorized in Excel.
+ for(const [tab,field] of [['TblK32_Handrail',model==='MR'?'D67':'D64'],['TblK32_HandrailLocation',model==='MR'?'D68':'D65']]){
+  const t=db.tables?.[tab],ref=/^([A-Z]+)(\d+):[A-Z]+(\d+)$/.exec(t?.ref||'');
+  if(!t||!ref||t.sheet!=='DataTable') {unverified.push(tab+' — source list unavailable');continue;}
+  const selected=value('SpecForm',field);
+  if(!selected.ok){unverified.push('SpecForm!'+field+' — '+selected.error);continue;}
+  const names=[];
+  for(let r=Number(ref[2])+1;r<=Number(ref[3]);r++){
+   const name=String(db.sheets.DataTable[ref[1]+r]??'').trim();if(name)names.push(name);
+  }
+  if(!names.includes(String(selected.value??'').trim()))issue('Source!'+tab,field,
+   tab==='TblK32_Handrail'?'Mã tay vịn chưa được cho phép trong Excel nguồn.':'Vị trí tay vịn không hợp lệ trong Excel nguồn.');
+  else verified.push('SpecForm!'+field+' — '+tab);
+ }
  // MRL JJ: the configured width is selectable, but only among supported values.
  // Other capacities use the default width declared in TblK5_Capacity.
  if(model==='MRL'){
@@ -247,6 +271,12 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
     }
    }
   }
+ }
+ // CWT-specific AH/BH source is authoritative, including 14 corrected original dimensions.
+ if(model==='MRL'){
+  if(db.__cwtDatasetMismatch)unverified.push('CWT: loaded custom workbook does not match Version02 156-row source');
+  else if(window.SPEC_CWT_ENGINE)window.SPEC_CWT_ENGINE.check(eng,issue,unverified,verified);
+  else unverified.push('CWT: required source data unavailable');
  }
  // Additional non-formula CheckSpecStep1 checks recovered from the legacy C# source.
  // The original hatch-pattern UI state cannot be reconstructed from formula values alone,

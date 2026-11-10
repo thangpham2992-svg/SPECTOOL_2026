@@ -406,7 +406,7 @@ function setupSpecialOptions(){
   const sel=document.createElement('select');sel.dataset.cell='D23';
   side.replaceWith(sel);if(f)f.options=eligibleSideDrops();
   refreshSideDrop();
-  sel.addEventListener('change',()=>{changes.D23=sel.value;sel.classList.add('dirty');invalidateCheck();status('Đã cập nhật Side drop / Side drop updated')});
+  sel.addEventListener('change',()=>{changes.D23=sel.value;sel.classList.add('dirty');refreshMRLShaftMinimum();invalidateCheck();status('Đã cập nhật loại đối trọng; AH/BH tối thiểu được tra lại theo CWT.')});
  }
  const obsField=current.fields.find(f=>/Observation/i.test(f.name));const obs=obsField?activeInput(obsField.cell):null;if(obs && obs.tagName!=='SELECT' && $('model').value==='MR'){
   const f=obsField;const values=['No','NY-40A','NY-40B','NY-40C','NY-40D','NY-40E'];let s=document.createElement('select');s.dataset.cell=obsField.cell;for(let v of values){let o=document.createElement('option');o.value=v;o.textContent=v;s.append(o)}s.value=String(obs.value||'No');s.addEventListener('change',()=>{changes[obsField.cell]=s.value;invalidateCheck()});obs.replaceWith(s);if(f)f.options=values;
@@ -499,6 +499,10 @@ const supplementalListSources={
  K36_DoorFinishOtherFloorMaterial:['TblK36_EntranceDoorFinish','Finish']
 };
 function workbookChoices(field,engine=null){
+ if(field.name==='K22_CeilingColor'&&window.SPEC_CEILING_FINISH){
+  const model=$('model').value,ceiling=String(currentValue(model==='MR'?'D45':'D41'));
+  return window.SPEC_CEILING_FINISH.options(model,ceiling);
+ }
  const workbook=workbookEngineData();
  let list=[];
  if(field.validation&&workbook&&window.SpecExcelSourceEngine){
@@ -561,6 +565,107 @@ function syncDropdownOptions(){
  }
 }
 
+// Mitsubishi design guide — visual reference beside the existing source-compatible dropdowns.
+// The picture catalogue is deliberately separate from workbook authorization: a reference
+// illustration must never make an unsupported Excel option pass Check Spec.
+function designKindFor(field){
+ if(field.name==='K22_CeilingModel')return 'ceiling';
+ // Keep the original ceiling-color dropdown, but do not show a duplicated image/description panel here.
+ if(field.name==='K32_Handrail')return 'handrail';
+ if(field.name==='K33_Mirror')return 'mirror';
+ return '';
+}
+function guideEntries(kind){return window.SPEC_DESIGN_GUIDE?.[$('model').value]?.[kind==='ceilingColor'?'ceiling':kind]||[]}
+function selectedGuideItem(kind){
+ const items=guideEntries(kind);let raw='';
+ if(kind==='ceiling'||kind==='ceilingColor')raw=String(currentValue($('model').value==='MR'?'D45':'D41'));
+ else raw=String(currentValue($('model').value==='MR'?(kind==='handrail'?'D67':'D69'):(kind==='handrail'?'D64':'D66')));
+ return [...items].sort((a,b)=>b.code.length-a.code.length).find(x=>raw.toUpperCase().startsWith(x.code.toUpperCase()))||null;
+}
+function designSummaryFor(kind){
+ const item=selectedGuideItem(kind);
+ if(kind==='ceilingColor'){
+  if(!item)return 'Chọn mẫu trần để xem màu sắc và vật liệu phù hợp.';
+  return item.code+' · '+($('model').value==='MR'?'Màu trần theo SpecForm · xem vật liệu tham khảo':item.code==='DL6'?'Chỉ Stainless-steel / Laminated steel sheet (không Painted). Excel gốc chưa đủ mã vật liệu.':'Xem ảnh và các vật liệu / See material options');
+ }
+ if(!item)return 'Xem bảng mẫu tham khảo & mô tả thiết kế';
+ return item.code+' · '+item.subtitle;
+}
+function refreshDesignHints(){
+ for(const wrap of document.querySelectorAll('.design-inline[data-design-kind]')){
+  const kind=wrap.dataset.designKind, item=selectedGuideItem(kind),img=wrap.querySelector('img'),hint=wrap.querySelector('.design-hint');
+  if(img){
+   if(item?.images?.[0]){img.src=item.images[0];img.alt=item.title;img.hidden=false;}
+   else {img.removeAttribute('src');img.hidden=true;}
+  }
+  if(hint){hint.textContent=designSummaryFor(kind);hint.classList.toggle('warn',kind==='ceilingColor'&&item?.code==='DL6');}
+ }
+}
+function renderDesignInline(box,kind){
+ if(!guideEntries(kind).length)return;
+ const holder=document.createElement('div');holder.className='design-inline';holder.dataset.designKind=kind;
+ const img=document.createElement('img');img.className='design-thumb';img.alt='Ảnh mẫu';
+ const note=document.createElement('span');note.className='design-hint';
+ const button=document.createElement('button');button.className='btn design-inline-btn';button.type='button';button.textContent='Xem hình & mô tả';
+ button.onclick=()=>openDesignGuide(kind);
+ holder.append(img,note,button);box.append(holder);
+ const item=selectedGuideItem(kind);if(item?.images?.[0]){img.src=item.images[0];img.alt=item.title}else img.hidden=true;
+ note.textContent=designSummaryFor(kind);
+}
+function guideSelectableValue(kind,code){
+ if(kind==='ceilingColor')return '';
+ const cell=kind==='ceiling'?($('model').value==='MR'?'D45':'D41'):$('model').value==='MR'?(kind==='handrail'?'D67':'D69'):(kind==='handrail'?'D64':'D66');
+ const input=activeInput(cell);if(!input||input.tagName!=='SELECT')return '';
+ const values=[...input.options].filter(op=>!op.dataset.invalid).map(op=>op.value);
+ if(kind==='ceiling'){
+  if($('model').value==='MR')return values.find(v=>String(v).toUpperCase()===code.toUpperCase())||'';
+  const raw=String(currentValue('D41'));
+  const currentLight=raw.endsWith('-W')?'-W':'-C';
+  return [code+currentLight,code+'-C',code+'-W',code].find(v=>values.includes(v))||'';
+ }
+ return values.find(v=>v.toUpperCase().startsWith(code.toUpperCase()))||'';
+}
+function openDesignGuide(kind){
+ const modal=$('design-popup'),items=guideEntries(kind);if(!modal||!items.length)return;
+ const label={ceiling:'Trần phòng thang / Car ceiling',ceilingColor:'Màu sắc & vật liệu trần / Ceiling finishes',handrail:'Tay vịn / Handrail',mirror:'Gương / Mirror'};
+ $('design-title').textContent=label[kind]+' · '+($('model').value==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02');
+ $('design-subtitle').textContent=kind==='ceilingColor'?'Vật liệu theo hình catalogue. Các màu bổ sung chỉ áp dụng khi có dữ liệu SpecTool tương ứng.':'Chọn mẫu bằng ảnh. Các mẫu chưa có trong Excel source được hiển thị để tham khảo.';
+ const root=$('design-cards');root.replaceChildren();
+ const selected=selectedGuideItem(kind)?.code;
+ for(const item of items){
+  const card=document.createElement('article');card.className='design-card';if(item.code===selected)card.classList.add('is-current');
+  const images=document.createElement('div');images.className='design-card-images'+(item.images.length>1?' double':'');
+  for(let i=0;i<item.images.length;i++){
+   const pic=document.createElement('img');pic.loading='lazy';pic.src=item.images[i];pic.alt=item.title+(item.images.length>1?(i===0?' — cool white':' — warm white'):'');images.append(pic);
+  }
+  const body=document.createElement('div');body.className='design-card-text';
+  const name=document.createElement('div');name.className='design-card-name';const strong=document.createElement('strong');strong.textContent=item.title;name.append(strong);
+  if(item.code===selected){const tag=document.createElement('span');tag.className='design-current';tag.textContent='Đang chọn';name.append(tag)}
+  const sub=document.createElement('div');sub.className='design-card-sub';sub.textContent=item.subtitle;
+  const desc=document.createElement('div');desc.className='design-card-desc';desc.textContent=item.desc;
+  body.append(name,sub,desc);
+  if(item.warning){const warning=document.createElement('div');warning.className='design-card-warning';warning.textContent=item.warning;body.append(warning)}
+  const foot=document.createElement('div');foot.className='design-card-footer';
+  const allowed=guideSelectableValue(kind,item.code);
+  if(allowed){const button=document.createElement('button');button.type='button';button.className='btn btn-small btn-secondary design-apply';button.textContent='Áp dụng vào Spec';
+   button.onclick=()=>{
+    const cell=kind==='ceiling'?($('model').value==='MR'?'D45':'D41'):$('model').value==='MR'?(kind==='handrail'?'D67':'D69'):(kind==='handrail'?'D64':'D66');
+    const input=activeInput(cell);if(!input)return;input.value=allowed;input.dispatchEvent(new Event('change',{bubbles:true}));closeDesignGuide();
+   };foot.append(button);
+  }else if(kind!=='ceilingColor'){
+   const note=document.createElement('span');note.className='design-unavailable';note.textContent='Mẫu tham khảo · chưa có trong dropdown Excel hiện tại';foot.append(note);
+  }else{
+   const note=document.createElement('span');note.className='design-unavailable';note.textContent='Vật liệu tham khảo từ hình catalogue';foot.append(note);
+  }
+  card.append(images,body,foot);root.append(card);
+ }
+ modal.classList.add('show');modal.setAttribute('aria-hidden','false');$('design-close')?.focus();
+}
+function closeDesignGuide(){const modal=$('design-popup');if(!modal)return;modal.classList.remove('show');modal.setAttribute('aria-hidden','true')}
+$('design-close')?.addEventListener('click',closeDesignGuide);
+$('design-popup')?.addEventListener('click',event=>{if(event.target===$('design-popup'))closeDesignGuide()});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('design-popup')?.classList.contains('show'))closeDesignGuide()});
+
 function row(field,displayName='',compact=false){
  const box=document.createElement('div');box.className='field';
  box.dataset.sourceCell=field.cell;
@@ -578,10 +683,21 @@ function row(field,displayName='',compact=false){
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
+   // A new ceiling model immediately changes its finish choices, instead of
+   // falsely flagging the old paint color when switching to SUS-HL.
+   if(field.name==='K22_CeilingModel'&&window.SPEC_CEILING_FINISH){
+    const model=$('model').value,fin=current.fields.find(x=>x.name==='K22_CeilingColor');
+    if(fin){const chosen=window.SPEC_CEILING_FINISH.next(model,input.value,currentValue(fin.cell));
+     if(String(currentValue(fin.cell))!==chosen)applyValue(fin.cell,chosen);}
+   }
    syncDropdownOptions();
    refreshSideDrop();
    refreshLocks();
-   if($('model').value==='MRL'){refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));}
+   refreshDesignHints();
+   if($('model').value==='MRL'){
+    refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));
+    if(['D13','D17','D31','D16','D84','D23'].includes(field.cell))refreshMRLShaftMinimum();
+   }
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
@@ -592,12 +708,35 @@ function row(field,displayName='',compact=false){
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
+ const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
   const hint=document.createElement('small');hint.className='fan-guidance';
   hint.textContent='Theo Sales Manual G11L1P: Plasma Quad™ là quạt tuần hoàn tùy chọn riêng (từ 825 kg, còn tùy kích thước cabin), không phải tên khác của quạt thông gió tiêu chuẩn.';
   box.append(hint);
  }
  return box;
+}
+// Additional MRL shaft minima from the user's 156-row, four-CWT V02 source.
+// These are displayed without overwriting a manually entered shaft size.
+function refreshMRLShaftMinimum(){
+ if($('model').value!=='MRL'||!window.SPEC_CWT_ENGINE||!window.SpecExcelSourceEngine)return;
+ const db=workbookEngineData();if(!db)return;
+ const calc=new window.SpecExcelSourceEngine.SourceEngine(db,changes);
+ const res=window.SPEC_CWT_ENGINE.lookupEngine(calc);
+ for(const [key,cell] of [['AH','D33'],['BH','D34']]){
+  const input=activeInput(cell);if(!input)continue;
+  const field=input.closest('.field');if(!field)continue;
+  let hint=field.querySelector('.cwt-minimum-hint');
+  if(!hint){hint=document.createElement('small');hint.className='cwt-minimum-hint';field.append(hint);}
+  if(res.ok){
+   hint.textContent=key+' tối thiểu: '+Number(res[key]).toLocaleString('vi-VN')+' mm · '+res.cwt;
+   const val=Number(currentValue(cell));const wrong=!Number.isFinite(val)||val<Number(res[key]);
+   hint.classList.toggle('cwt-minimum-error',wrong);input.classList.toggle('cwt-below-minimum',wrong);
+  }else{
+   hint.textContent=res.reason==='cwt'?'Đối trọng chưa có dữ liệu AH/BH cho tổ hợp này.':'CHECK LAYOUT: chưa có tổ hợp AH/BH phù hợp.';
+   hint.classList.add('cwt-minimum-error');input.classList.remove('cwt-below-minimum');
+  }
+ }
 }
 // MRL OH/PD source-of-truth: normalized DataTable!DA5:DL164.
 // Minima come from the same SpecForm F36/F37 formulas as exported workbook.
@@ -753,7 +892,7 @@ function invalidateCheck(){
  const top=$('check-top');if(top){top.className='check-top partial';top.textContent='Đã thay đổi — cần kiểm tra lại';}
  const issues=$('check-issues');if(issues)issues.replaceChildren();
 }
-function load(){window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshMRLOverheadMinimum(false);renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function load(){window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -867,7 +1006,10 @@ function renderSourceCheck(result){
   if(dimensionDetails&&x.id==='SpecForm!B209'&&/OH\/PD|DataTable!D522|AH\/BH/i.test(x.message))return false;
   return true;
  });
- const issues=filtered.length?filtered:result.errors;
+ const issues=[...(filtered.length?filtered:result.errors)].sort((a,b)=>{
+  const num=error=>{const cell=String(error.cell||'');const m=/\d+/.exec(cell);return m?Number(m[0]):9999;};
+  return num(a)-num(b);
+ });
  const fields=new Map(),features=sourceFeatureRows();
  const sizeLabel={D33:'Chiều rộng hố thang (AH)',D34:'Chiều sâu hố thang (BH)',D36:'Chiều sâu hố PIT (PD)',D37:'Đỉnh hố thang (OH)',D40:'Chiều sâu hố PIT (PD)',D41:'Đỉnh hố thang (OH)',D35:'Chiều sâu hố thang (BH)'};
  const isDimension=cell=>$('model').value==='MRL'?['D33','D34','D36','D37'].includes(cell):['D34','D35','D40','D41'].includes(cell);
@@ -988,6 +1130,8 @@ async function applyWorkbook(model,name,bytes,quiet=false){
   parsed.fields.push({...x,value:raw&&typeof raw==='object'?(raw.v??x.value):(raw??x.value)});
  }
  parsed.fields.sort((a,b)=>split(a.cell)[1]-split(b.cell)[1]);
+ // Apply the versioned CWT source table and ceiling-finish checks to imported old databases.
+ window.SPEC_CWT_ENGINE?.applyDataset(parsed.engineData,model);
  models[model]=parsed;sourceFiles[model]={name,bytes,engineData:parsed.engineData};
  if($('model').value===model){load();if(!quiet)status('Đã nạp Excel Database / Loaded: '+name+'\n'+parsed.fields.length+' trường SpecForm; '+parsed.validations.length+' Data Validations; '+parsed.table_count+' DataTable tables.','ok')}
  return parsed;

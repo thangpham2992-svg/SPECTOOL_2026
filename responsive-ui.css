@@ -149,3 +149,8 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 .itp-panel .feature-itp-config{margin-top:11px;border-left:3px solid #bf2630}
 .itp-panel .feature-itp-config select{width:100%;max-width:none;font-size:14px;min-height:43px}
 .fan-guidance{display:block;color:#577088;font-size:11px;line-height:1.4;margin-top:4px}
+
+/* CWT-specific minimum checks, displayed immediately below AH/BH */
+.cwt-minimum-hint{display:block;font-size:11px;line-height:1.5;color:#45667d;margin-top:4px}
+.cwt-minimum-error{color:#a62929;font-weight:650}
+.cwt-below-minimum{outline:2px solid #bd3838;outline-offset:1px}

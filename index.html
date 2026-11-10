@@ -56,6 +56,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 
 </style>
 <link rel="stylesheet" href="responsive-ui.css?v=4.2">
+<link rel="stylesheet" href="design-guide.css?v=4.4">
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span></header>
@@ -86,6 +87,12 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
     <div class="ny40-foot"><button type="button" class="btn btn-secondary" id="ny40-ok">Đóng</button><button type="button" class="btn btn-primary" id="ny40-apply" style="margin-left:8px">Áp dụng mẫu</button></div>
   </div>
 </div>
+<div id="design-popup" class="design-popup" aria-hidden="true">
+  <div class="design-dialog" role="dialog" aria-modal="true" aria-labelledby="design-title">
+    <div class="design-header"><div><span class="design-eyebrow">MITSUBISHI · DESIGN REFERENCE</span><h3 id="design-title">Hình mẫu & mô tả thiết kế</h3><p id="design-subtitle"></p></div><button type="button" class="design-close" id="design-close" aria-label="Đóng">×</button></div>
+    <div class="design-content"><div id="design-cards" class="design-cards"></div><p class="design-footnote">Ảnh dùng để đối chiếu mẫu. Chỉ các lựa chọn có trong Excel database đang nạp mới có thể áp dụng trực tiếp vào SpecForm; các mẫu khác được ghi rõ là tham khảo.</p></div>
+  </div>
+</div>
 
 <script src="vendor/jszip.min.js"></script>
 <script src="embedded-data.js?v=4.2"></script>
@@ -99,14 +106,17 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <script src="source-validations.js"></script>
 <script src="ordered-b209.js"></script>
 <script src="engine-database.js?v=4.2"></script>
+<script src="ceiling-finishes.js?v=4.7"></script>
+<script src="cwt-dimensions.js?v=4.7"></script>
 <script src="spec-conditional.js"></script>
 <script src="source-engine.js"></script>
 <script src="legacy-step1.js"></script>
 <script src="conditional-check.js"></script>
-<script src="source-check.js?v=4.2"></script>
+<script src="source-check.js?v=4.7"></script>
 <script src="export-engine.js?v=4.2"></script>
 <script src="print-layout.js"></script>
-<script src="app.js?v=4.2"></script>
+<script src="design-guide.js?v=4.4"></script>
+<script src="app.js?v=4.7"></script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>
