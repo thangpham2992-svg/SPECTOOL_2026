@@ -785,28 +785,46 @@ function renderSourceCheck(result){
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
  const primaries=result.errors.filter(x=>!aggregates.test(x.id));
  const detailedObservation=primaries.some(x=>String(x.id).startsWith('DataTable!D525 /'));
- const filtered=detailedObservation?primaries.filter(x=>!(x.id==='SpecForm!B209'&&/Observation/i.test(x.message))):primaries;
+ const dimensionDetails=primaries.some(x=>/^DataTable!D52[23]\//.test(String(x.id)));
+ const filtered=primaries.filter(x=>{
+  if(detailedObservation&&x.id==='SpecForm!B209'&&/Observation/i.test(x.message))return false;
+  if(dimensionDetails&&x.id==='SpecForm!B209'&&/OH\/PD|DataTable!D522|AH\/BH/i.test(x.message))return false;
+  return true;
+ });
  const issues=filtered.length?filtered:result.errors;
- const fields=new Map();
- const features=sourceFeatureRows();
+ const fields=new Map(),features=sourceFeatureRows();
+ const sizeLabel={D33:'Chiều rộng hố thang (AH)',D34:'Chiều sâu hố thang (BH)',D36:'Chiều sâu hố PIT (PD)',D37:'Đỉnh hố thang (OH)',D40:'Chiều sâu hố PIT (PD)',D41:'Đỉnh hố thang (OH)',D35:'Chiều sâu hố thang (BH)'};
+ const isDimension=cell=>$('model').value==='MRL'?['D33','D34','D36','D37'].includes(cell):['D34','D35','D40','D41'].includes(cell);
+ const dimensionPriority=err=>/^(?:DataTable!D52[23]\/|DataTable!AP2[45]$)/.test(String(err.id))?3:err.id==='Tool.exe CheckSpecStep1'?2:1;
  for(const err of issues){
-  const cell=String(err.cell||'').trim();if(!cell||fields.has(cell))continue;
+  const cell=String(err.cell||'').trim();if(!cell)continue;
   const f=current.fields.find(x=>x.cell===cell),feature=features.find(x=>x.cell===cell);
   let name=vietnameseFieldName(xrules().labels?.[cell]||f?.label||feature?.vi||feature?.code||'Thông số kỹ thuật');
+  if(isDimension(cell))name=sizeLabel[cell]||name;
   if(!name||name===cell)name='Thông số kỹ thuật';
-  fields.set(cell,name);
+  const message=isDimension(cell)?String(err.message||'').trim():'';
+  const priority=isDimension(cell)?dimensionPriority(err):0;
+  const old=fields.get(cell);
+  if(!old||priority>old.priority)fields.set(cell,{name,message,priority});
  }
  if(top&&failed)top.textContent=`Không đạt — ${fields.size||1} lỗi`;
  if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);return}
  let index=0;
- for(const [cell,label] of fields){
+ for(const [cell,item] of fields){
   const link=document.createElement('button');link.type='button';link.className='check-error-row';
-  link.textContent=`${++index}. ${label}`;
-  link.setAttribute('aria-label','Đến thông số lỗi: '+label);
+  const heading=document.createElement('strong');heading.textContent=`${++index}. ${item.name}`;link.append(heading);
+  if(item.message){const explanation=document.createElement('span');explanation.className='check-error-explanation';
+   let detail=item.message;
+   // Avoid repeating the same field name in title and explanation, without hiding the limit.
+   detail=detail.replace(/^(?:Đỉnh hố thang \(OH\)|Chiều sâu hố PIT \(PD\)|Chiều rộng hố thang \(AH\)|Chiều sâu hố thang \(BH\))\s*/,'');
+   explanation.textContent=detail;link.append(explanation);
+  }
+  link.setAttribute('aria-label','Đến thông số lỗi: '+item.name+(item.message?' — '+item.message:''));
   link.onclick=()=>focusIssue(cell);
   wrap.append(link);
  }
 }
+
 function download(bytes,name,type){let blob=new Blob([bytes],{type});let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 async function buildFinalExport(){
   const model=$('model').value,db=workbookEngineData();
