@@ -55,7 +55,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 .check-error-explanation{display:block;color:#a32d34;font-size:12px;line-height:1.55;font-weight:500;white-space:normal}
 
 </style>
-<link rel="stylesheet" href="responsive-ui.css">
+<link rel="stylesheet" href="responsive-ui.css?v=4.2">
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span></header>
@@ -66,7 +66,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <section class="action-panel"><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary" id="final-xlsx" type="button">Xuất Excel (.xlsx)</button><button class="btn btn-secondary" id="final-pdf" type="button">Xuất A4 PDF</button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
 <nav class="spec-nav" id="spec-nav" aria-label="Điều hướng nhóm thông số / Sections"></nav>
 <div class="fields-root" id="fields"></div>
-<section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
+<section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="itp-panel" class="itp-panel" aria-label="ITP – Hệ thống liên lạc nội bộ"></div><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
 <div class="hidden-internal" aria-hidden="true"><span id="numfields"></span><span id="numvalid"></span><span id="numtables"></span><div id="formula-audit"></div></div>
 <div class="footer">MITSUBISHI ELECTRIC VIETNAM · SPEC ENGINEERING</div>
 <div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div>
@@ -88,25 +88,25 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 </div>
 
 <script src="vendor/jszip.min.js"></script>
-<script src="embedded-data.js"></script>
-<script src="workbooks.js"></script>
+<script src="embedded-data.js?v=4.2"></script>
+<script src="workbooks.js?v=4.2"></script>
 <script src="excel-rules.js"></script>
-<script src="specform-layout.js"></script>
+<script src="specform-layout.js?v=4.2"></script>
 <script src="formula-catalog.js"></script>
 <script src="formula-check.js"></script>
 <script src="technical-checks.js"></script>
 <script src="engineering-source.js"></script>
 <script src="source-validations.js"></script>
 <script src="ordered-b209.js"></script>
-<script src="engine-database.js"></script>
+<script src="engine-database.js?v=4.2"></script>
 <script src="spec-conditional.js"></script>
 <script src="source-engine.js"></script>
 <script src="legacy-step1.js"></script>
 <script src="conditional-check.js"></script>
-<script src="source-check.js"></script>
-<script src="export-engine.js"></script>
+<script src="source-check.js?v=4.2"></script>
+<script src="export-engine.js?v=4.2"></script>
 <script src="print-layout.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=4.2"></script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>

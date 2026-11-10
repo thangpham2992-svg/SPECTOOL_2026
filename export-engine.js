@@ -106,6 +106,9 @@
      if(a)cells[a]='';
    }
    Object.assign(cells,overrides);
+   // v4.2: Remove the legacy decorative-weight exclusion note from any export.
+   for(const addr of Object.keys(cells))if(typeof cells[addr]==='string')cells[addr]=cells[addr]
+     .replace(/\s*[-–]?\s*Trừ\s*:\s*Handrail\s*&\s*mirror\s*nhập khẩu\s*;\s*sàn\s*\(By local\)/gi,'');
    // MR source has two historical MBSS #N/A lookups on feature rows that are removed
    // when MBSS does not apply; only unresolved visible output cells block export.
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));

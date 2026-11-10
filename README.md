@@ -124,3 +124,11 @@ GQXL2P: DataTable DA3:DL164 is the authoritative, normalized view of the unchang
 
 ## v4.1 – ITP / Interphone type
 When ITP is selected in Features → Signal, choose the corresponding system type under the ITP checkbox. The options are read from `DataTable!DN:DP` in the MR/MRL Excel Database and depend on Group Control Operation. For 1C-2BC with FE (including FE Hong Kong), `6V Single – 3 Master Stations` is mandatory. Unselected ITP type triggers `Vui lòng chọn loại ITP` in Check Spec and blocks Export. The selected type is exported in the Vietnamese and English ITP descriptions.
+
+## Bản v4.2 — ITP dropdown & Ventilation
+
+- ITP: trình chọn loại được ghim ở đầu mục V. Các tính năng (không cần mở tab Tín hiệu); chỉ xuất hiện khi bật tính năng ITP. Khi chưa chọn loại, Check Spec báo "Vui lòng chọn loại ITP".
+- Excel Database: có Data Validation dạng danh sách tại SpecForm!H175 (MR) và SpecForm!H177 (MRL). Lựa chọn thay đổi theo hệ điều khiển và FE; danh sách nguồn là DataTable!DN:DP. Nên mở bằng Microsoft Excel Desktop để dùng Data Validation đầy đủ.
+- Export: mô tả ITP theo giá trị đã chọn, bỏ câu ghi chú cũ "Trừ: Handrail & mirror nhập khẩu; sàn (By local)".
+- MRL quạt thông gió: giữ Standard / 02 Sets. Theo G11L1P Sales Manual, Plasma Quad™ là một quạt tuần hoàn/tùy chọn riêng, chỉ áp dụng từ 825 kg và một số kích thước cabin không hỗ trợ; không tự gộp với quạt thông gió tiêu chuẩn.
+- Để cập nhật GitHub Pages, thay toàn bộ file trong ZIP, đặc biệt index.html, app.js, các JS database và database/*.xlsx. Refresh trình duyệt sau khi deploy.

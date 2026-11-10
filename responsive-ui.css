@@ -137,3 +137,15 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 .feature-itp-config label{font-size:12px;font-weight:650;color:#26465f}
 .feature-itp-config select{width:100%;max-width:620px;min-height:38px;font-size:13px}
 .feature-itp-config small{font-size:11px;color:#586f87}
+
+/* v4.2: Prominent ITP feature and type selection on desktop and mobile */
+.itp-panel{border:1px solid #cbdced;background:#f8fbff;border-radius:9px;margin:17px 0 6px;padding:14px 18px}
+.itp-pinned-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#213d5a}
+.itp-pinned-title div{flex:1 1 280px;min-width:0}
+.itp-pinned-title strong{font-size:14px;display:block}
+.itp-pinned-title small{font-size:12px;display:block;color:#607a91;margin-top:4px}
+.itp-pinned-title input{width:19px;height:19px;accent-color:#bb2731;flex:none}
+.itp-pinned-title label{font-size:12px;font-weight:650;cursor:pointer}
+.itp-panel .feature-itp-config{margin-top:11px;border-left:3px solid #bf2630}
+.itp-panel .feature-itp-config select{width:100%;max-width:none;font-size:14px;min-height:43px}
+.fan-guidance{display:block;color:#577088;font-size:11px;line-height:1.4;margin-top:4px}

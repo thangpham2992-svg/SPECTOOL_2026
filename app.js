@@ -412,15 +412,38 @@ function setupSpecialOptions(){
   const f=obsField;const values=['No','NY-40A','NY-40B','NY-40C','NY-40D','NY-40E'];let s=document.createElement('select');s.dataset.cell=obsField.cell;for(let v of values){let o=document.createElement('option');o.value=v;o.textContent=v;s.append(o)}s.value=String(obs.value||'No');s.addEventListener('change',()=>{changes[obsField.cell]=s.value;invalidateCheck()});obs.replaceWith(s);if(f)f.options=values;
  }
 }
+function renderITPPinned(features){
+ const panel=$('itp-panel');if(!panel)return;
+ panel.replaceChildren();
+ const feature=features.find(f=>f.code==='ITP');if(!feature)return;
+ const db=workbookEngineData();
+ const eng=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
+ const allowed=eng?.safe('SpecForm','E'+feature.cell.slice(1));
+ const disabled=allowed?.ok && String(allowed.value).trim().toUpperCase()==='X';
+ const enabled=['1','TRUE','V','✓'].includes(String(changes[feature.cell]??feature.apply).toUpperCase());
+ const head=document.createElement('div');head.className='itp-pinned-title';
+ const title=document.createElement('div');title.innerHTML='<strong>ITP — Hệ thống liên lạc nội bộ</strong><small>Inter-communication system · Chọn loại ITP tại đây (không cần mở tab Tín hiệu)</small>';
+ const chk=document.createElement('input');chk.type='checkbox';chk.id='itp-feature-check';chk.dataset.cell=feature.cell;chk.checked=enabled;chk.disabled=disabled;
+ const label=document.createElement('label');label.htmlFor='itp-feature-check';label.textContent='Áp dụng ITP';
+ head.append(title,chk,label);panel.append(head);
+ chk.onchange=()=>{
+  changes[feature.cell]=chk.checked?'1':'0';
+  if(!chk.checked)delete changes[itpCell()];
+  renderFeatures();invalidateCheck();
+  status('Đã cập nhật tính năng ITP; cần chạy lại Check Spec.');
+ };
+ if(disabled){const note=document.createElement('small');note.textContent='ITP không áp dụng với cấu hình này.';panel.append(note)}
+ else if(enabled)renderITPOptions(panel);
+}
 function renderFeatures(){
- const features=sourceFeatureRows();const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();
+ const features=sourceFeatureRows();const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();renderITPPinned(features);
  if(!tables.length){main.textContent='Chưa trích xuất được bảng Features / Features unavailable';return}
  if(!tables.includes(activeFeatureTable))activeFeatureTable=tables[0];
  tables.forEach(t=>{let b=document.createElement('button');b.className='btn'+(t===activeFeatureTable?' red':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
- for(const f of features.filter(f=>f.table===activeFeatureTable)){
+ for(const f of features.filter(f=>f.table===activeFeatureTable && f.code!=='ITP')){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
-  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='ITP')renderFeatures();invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
+  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='FE'||f.code==='ITP')renderFeatures();invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
   let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line)
  }
 }
@@ -568,7 +591,13 @@ function row(field,displayName='',compact=false){
   const btn=document.createElement('button');btn.type='button';btn.className='btn btn-small obs-preview-btn';btn.textContent='Xem mô tả';
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
- }else box.append(name,input);return box;
+ }else box.append(name,input);
+ if($('model').value==='MRL' && field.name==='K35_Ventilation'){
+  const hint=document.createElement('small');hint.className='fan-guidance';
+  hint.textContent='Theo Sales Manual G11L1P: Plasma Quad™ là quạt tuần hoàn tùy chọn riêng (từ 825 kg, còn tùy kích thước cabin), không phải tên khác của quạt thông gió tiêu chuẩn.';
+  box.append(hint);
+ }
+ return box;
 }
 // MRL OH/PD source-of-truth: normalized DataTable!DA5:DL164.
 // Minima come from the same SpecForm F36/F37 formulas as exported workbook.
