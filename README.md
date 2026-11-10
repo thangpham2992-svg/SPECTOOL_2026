@@ -1,4 +1,11 @@
-# SpecWebTool v4.8 — NEXIEZ-MRL Version02 JJ options and COP Check Spec
+# SpecWebTool v4.9 — ITP defaults to first valid option
+
+## New in v4.9
+- ITP dropdown automatically selects the first valid choice on initial load for both MR and MRL.
+- When users explicitly select a different ITP choice, it is preserved across UI re-renders while valid.
+- Group Control/FE changes select the first eligible option if the earlier one is no longer valid.
+- The automatic choice is written into the working spec state so Check Spec/Export sees it. No false ITP Required warning for an untouched valid dropdown.
+- Existing v4.8 features/databases remain unchanged.
 
 ## Changes
 - JJ (mm) standard first, then optional configurations marked `(Option)` in dropdown.

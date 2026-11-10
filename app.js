@@ -487,13 +487,21 @@ function renderITPOptions(line){
  const area=document.createElement('div');area.className='feature-itp-config';
  const label=document.createElement('label');label.htmlFor='itp-type';label.textContent='Loại liên lạc nội bộ / Interphone type';
  const select=document.createElement('select');select.id='itp-type';select.dataset.cell=cell;
- const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='— Chọn loại ITP —';select.appendChild(placeholder);
- for(const value of options){const o=document.createElement('option');o.value=value;o.textContent=value;select.appendChild(o)}
- const source=workbookEngineData()?.sheets?.SpecForm?.[cell];
- const fromDb=source&&typeof source==='object'?source.v??'':source??'';
- let current=String(changes[cell]??fromDb);
- if(current&&!options.includes(current)){current='';changes[cell]=''}
- select.value=current;
+ // Default to the first valid row of the current model/operation/FE list.
+ // Keep explicit user choices when they remain available after a re-render.
+ // Save the default into changes so Check Spec and both exports use the visible choice.
+ const previous=Object.hasOwn(changes,cell)?String(changes[cell]):'';
+ if(options.length){
+  for(const value of options){const o=document.createElement('option');o.value=value;o.textContent=value;select.appendChild(o)}
+  const selected=options.includes(previous)?previous:options[0];
+  select.value=selected;
+  changes[cell]=selected;
+ }else{
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='— Không có loại ITP phù hợp —';select.appendChild(placeholder);
+  select.value='';
+  delete changes[cell];
+  select.disabled=true;
+ }
  select.onchange=()=>{changes[cell]=select.value;invalidateCheck();status('Đã cập nhật loại ITP. Vui lòng chạy lại Check Spec.')};
  area.append(label,select);
  if(options.length===1){const hint=document.createElement('small');hint.textContent='FE / FE Hong Kong: bắt buộc chọn loại 3 Master Stations.';area.append(hint)}
