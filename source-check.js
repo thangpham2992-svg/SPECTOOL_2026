@@ -34,6 +34,21 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   return 'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
+ // All displayed dimension limits are calculated by the workbook's current formulas.
+ // Never guess a minimum/maximum or silently treat an unresolved lookup as a valid value.
+ const fmtMm=x=>Number(x).toLocaleString('vi-VN')+' mm';
+ const dimensionName={OH:'Đỉnh hố thang (OH)',PD:'Chiều sâu hố PIT (PD)',AH:'Chiều rộng hố thang (AH)',BH:'Chiều sâu hố thang (BH)'};
+ const dimensionMessage=(kind,actual,limit,relation='min')=>{
+  const name=dimensionName[kind]||kind;
+  const found=actual.ok?Number(actual.value):NaN;
+  const validLimit=limit.ok?Number(limit.value):NaN;
+  if(!Number.isFinite(validLimit)||validLimit<=0)return name+': chưa có dữ liệu giới hạn phù hợp Capacity / Speed / TR trong DataTable (CHECK LAYOUT).';
+  if(!Number.isFinite(found))return name+': vui lòng nhập kích thước hợp lệ (tiêu chuẩn '+fmtMm(validLimit)+').';
+  return relation==='max'
+   ?name+' '+fmtMm(found)+' vượt quá giới hạn tối đa '+fmtMm(validLimit)+'.'
+   :name+' '+fmtMm(found)+' nhỏ hơn tiêu chuẩn tối thiểu '+fmtMm(validLimit)+'.';
+ };
+
  function checkRule(sheet,addr,kind='condition',tracked=true){
   const reference=sheet+'!'+addr;let x=value(sheet,addr);
   if(!x.ok){if(tracked)conditionCount.unknown++;unverified.push(reference+' — '+x.error);details.push({ref:reference,state:'UNKNOWN',message:x.error,cell:addr});return null;}
@@ -43,7 +58,29 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(tracked)conditionCount.fail++;
    let row=Number(/\d+$/.exec(addr)[0]);let source=base(db.sheets.DataTable['C'+row]);let msg=source||`Rule ${reference} returned FALSE`;
    let field=sheet==='DataTable'&&addr==='AP5'?'D61':cellForCondition(row);
-   if(model==='MRL'&&sheet==='DataTable'&&row===525){
+   if(model==='MRL'&&sheet==='DataTable'&&row===522){
+    // D522 combines AH and BH. Show the exact failing field and dynamic F33/F34 minimum.
+    let found=false;
+    for(const [kind,addr,lookup] of [['AH','D33','F33'],['BH','D34','F34']]){
+     const actual=value('SpecForm',addr),expected=value('SpecForm',lookup);
+     const n=expected.ok?Number(expected.value):NaN,got=actual.ok?Number(actual.value):NaN;
+     if(!Number.isFinite(n)||n<=0||!Number.isFinite(got)||got<n){
+      issue(reference+'/'+kind,addr,dimensionMessage(kind,actual,expected));found=true;
+     }
+    }
+    if(!found)issue(reference,'D33',msg);
+   }else if(model==='MRL'&&sheet==='DataTable'&&row===523){
+    // Report OH and PD independently; use minimum calculated by F36/F37.
+    let found=false;
+    for(const [kind,addr,lookup] of [['PD','D36','F36'],['OH','D37','F37']]){
+     const actual=value('SpecForm',addr),expected=value('SpecForm',lookup);
+     const n=expected.ok?Number(expected.value):NaN,got=actual.ok?Number(actual.value):NaN;
+     if(!Number.isFinite(n)||n<=0||!Number.isFinite(got)||got<n){
+      issue(reference+'/'+kind,addr,dimensionMessage(kind,actual,expected));found=true;
+     }
+    }
+    if(!found)issue(reference,'D37',msg);
+   }else if(model==='MRL'&&sheet==='DataTable'&&row===525){
     const obs=value('SpecForm','D14'),gate=value('SpecForm','R14'),ceiling=value('SpecForm','D41'),handrail=value('SpecForm','D64');
     let found=false;
     if(!gate.ok||gate.value!==true){issue(reference+' / upstream','D14','Mẫu cabin quan sát không phù hợp tải trọng hoặc loại cửa.');found=true;}
@@ -106,7 +143,17 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
     if(!out.ok){unverified.push('DataTable!'+ref+' — '+out.error);continue;}
     if(typeof out.value!=='string'){unverified.push('DataTable!'+ref+' — expected an error message or empty string');continue;}
     verified.push('DataTable!'+ref);
-    if(out.value.trim())issue('DataTable!'+ref,field,desc+': '+out.value.trim());
+    if(out.value.trim()){
+     if(ref==='AP24'||ref==='AP25'){
+      // Honor the actual MR priority: short OH B529 over E521, short PD E524 over E523.
+      const isOH=ref==='AP24',kind=isOH?'OH':'PD',actual=value('SpecForm',field);
+      const order=isOH?['B529','E521']:['E524','E523'];
+      let lookup=null;
+      for(const candidate of order){const result=value('DataTable',candidate);
+       if(result.ok&&typeof result.value==='number'&&Number.isFinite(result.value)&&result.value>0){lookup=result;break;}}
+      issue('DataTable!'+ref,field,lookup?dimensionMessage(kind,actual,lookup):desc+': '+out.value.trim());
+     }else issue('DataTable!'+ref,field,desc+': '+out.value.trim());
+    }
   }
   for(const ref of ['E521','B529','E523','E524']){
     const out=value('DataTable',ref);

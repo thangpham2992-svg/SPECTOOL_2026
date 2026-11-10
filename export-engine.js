@@ -143,8 +143,55 @@
        instead of destructive shift, to preserve all merged cell geometry and print areas. */}
    }
    for(const row of all(x,'row')){const num=+(row.getAttribute('r')||0);if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}}
-   // Print/export neutral: do NOT add tan/brown highlights to optional feature rows.
-   // Feature type remains available in doc.includedFeatures; no workbook styles are changed.
+   // v3.8: highlight only Roman-numbered specification section headings (I., II., III., IV., etc.).
+   // Style the frozen export worksheet itself, so both XLSX and its PDF print share
+   // exactly the same blue sections regardless of the source workbook theme/fill.
+   const sectionTitle=/^\s*[IVXLCDM]+\.\s+/i;
+   const blueRows=[...new Set(Object.entries(doc.cells)
+     .filter(([addr,value])=>/^A\d+$/.test(addr)&&cellRow(addr)<=300&&!doc.hiddenRows.has(cellRow(addr))&&sectionTitle.test(text(value)))
+     .map(([addr])=>cellRow(addr)))];
+   if(blueRows.length){
+     const stylePath='xl/styles.xml';const styleFile=zip.file(stylePath);
+     if(!styleFile)throw Error('Missing Excel styles file for section formatting');
+     const styles=parse(await styleFile.async('string'));
+     const fills=all(styles,'fills')[0],xfs=all(styles,'cellXfs')[0];
+     if(!fills||!xfs)throw Error('Missing Excel fills/cellXfs for section formatting');
+     const fill=styles.createElementNS(n,'fill'),pattern=styles.createElementNS(n,'patternFill');
+     pattern.setAttribute('patternType','solid');
+     const fg=styles.createElementNS(n,'fgColor');fg.setAttribute('rgb','FFD9EDF7');
+     const bg=styles.createElementNS(n,'bgColor');bg.setAttribute('indexed','64');
+     pattern.append(fg,bg);fill.append(pattern);
+     const newFillId=Array.from(fills.children).filter(el=>el.localName==='fill').length;
+     fills.appendChild(fill);fills.setAttribute('count',String(newFillId+1));
+     const existingStyles=Array.from(xfs.children).filter(el=>el.localName==='xf');
+     const baseStyleCount=existingStyles.length;const blueStyleCache=new Map();
+     function blueStyle(baseId){
+       baseId=baseId>=0&&baseId<baseStyleCount?baseId:0;
+       if(blueStyleCache.has(baseId))return blueStyleCache.get(baseId);
+       const xf=existingStyles[baseId].cloneNode(true);xf.setAttribute('fillId',String(newFillId));xf.setAttribute('applyFill','1');
+       const id=baseStyleCount+blueStyleCache.size;xfs.appendChild(xf);blueStyleCache.set(baseId,id);return id;
+     }
+     const rowMap=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')),row]));
+     for(const rowNum of blueRows){
+       const row=rowMap.get(rowNum);if(!row)continue;
+       const origA=Array.from(row.children).find(el=>el.localName==='c'&&el.getAttribute('r')==='A'+rowNum);
+       const aStyle=Number(origA?.getAttribute('s')||0);
+       for(const letter of ['A','B','C']){
+         const addr=letter+rowNum;
+         let cell=Array.from(row.children).find(el=>el.localName==='c'&&el.getAttribute('r')===addr);
+         if(!cell){
+           cell=x.createElementNS(n,'c');cell.setAttribute('r',addr);
+           const next=Array.from(row.children).find(el=>el.localName==='c'&&String(el.getAttribute('r')||'').charCodeAt(0)>letter.charCodeAt(0));
+           if(next)row.insertBefore(cell,next);else row.appendChild(cell);
+         }
+         const oldStyle=Number(cell.getAttribute('s')||aStyle);
+         cell.setAttribute('s',String(blueStyle(oldStyle)));
+       }
+     }
+     xfs.setAttribute('count',String(baseStyleCount+blueStyleCache.size));
+     zip.file(stylePath,serial(styles));
+   }
+   // Normal feature rows remain neutral: no tan/brown highlighting is added.
    // Hide helper columns D/E; Source C# blanks them after evaluating Option status.
    const cols=all(x,'cols')[0];if(cols){for(const col of all(cols,'col')){
        let min=+col.getAttribute('min'),max=+col.getAttribute('max');

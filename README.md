@@ -111,3 +111,13 @@ v2.3 thay đổi giao diện và engine trình bày PDF. Không thay đổi các
 - NEXIEZ-MR P10 700 kg: Check Spec chỉ rõ lỗi khối lượng trang trí thay vì hiển thị nhầm Capacity. Giới hạn khối lượng vẫn lấy theo công thức Excel, không bỏ qua lỗi kỹ thuật.
 - Danh sách cửa chống cháy EN81-58(II) 120 phút của hai model vẫn giữ nguyên.
 - Xem `QA_v3.3.md` để biết phạm vi kiểm tra và giới hạn.
+
+## v3.6: OH / PD mapping
+
+GQXL2P: DataTable DA3:DL164 is the authoritative, normalized view of the unchanged BG8:BS43 OH/PD source. SpecForm F36/F37 and the Webtool calculate against DA:DL. Service floor is an optional free-text field. Run `node tools/qa_v36.js` to verify mappings. See `CHANGELOG_v3.6.md` and `QA_v3.6.md`.
+
+## v3.9 — Blue headings and meaningful dimension validation
+
+- Both Excel and PDF exports keep blue I/II/III/IV section headers; detailed Feature rows do not receive brown backgrounds.
+- OH/PD/AH/BH errors show current value, actual source minimum/maximum and whether too small or too large; the link opens the correct field.
+- The package bundles unchanged MR and MRL Excel Databases from v3.7. See `QA_v3.9.md` and `CHANGELOG_v3.9.md` for verification.

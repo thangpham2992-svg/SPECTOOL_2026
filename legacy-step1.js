@@ -28,44 +28,10 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
  const travel=num(n('K21_CarTR'));
  const stops=num(n('K9_Stops'));
  const group=f('K13_Operation');
- const tableFloors=tbl('TblK10_SFloor');
- // 1. Validate floor names, count, COP indicator compatibility and special-floor groups.
- if(!tableFloors){unverified.push('Tool.exe: TblK10_SFloor not found');}
- else{
-  const service=f('K10_SFloor').replace(/\s+/g,'');
-  let floorCount=0,valid=true,groupName='';
-  const byName=new Map(tableFloors.map(r=>[str(r.FloorNameButton),r]));
-  const bracket=(s)=>/^([1-9]|[12]\d|3[0-6])$/.test(s);
-  const pivs=model==='MRL'?['K36_PIVTopFloor','K36_PIVMainFloor','K36_PIVOtherFloor']:['K36_PIVMainFloor','K36_PIVOtherFloor'];
-  for(const token of service.split(',')){
-   const range=token.split('-');
-   if(!token){valid=false;break;}
-   if(range.length===1){
-    const record=byName.get(token);
-    if(!record&&!bracket(token)){valid=false;break;}
-    floorCount++;
-    if(!record)continue;
-    const copCode=f('K31_COPCode'),copButton=f('K31_COPButton');
-    const no=k=>str(record[k]).toUpperCase()==='N';
-    if((['760','710'].includes(copCode)&&no('SegmentLED'))||(['730','780'].includes(copCode)&&no('LCD')))mark('K31_COPCode',`Loại COP ${copCode} không dùng được tại tầng ${token} / COP type incompatible with floor label`);
-    if(no('TactileButton')&&['CBV1','CBV3','CBV5'].some(c=>copButton.includes(c)))mark('K31_COPButton',`Nút Braille/tactile ${copButton} không áp dụng tầng ${token} / Tactile button unavailable`);
-    if(no('FlatButton')&&['CBV2','CBV4','CBV6'].some(c=>copButton.includes(c)))mark('K31_COPButton',`Nút phẳng ${copButton} không áp dụng tầng ${token} / Flat button unavailable`);
-    for(const piv of pivs){const p=f(piv);
-     if((['71','72','1010','1020'].some(x=>p.includes(x))&&no('SegmentLED'))||(['766','776'].some(x=>p.includes(x))&&no('LCD')))
-      mark(piv,`PIV ${p} không áp dụng tầng ${token} / Hall indicator incompatible with floor label`);
-    }
-    if(f('K31_BrailleLetter')==='Supplied'&&no('Braille'))mark('K31_BrailleLetter',`Braille không hỗ trợ tầng ${token} / Unsupported floor label`);
-    const grp=str(record.Group);if(grp){if(groupName&&groupName!==grp)mark('K10_SFloor',`Không cùng nhóm tầng đặc biệt tại ${token} / Mixed special-floor groups`);else groupName=grp;}
-    if(model==='MR'&&no('AAN-G')){
-     const sig=tbl('TblFeature_Signal');if(sig?.some(r=>str(r.Feature)==='AAN-G'&&Number(r.Apply)===1&&str(r.Option)!=='X'))mark('K10_SFloor',`Feature AAN-G không áp dụng tầng ${token} / AAN-G inapplicable`);
-    }
-   }else if(range.length===2&&bracket(range[0])&&bracket(range[1])&&Number(range[0])<Number(range[1]))floorCount+=Number(range[1])-Number(range[0])+1;
-   else {valid=false;break;}
-  }
-  if(!valid)mark('K10_SFloor','Tên tầng không hợp lệ theo Tool.exe / Invalid floor names or range syntax');
-  if(Number.isFinite(stops)&&floorCount!==stops)mark('K9_Stops',`Số tầng phục vụ ${floorCount} khác số điểm dừng ${stops} / Floor count differs from stops`);
-  verified.push('Tool.exe: Floor names, COP/LED/Braille, service-floor count');
- }
+ // Service floor is a free-text project description, intentionally independent of Stops.
+ // Do not parse floor labels, enforce count, special-floor groups, or validate its syntax.
+ // Preserve the exact entered string in SpecForm and Export.
+ verified.push('Service floor: free-text input, not checked against Stops');
  // 2. Core dimension and travel checks. Workbook's newest formulas have priority for OH/PD in MRL.
  const capacities=tbl('TblK5_Capacity');
  const row=capacities?.find(x=>str(x.EleCapacityName)===capacity);
@@ -74,10 +40,28 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
   const capKg=num(row.Capacity),family=['S300','N300','N300S','L310','N120','N130','N140','FEVN10'];
   const ceiling=f('K22_CeilingModel');
   if(carHeight===2500&&family.includes(ceiling))mark('K22_CeilingModel',`HL=2500 không dùng được với trần ${ceiling} / Ceiling not compatible with HL=2500`);
+  const mm=x=>Number(x).toLocaleString('vi-VN')+' mm';
+  const shaftName={AH:'Chiều rộng hố thang (AH)',BH:'Chiều sâu hố thang (BH)'};
   for(const [code,dimension] of [['AH','K19_CarAH'],['BH','K19_CarBH']]){
    const state=str(row[code+'-Valid']),limit=num(row[code+'-Valid-Value']),actual=num(n(dimension));
-   if(state==='N-Max'&&Number.isFinite(limit))mark(dimension,`${code} = ${actual} mm vượt giới hạn Max ${limit} mm / Hoistway dimension exceeds maximum`);
-   if(state==='N-Min'&&Number.isFinite(limit))mark(dimension,`${code} = ${actual} mm thấp hơn Min ${limit} mm / Hoistway dimension below minimum`);
+   // These state codes are workbook-calculated against model/door/fire/CWT-specific ranges.
+   if(state==='N-Max'&&Number.isFinite(limit))mark(dimension,`${shaftName[code]} ${mm(actual)} vượt quá giới hạn tối đa ${mm(limit)}.`);
+   if(state==='N-Min'&&Number.isFinite(limit))mark(dimension,`${shaftName[code]} ${mm(actual)} nhỏ hơn tiêu chuẩn tối thiểu ${mm(limit)}.`);
+  }
+  if(model==='MRL'){
+   // DataTable has AH-Max / BH-Max (and fire-door-specific maxima) even when
+   // AH-Valid/BH-Valid returns MANUAL GQ LAYOUT. Enforce the explicitly declared
+   // table envelope; exceeding it requires a different factory layout.
+   const isFire=!/^Not suppl(?:ied|y)$/i.test(str(n('K36_FireproofDoor')));
+   for(const [code,dimension] of [['AH','K19_CarAH'],['BH','K19_CarBH']]){
+    const column=code+'-Max'+(isFire?'-FIRE':'');
+    const max=num(row[column]),actual=num(n(dimension));
+    if(Number.isFinite(max)&&max>0&&Number.isFinite(actual)&&actual>max){
+     mark(dimension,`${shaftName[code]} ${mm(actual)} vượt quá giới hạn tối đa ${mm(max)} theo DataTable (${isFire?'cửa chống cháy':'cửa thường'}).`);
+    }else if(!Number.isFinite(max)||max<=0){
+     unverified.push('DataTable!TblK5_Capacity: missing '+column+' for '+capacity);
+    }
+   }
   }
   if(model==='MR'){
    if(capKg===450&&speed>60)mark('K8_Speed','450 kg không áp dụng tốc độ 90/105 m/min / Restricted speed for 450 kg');
@@ -85,9 +69,14 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
    if(minTR!==null&&travel<minTR)mark('K21_CarTR',`Hành trình nâng ${travel} thấp hơn ${minTR} mm / Travel below minimum`);
    if(travel>maxTR)mark('K21_CarTR',`Hành trình nâng ${travel} vượt ${maxTR} mm / Travel exceeds maximum`);
    const pit=num(n('K21_CarPD'));
-   if(speed===60){const min=(capKg===1350&&!capacity.includes('P20C4'))?1300:1250;if(pit<min||pit>2500)mark('K21_CarPD',`PD ${pit} mm ngoài khoảng ${min}–2500 mm / Pit depth outside allowed range`);}
-   if(speed===90&&capKg!==450){if(pit<1340||pit>2800)mark('K21_CarPD',`PD ${pit} mm ngoài khoảng 1340–2800 mm / Pit depth outside allowed range`);}
-   if(speed===105&&capKg!==450){const min=(capKg===1350&&!capacity.includes('P20C4'))?1410:1380;if(pit<min||pit>2900)mark('K21_CarPD',`PD ${pit} mm ngoài khoảng ${min}–2900 mm / Pit depth outside allowed range`);}
+   const pitIssue=(min,max)=>{
+    if(!Number.isFinite(pit))return;
+    if(pit<min)mark('K21_CarPD',`Chiều sâu hố PIT (PD) ${mm(pit)} nhỏ hơn tiêu chuẩn tối thiểu ${mm(min)}.`);
+    if(pit>max)mark('K21_CarPD',`Chiều sâu hố PIT (PD) ${mm(pit)} vượt quá giới hạn tối đa ${mm(max)}.`);
+   };
+   if(speed===60){const min=(capKg===1350&&!capacity.includes('P20C4'))?1300:1250;pitIssue(min,2500);}
+   if(speed===90&&capKg!==450)pitIssue(1340,2800);
+   if(speed===105&&capKg!==450){const min=(capKg===1350&&!capacity.includes('P20C4'))?1410:1380;pitIssue(min,2900);}
    // Decoration weight: DataTable AP5 is formula-derived and already included in source-check.
   }else{
    let minTR=null;
@@ -95,8 +84,8 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
    else minTR=speed===60?3400:[96,105].includes(speed)?7300:null;
    if(minTR!==null&&travel<minTR)mark('K21_CarTR',`Hành trình nâng ${travel} thấp hơn ${minTR} mm / Travel below minimum for group operation`);
    const pitState=str(row['PD-Valid']),pitLimit=num(row['PD-Valid-Value']);
-   if(pitState==='N-Max'&&Number.isFinite(pitLimit))mark('K21_CarPD',`PD vượt Max ${pitLimit} mm / Pit depth exceeds limit`);
-   else if(pitState==='N-Min'&&Number.isFinite(pitLimit))mark('K21_CarPD',`PD thấp hơn Min ${pitLimit} mm / Pit depth below limit`);
+   if(pitState==='N-Max'&&Number.isFinite(pitLimit))mark('K21_CarPD',`Chiều sâu hố PIT (PD) ${mm(num(n('K21_CarPD')))} vượt quá giới hạn tối đa ${mm(pitLimit)}.`);
+   else if(pitState==='N-Min'&&Number.isFinite(pitLimit))mark('K21_CarPD',`Chiều sâu hố PIT (PD) ${mm(num(n('K21_CarPD')))} nhỏ hơn tiêu chuẩn tối thiểu ${mm(pitLimit)}.`);
    // The new workbook handles F36/F37, D523; decoration is a C# Step1-only branch.
    // Use the workbook's *calculated* TblK5_Capacity columns rather than fixed engineering limits.
    const decorName=db.names?.local?.DataTable?.K29_DecorWeightTotal||db.names?.global?.K29_DecorWeightTotal;

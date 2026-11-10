@@ -13,6 +13,8 @@ window.SPEC_CF_CHECK=function(model,changes,db,engine){
   const match=/^'?SpecForm'?!\$?([A-Z]+)\$?(\d+)$/i.exec(String(ref).trim());
   if(!match)continue;
   const cell=match[1].toUpperCase()+match[2];if(seen.has(cell))continue;seen.add(cell);
+  // Service floor is optional free text; never require a value or floor-count match.
+  if(name==='K10_SFloor')continue;
   let hatched=(meta.defaultLightUp||[]).includes(cell), valid=true;
   for(const rule of rules){
    if(!contains(rule.ranges,cell))continue;

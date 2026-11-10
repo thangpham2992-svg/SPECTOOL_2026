@@ -79,6 +79,19 @@
      merges.set('A'+rn,{colspan:3,rowspan:1});
      covered.add('B'+rn);covered.add('C'+rn);
    }
+   // v3.8: merge Roman-numbered specification section headings for the print view.
+   // The blue background is guaranteed by the same export style used for XLSX.
+   const romanSection=/^\s*[IVXLCDM]+\.\s+/i;
+   const blueRomanRows=new Set();
+   for(const [rn] of visibleRows){
+     const a=String(cells.get('A'+rn)?.value||'');
+     const b=String(cells.get('B'+rn)?.value||'');
+     const c=String(cells.get('C'+rn)?.value||'');
+     if(!romanSection.test(a))continue;
+     blueRomanRows.add(rn);
+     if(b.trim()||c.trim()||merges.has('A'+rn)||covered.has('A'+rn))continue;
+     merges.set('A'+rn,{colspan:3,rowspan:1});covered.add('B'+rn);covered.add('C'+rn);
+   }
    // Improve print legibility of the two original header lines without altering XLSX cells.
    // The company/address text is in A1/A2 and B1/B2 are blank, so span these on paper.
    for(const headrow of [1,2]){if(visibleRows.has(headrow)&&!String(cells.get('B'+headrow)?.value||'').trim()&&!merges.has('A'+headrow)){merges.set('A'+headrow,{colspan:2,rowspan:1});covered.add('B'+headrow)}}
@@ -96,7 +109,10 @@
        const key=colAddr(col)+rowNum;if(covered.has(key))continue;
        const val=cells.get(key)||{value:'',style:0};const merge=merges.get(key)||{colspan:1,rowspan:1};
        const extra=merge.colspan>1?' colspan="'+merge.colspan+'"':'';const vextra=merge.rowspan>1?' rowspan="'+merge.rowspan+'"':'';
-       const style=formatStyle(val.style,styles);
+       let style=formatStyle(val.style,styles);
+       // Explicit inline background prevents theme tint and browser print defaults
+       // from suppressing the original pale-blue I/II/III/IV section headers.
+       if(blueRomanRows.has(rowNum))style+=';background-color:#d9edf7;color:#173c56;font-weight:700';
        rowCells.push('<td'+extra+vextra+' data-cell="'+key+'" style="'+style+'">'+esc(val.value).replace(/\r\n|\r|\n/g,'<br>')+'</td>');
      }
      // Excel's explicit row heights are respected as minimums; text-heavy wrapped cells can expand.

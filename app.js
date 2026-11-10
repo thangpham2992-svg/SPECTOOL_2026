@@ -420,7 +420,7 @@ function renderFeatures(){
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
-  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
+  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const dynamicOption=optResult?.ok?optResult.value:f.option;let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{changes[f.cell]=chk.checked?'1':'0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
   let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);main.append(line)
  }
 }
@@ -519,6 +519,7 @@ function row(field,displayName='',compact=false){
    syncDropdownOptions();
    refreshSideDrop();
    refreshLocks();
+   if($('model').value==='MRL'){refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));}
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
@@ -529,6 +530,25 @@ function row(field,displayName='',compact=false){
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);return box;
+}
+// MRL OH/PD source-of-truth: normalized DataTable!DA5:DL164.
+// Minima come from the same SpecForm F36/F37 formulas as exported workbook.
+// Auto-raise on source configuration change only; never overwrite a larger manual value.
+function refreshMRLOverheadMinimum(adjustIfBelow=false){
+ if($('model').value!=='MRL')return;
+ const db=workbookEngineData();const Engine=window.SpecExcelSourceEngine?.SourceEngine;
+ if(!db||!Engine)return;
+ const calc=new Engine(db,changes);
+ for(const [cell,source,label] of [['D36','F36','PD'],['D37','F37','OH']]){
+  const el=activeInput(cell);if(!el)continue;
+  const r=calc.safe('SpecForm',source),numeric=r.ok?Number(r.value):NaN;
+  const minimum=typeof r.value==='number'&&Number.isFinite(numeric)&&numeric>0?numeric:null;
+  let hint=el.closest('.field')?.querySelector('.oh-minimum-hint');
+  if(!hint){hint=document.createElement('div');hint.className='oh-minimum-hint';hint.style.cssText='font-size:11px;color:#526a82;line-height:1.4;margin-top:2px';el.closest('.field')?.append(hint);}
+  if(minimum===null){hint.textContent=`${label}: CHECK LAYOUT — không có giá trị cho tổ hợp Capacity / Speed / TR hiện tại.`;hint.style.color='#a32832';continue;}
+  hint.textContent=`${label} tối thiểu theo DataTable: ${minimum} mm (có thể nhập lớn hơn)`;hint.style.color='#526a82';
+  if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<minimum){el.value=String(minimum);changes[cell]=String(minimum);el.classList.add('dirty');}}
+ }
 }
 function capacityUpdate(capacity){
  let row=current.capacity.find(c=>String(c.EleCapacityName)===capacity);if(!row)return;
@@ -665,7 +685,7 @@ function invalidateCheck(){
  const top=$('check-top');if(top){top.className='check-top partial';top.textContent='Đã thay đổi — cần kiểm tra lại';}
  const issues=$('check-issues');if(issues)issues.replaceChildren();
 }
-function load(){window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function load(){window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshMRLOverheadMinimum(false);renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
