@@ -161,4 +161,20 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 .hall-choice-item .field input,.hall-choice-item .field select{width:100%;min-width:0}
 @media(max-width:740px){.hall-choice-panel{padding:12px 10px}.hall-floor-grid{grid-template-columns:1fr}.hall-choice-title{font-size:13px}.hall-floor-options{padding:3px 12px 7px}}
 
-.mirror-weight-hint{display:block;padding:7px 10px;margin-top:5px;color:#21527b;border-left:3px solid #80a9ca;background:#f1f7fc;font-size:12px;line-height:1.4;}
+
+/* v5.6 — hall lantern catalog, independent per-floor selections */
+.hall-lantern-choice{padding-top:12px}
+.hall-lantern-select{width:100%;border:1px solid #b9d5f3;background:#eaf4ff;border-radius:6px;padding:11px;color:#173957;font:inherit}
+.hall-lantern-controls{display:flex;align-items:center;gap:12px;min-height:48px}
+.hall-lantern-thumb{max-width:45px;max-height:68px;object-fit:contain;background:#f4f8fb;border-radius:3px;padding:2px}
+.hall-lantern-view{font-size:11px;padding:7px 11px;border:1px solid #b8d1ea!important;color:#235179!important;background:#f7fbff!important}
+.hall-lantern-overlay{position:fixed;inset:0;background:rgba(10,25,44,.67);display:flex;align-items:center;justify-content:center;z-index:21000;padding:18px}
+.hall-lantern-modal{width:min(950px,100%);max-height:92vh;overflow:auto;border-radius:10px;background:white;box-shadow:0 25px 85px #0004}
+.hall-lantern-header{position:sticky;top:0;z-index:2;background:#eaf3fa;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 19px;border-bottom:1px solid #cedcea}
+.hall-lantern-header h3{margin:0;font-size:16px;color:#1c4262}
+.hall-lantern-gallery{padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.hall-lantern-card{border:1px solid #d7e2ed;background:white;border-radius:8px;padding:12px 8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;flex-direction:column;gap:12px;color:#1d476b;min-height:180px}
+.hall-lantern-card:hover,.hall-lantern-card.is-current{border-color:#528ac3;background:#edf6fe}
+.hall-lantern-card img{max-height:144px;max-width:100%;object-fit:contain}
+.hall-lantern-card strong{font-size:12px}
+@media(max-width:500px){.hall-lantern-gallery{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px}.hall-lantern-header h3{font-size:13px}}

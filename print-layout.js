@@ -132,7 +132,7 @@
    table.excel{border-collapse:collapse;border-spacing:0;table-layout:fixed;width:100%;font-size:8.2pt;line-height:1.18}
    table.excel td{padding:2px 3px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;line-height:1.2;min-width:0}
    tr.excel-row{break-inside:avoid;page-break-inside:avoid}
-   tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:page;page-break-before:always}
+   tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
    @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;padding:0;margin:0;width:100%;max-width:100%}table.excel{width:100%;} .paper{zoom:.96;width:104.17%;} }
    `;
    return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+'</style></head><body>'+

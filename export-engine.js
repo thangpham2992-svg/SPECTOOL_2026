@@ -106,6 +106,27 @@
      if(a)cells[a]='';
    }
    Object.assign(cells,overrides);
+   // Include selected Hall Lanterns in the SAME entrance-design floor groups as
+   // PIV/HBV/PIH, with complete Vietnamese and English faceplate descriptions.
+   // Both XLSX and A4 PDF use these frozen SpecFormExport cells (no separate PDF text).
+   const hallLanternExportRows=[];
+   if(model==='MRL'&&window.SPEC_HALL_LANTERN){
+     const hall=window.SPEC_HALL_LANTERN;
+     for(const [floor,key,row] of [['TopFloor','HL_TOP',76],['OtherFloor','HL_OTHER',82],['MainFloor','HL_MAIN',79]]){
+       const choice=hall.selection(changes,key);
+       if(choice===hall.none)continue;
+       const description=hall.exportDescription(choice);
+       if(!description)throw Error('Hall Lantern material information missing for '+choice);
+       const addr='C'+row;
+       const original=text(cells[addr]).trim();
+       // The floor's PIV can be Not supplied even while a Hall Lantern is present.
+       // Do not show an inaccurate "Not supplied" immediately before the lantern.
+       const keepOriginal=!/^(?:Không cung cấp\s*\(Not supplied\)|Not supplied)\.?$/i.test(original);
+       cells[addr]=[keepOriginal?original:'',description.vi,description.en].filter(Boolean).join('\n');
+       hiddenRows.delete(row);
+       hallLanternExportRows.push(row);
+     }
+   }
    // SUS-HL/SUS-M are material FINISHES, never paint codes.
    // Override only ceiling bilingual description rows; leave all paint colors intact.
    const finishCell=model==='MR'?'D46':'D42',ceilingCell=model==='MR'?'D45':'D41';
@@ -117,17 +138,7 @@
      cells['C'+ceilingOutputRow]=`Trần phòng thang kiểu ${ceilingName}, ${mirror?'inox gương':'inox sọc nhuyễn'} (${ceilingFinish}).`;
      cells['C'+(ceilingOutputRow+1)]=`(Car ceiling model ${ceilingName}, ${mirror?'mirror-finish':'hairline-finish'} stainless steel ceiling (${ceilingFinish})).`;
    }
-   // The adjustment from AES13-006 Table 11-C applies to permitted decoration weight, not rated payload.
-   if(model==='MR' && window.SPEC_MIRROR_RULES){
-     const cap=text(eng.safe('SpecForm','D13').value),mir=text(eng.safe('SpecForm','D69').value);
-     const delta=window.SPEC_MIRROR_RULES.adjustment(cap,mir),output=63;
-     if(delta!==null && !/^Not supplied/i.test(mir)){
-       const fmt=(delta>=0?'+':'')+delta.toString().replace('.',',');
-       cells['C'+output]+=` Hiệu chỉnh khối lượng trang trí cho phép: ${fmt} kg / Permissible decoration-weight adjustment: ${fmt.replace(',','.')} kg (AES13-006, Table 11-C).`;
-     }else if(/^By local$/i.test(mir)){
-       cells['C'+output]+=' Khối lượng gương cung cấp tại Việt Nam cần tính vào khối lượng trang trí / Include locally supplied mirror mass in decoration weight.';
-     }
-   }
+   // Mirror weight adjustment is calculated in Excel only; do not append note in Export.
    // MR FE-Hongkong (FE-C30): the historical template omits a dedicated row.
    // In this variant the existing FE bilingual export slot represents FE-C30.
    // Avoid adding rows to the XLSX layout or mislabeling standard FE.
@@ -167,7 +178,7 @@
    // when MBSS does not apply; only unresolved visible output cells block export.
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
-   return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,totalFormulaUnresolved:unresolved.length,fatal};
+   return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal};
  }
  function updateCell(document, c, v){
    for(const old of Array.from(c.childNodes))if(['f','v','is'].includes(old.localName))c.removeChild(old);
@@ -219,7 +230,19 @@
        }
      }
    }
-   for(const row of all(x,'row')){const num=+(row.getAttribute('r')||0);if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}}
+   for(const row of all(x,'row')){
+     const num=+(row.getAttribute('r')||0);
+     if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}
+     // Expanded bilingual Hall Lantern description needs a taller Excel row;
+     // all existing wrapped-cell and merged-cell geometry is retained.
+     else if(doc.hallLanternExportRows?.includes(num)){
+       const base=Number(row.getAttribute('ht'))||24;
+       const description=String(doc.cells['C'+num]||'');
+       const lines=description.split(/\r?\n/).reduce((total,line)=>total+Math.max(1,Math.ceil(line.length/69)),0);
+       row.setAttribute('ht',String(Math.max(base,Math.min(185,lines*16+14))));
+       row.setAttribute('customHeight','1');
+     }
+   }
    // v3.8: highlight only Roman-numbered specification section headings (I., II., III., IV., etc.).
    // Style the frozen export worksheet itself, so both XLSX and its PDF print share
    // exactly the same blue sections regardless of the source workbook theme/fill.

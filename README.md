@@ -1,16 +1,27 @@
-# SpecWebTool v5.2 — Feature Matrix / Version02
+# SpecWebTool v5.7 — NEXIEZ-MRL Version02 Hall Lanterns and feature interlocks
 
-- Based on Webtool v5.1, preserving MR/MRL Check Spec, ITP, hall buttons, AH/BH, material descriptions, and images.
-- Fixes old ALPHA Q applicability flags in the active MRL DataTable using *Sales & Sales Engineering Manual for NEXIEZ-MRL Alpha Package Version2 [G11L1P]*, manual pages 29–38 (PDF pages 1–10), dated 2026-05-08.
-- Controls 1C-2BC, 2C-2BC, and SAI-2200C/3C/4C are evaluated separately. A=Available option, S=Standard, X=Not applicable. Inapplicable features stay disabled.
-- Adds missing Manual Version02 feature codes as selectable manual-linked options; their selected entries appear in a separate bilingual appendix at the end of Excel/PDF export if they are not originally represented by the source workbook.
-- The nine no-charge features FCC-A, FCC-P, FHC-P, SOHS, GCBK, COS, PTC, UPS, DPS auto-select whenever they are applicable, for both MR and MRL. A manual uncheck remains respected; switching to unsupported group clears it.
-- Original source Excel file bytes remain in /database/; corrections are applied in the Webtool during workbook load and before checks/exports. The manual does not establish that these features are free of charge; the zero-cost auto-select rule comes from the user's pricing instruction.
+## Usage
+Unzip all files to one folder, then open `index.html` in a browser. Keep `assets/hall-lanterns/` beside the other application files.
 
-## v5.3 Mirror and mass adjustment
-- MR: full Table 11-C of AES13-006 Rev AM, 29 cabin codes, for YZ-52A/YZ-53A/YZ-55SN and Not supplied; B750/B1000 not eligible.
-- Existing DataTable allowed decoration-weight formula (AA10:AA56) is recalculated with selected mirror type; no rated-capacity reduction. Handrail adjustments remain unchanged.
-- Local mirror is an external material; its actual mass must be included in entered decoration weight.
-- MRL Version02: mirror dropdown constrained by AA 1000–2200 for YZ-52A/53A; 1100–2100 for YZ-55SN, plus Local.
-- Image cards provided for all MR mirror models. The original workbooks are preserved in /database; updates are applied in Webtool at runtime, not in original Excel.
-- Mirror selection is checked on its own field, not Capacity.
+## NEXIEZ-MRL Version02
+- In IV. Entrance design / Hall indicators & buttons, the three floor cards each have one Hall Lanterns dropdown immediately below PIH/PID: Top floor, Other floors, Main floor.
+- 14 Hall Lantern models from Sales Manual S-1-U4010-E, Table 5.6.2 (p.27), with original product image thumbnails and a name/image gallery: HLV-A16S, HLV-E65, HLV-E66, HLH-A16S, HLV1-A80S, HLV3-A80S, HLV1-A90S, HLV3-A90S, HLV1-E62, HLV3-E62, HLH1-A80S, HLH3-A80S, HLH1-A90S and HLH3-A90S.
+- When one or more Hall Lanterns are selected, FHL is automatically selected. Without Hall Lanterns, FHL is not allowed.
+- AECC and AECH are mutually exclusive; AECH and AIL are mutually exclusive.
+- AIL requires Hall Lantern and SAI-2200C group control, following Manual Table 6.4.2.
+- Check Spec points to the actual conflicting Feature. Export includes each selected Hall Lantern code in the corresponding floor's entrance-design text (bilingual), retaining the existing SpecFormExport layout.
+
+## Excel source and model isolation
+- `database/SpecToolGQXL2P.xlsx` is the updated MRL Version02 source. It adds `HallLantern_V02` with catalog and Excel-check formulas for the user-editable source selections. Existing technical formulas and other sheets remain intact.
+- `database/SpecToolGXLM2P.xlsx` is the unchanged MR v5.5 source. MR does not use the MRL lanterns or its feature conditions.
+- The embedded XLSX and calculation dataset were synchronized so this package works without a server.
+
+## QA
+Verified JS syntax, 3 MRL selectors (15 choices each), 14 gallery items, FHL auto selection, MR unaffected, feature interlocks, and exported model text using a Chromium test harness with inlined scripts (the test environment blocks local file navigation). Full saved-XLSX export and external Excel recalc should be verified with a production workbook.
+
+## v5.7 SpecFormExport — Hall Lantern housing / faceplate
+- The chosen Hall Lantern is printed in each applicable floor block (Top / Other / Main), preserving any PIV description, with one Vietnamese and one English material sentence.
+- SUS-HL (SUS304) applies to A16S, E65, E66, A80S and E62 codes; black plastic applies to A90S codes. Material names follow Manual Table 5.6.2 p.27.
+- Selecting a Hall Lantern when PIV is Not supplied no longer prints a misleading standalone “Not supplied” message in its export row.
+- XLSX output rows expand to fit bilingual content; PDF is generated from that exact XLSX SpecFormExport worksheet.
+- Unselected Hall Lanterns do not appear in Export. Source .xlsx Feature and technical data are unchanged.

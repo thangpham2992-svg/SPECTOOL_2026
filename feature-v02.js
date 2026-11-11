@@ -11,9 +11,16 @@ function status(model,code,operation,db){
  const key=canonical(code),group=kind(operation);
  if(group<0)return 'X';
  if(model==='MRL'&&catalog[key])return catalog[key].statuses[group];
+ if(model==='MR'&&key==='FE-C30')return 'A';
  const t=db?.tables?.Tbl39_Feature,dt=db?.sheets?.DataTable;if(!t||!dt)return null;
  const start=Number((t.ref.split(':')[0].match(/\d+/)||[])[0]||0)+1,end=Number((t.ref.split(':')[1].match(/\d+/)||[])[0]||0);
- for(let r=start;r<=end;r++)if(String(dt['A'+r]||'')===key){const col=group===0?'G':group===1?'H':'J';return String(dt[col+r]||'X').trim().toUpperCase();}
+ for(let r=start;r<=end;r++)if(String(dt['A'+r]||'')===key){
+  // MR: ALPHA flag is authoritative; not a single Version02/manual flag can turn it on.
+  if(model==='MR'&&String(dt['Q'+r]||'').trim().toUpperCase()!=='Y')return 'X';
+  const ctl=String(operation||'').trim().toUpperCase();
+  const col=(model==='MR'&&(/^(AI-22|AI22)$/.test(ctl)))?'I':group===0?'G':group===1?'H':'J';
+  const v=dt[col+r];return typeof v==='object'?String(v.v||'X').trim().toUpperCase():String(v||'X').trim().toUpperCase();
+ }
  return null;
 }
 function fixDatabase(model,db){
@@ -27,8 +34,6 @@ function fixDatabase(model,db){
    dt['G'+r]=st[0];dt['H'+r]=st[1];dt['I'+r]=st[2];dt['J'+r]=st[2];
    // Version01 ALPHA blank flags must not make Version02 options disappear.
    dt['Q'+r]='Y';
-  }else if(complimentary.has(k)){
-   dt['Q'+r]='Y';
   }
  }
  return db;
@@ -40,7 +45,7 @@ function virtual(model,db){
   const a=Number((t.ref.split(':')[0].match(/\d+/)||[])[0]||0)+1,b=Number((t.ref.split(':')[1].match(/\d+/)||[])[0]||0);
   for(let r=a;r<=b;r++){const k=sh['B'+r];if(k)present.add(canonical(String(k)));}
  }
- return Object.entries(catalog).filter(([code])=>!present.has(code)).map(([code,d])=>({
+ return Object.entries(catalog).filter(([code,d])=>!present.has(code)&&/[AS]/.test(d.statuses)).map(([code,d])=>({
   table:'TblFeature_'+d.group,cell:'V52_'+code.replace(/[^A-Z0-9]/gi,'_'),code,virtual:true,
   en:en[code]||code,vi:vi[code]||en[code]||code,option:d.statuses[0],suggestion:'Manual V02',apply:d.statuses[0]==='S'?1:0
  }));

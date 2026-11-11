@@ -19,7 +19,7 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  const cellForCondition=(row)=>{
   if(model==='MRL'){
    if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D23';
-   if(row===525)return 'D14';if(row===526)return 'D62';
+   if(row===525)return 'D14';if(row===526)return 'D62';if(row===528)return 'D66';
    if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
    if(row===514)return 'D35';if(row===515)return 'D18';if(row===516||row===517||row===518)return 'D41';
    // COP failures are NOT rated-load errors: map them to the user-editable COP inputs.
@@ -198,6 +198,9 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   for(const addr of ['R13','R14','R23','R46','R73','R74','F33','F34','F36','F37']){
    const r=value('SpecForm',addr);if(!r.ok)unverified.push('SpecForm!'+addr+' — '+r.error);else verified.push('SpecForm!'+addr);
   }
+  // Mirror/AA is a standalone technical condition, not a Capacity failure.
+  if(db.sheets.DataTable?.D528?.f)checkRule('DataTable','D528','boolean');
+  else unverified.push('DataTable!D528 mirror/AA technical formula missing');
   for(const a of ['D527','D512']){
    const r=value('DataTable',a);if(!r.ok||typeof r.value!=='boolean')unverified.push(`DataTable!${a} — `+(r.error||'not boolean'));
    else {verified.push('DataTable!'+a);details.push({ref:'DataTable!'+a,state:r.value?'PASS':'FAIL',message:'Workbook aggregate result'});} 
@@ -228,6 +231,32 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   const isOn=apply.value===1||apply.value===true||String(apply.value).toUpperCase()==='V';
   if(isOn&&String(option.value).trim().toUpperCase()==='X')issue('SpecForm!E'+r,addr,`${db.sheets.SpecForm['B'+r]} không được áp dụng trong Group Control hiện tại / Feature unavailable (Option X)`);
   verified.push('SpecForm!E'+r);
+ }
+ // NEXIEZ-MRL Version02 — Manual feature notes and selected Hall Lantern equipment.
+ // Hall selections are additional optional equipment inputs, not Capacity constraints.
+ if(model==='MRL'&&window.SPEC_HALL_LANTERN){
+   const hall=window.SPEC_HALL_LANTERN;
+   for(const key of Object.values(hall.keys)){
+     const chosen=String(changes[key]||hall.none);
+     if(!hall.allowed(chosen))issue('HallLantern!'+key,key,'Mẫu đèn báo tầng không thuộc Sales Manual Version02 / Unsupported Hall Lantern model: '+chosen);
+   }
+   const supplied=hall.any(changes);
+   const group=value('SpecForm','D22');
+   const onCode=(code)=>{
+     const cell=featureByCode[String(code).toLowerCase()];
+     if(!cell)return {on:false,cell:null};
+     const state=value('SpecForm',cell);
+     if(!state.ok){unverified.push('Feature '+code+' — '+state.error);return {on:false,cell};}
+     return {on:state.value===1||state.value===true||String(state.value).toUpperCase()==='V',cell};
+   };
+   const aecc=onCode('AECC'),aech=onCode('AECH'),ail=onCode('AIL'),fhl=onCode('FHL');
+   if(aecc.on&&aech.on)issue('Feature!AECC+AECH',aech.cell||'A166','AECC và AECH không được sử dụng đồng thời / Cannot combine car and hall arrival chimes.');
+   if(aech.on&&ail.on)issue('Feature!AECH+AIL',ail.cell||'A168','AECH và AIL không được sử dụng đồng thời / AECH cannot be combined with AIL.');
+   if(ail.on&&(!supplied||!group.ok||String(group.value).trim()!=='SAI-2200C'))
+     issue('Feature!AIL',ail.cell||'A168','AIL chỉ áp dụng với SAI-2200C khi có Hall Lantern / AIL requires SAI-2200C with Hall Lantern.');
+   if(supplied&&!fhl.on)issue('Feature!FHL',fhl.cell||'A176','Đã chọn Hall Lantern nên phải bật FHL / Selected hall lanterns require FHL.');
+   if(!supplied&&fhl.on)issue('Feature!FHL-NoLantern',fhl.cell||'A176','FHL yêu cầu phải chọn Hall Lantern / FHL requires Hall Lantern equipment.');
+   verified.push('MRL Version02: AECC/AECH, AECH/AIL, AIL control + Hall Lantern, FHL/Hall Lantern');
  }
  // ITP selection: a required and operation-dependent option whenever ITP feature is enabled.
  // Values and FE/FE Hong Kong constraint are sourced from DataTable!DN:DP.

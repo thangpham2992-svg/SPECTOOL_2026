@@ -168,6 +168,24 @@ function sourceFeatureRows(){
    fromSource.push({table:name,cell:'A'+r,code,en:String(src('C'+r)||''),vi:String(src('D'+r)||''),option:String(src('E'+r)||''),suggestion:String(src('F'+r)||''),apply:src('A'+r)});
   }
  }
+ // NEXIEZ-MR is an independent product: show only Feature codes with ALPHA=Y
+ // in the MR DataTable; do not borrow Version02 features or show MR Q-blank options.
+ if($('model').value==='MR' && db.tables?.Tbl39_Feature && db.sheets?.DataTable){
+  const dt=db.sheets.DataTable,ref=db.tables.Tbl39_Feature.ref.split(':');
+  const begin=Number(ref[0].match(/\d+/)[0])+1,end=Number(ref[1].match(/\d+/)[0]);
+  const allowed=new Set(),notAllowed=new Set();
+  for(let r=begin;r<=end;r++){
+   const code=String(dt['A'+r]||'').trim();if(!code)continue;
+   if(String(dt['Q'+r]||'').trim().toUpperCase()==='Y')allowed.add(code);
+   else notAllowed.add(code);
+  }
+  for(let i=fromSource.length-1;i>=0;i--){
+    const f=fromSource[i];if(!allowed.has(f.code)){
+      // Even if an older source checked the feature, never submit or export it.
+      changes[f.cell]='0';fromSource.splice(i,1);
+    }
+  }
+ }
  // The supplied MR source rule contains FE-C30, but older generated DB tables
  // may omit its row. Show this selectable variant without re-numbering source cells.
  if($('model').value==='MR' && fromSource.length && !fromSource.some(f=>f.code==='FE-C30')){
@@ -491,7 +509,30 @@ function renderFeatures(){
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
-  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';if(f.code==='FE-C30'&&chk.checked)changes.A93='0';if(f.code==='FE'&&chk.checked)changes.FE_C30='0';if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);if(f.code==='FE'||f.code==='FE-C30'||f.code==='ITP'){if(f.code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();}invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.')};
+  let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';
+  const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
+  if($('model').value==='MRL'&&fCode==='AIL'&&!window.SPEC_HALL_LANTERN?.any(changes))disabled=true;
+  chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{
+   const code=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
+   if($('model').value==='MRL'&&code==='FHL'&&!chk.checked&&window.SPEC_HALL_LANTERN?.any(changes)){
+     chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
+   }
+   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
+   if($('model').value==='MRL'&&chk.checked&&['AECC','AECH','AIL'].includes(code)){
+     // Apply the exclusivity notes from the Version02 Sales Manual.
+     const conflicts=code==='AECC'?['AECH']:code==='AECH'?['AECC','AIL']:['AECH'];
+     for(const other of sourceFeatureRows())if(conflicts.includes(window.SPEC_V52_FEATURES?.canonical(other.code)||other.code)){
+       changes[other.cell]='0';featureTouched.add(other.cell);
+     }
+   }
+   if(f.code==='FE-C30'&&chk.checked)changes.A93='0';
+   if(f.code==='FE'&&chk.checked)changes.FE_C30='0';
+   if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);
+   if(['FE','FE-C30','ITP','AECC','AECH','AIL'].includes(code)){
+     if(code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();
+   }
+   invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.');
+  };
   let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line)
  }
 }
@@ -660,7 +701,7 @@ function refreshDesignHints(){
    if(item?.images?.[0]){img.src=item.images[0];img.alt=item.title;img.hidden=false;}
    else {img.removeAttribute('src');img.hidden=true;}
   }
-  if(hint){hint.textContent=designSummaryFor(kind);hint.classList.toggle('warn',kind==='ceilingColor'&&item?.code==='DL6');}
+  if(hint){hint.textContent=kind==='mirror'?'':designSummaryFor(kind);hint.hidden=kind==='mirror';hint.classList.toggle('warn',kind==='ceilingColor'&&item?.code==='DL6');}
  }
 }
 function renderDesignInline(box,kind){
@@ -672,7 +713,7 @@ function renderDesignInline(box,kind){
  button.onclick=()=>openDesignGuide(kind);
  holder.append(img,note,button);box.append(holder);
  const item=selectedGuideItem(kind);if(item?.images?.[0]){img.src=item.images[0];img.alt=item.title}else img.hidden=true;
- note.textContent=designSummaryFor(kind);
+ note.textContent=kind==='mirror'?'':designSummaryFor(kind);note.hidden=kind==='mirror';
 }
 function guideSelectableValue(kind,code){
  if(kind==='ceilingColor')return '';
@@ -691,7 +732,8 @@ function openDesignGuide(kind){
  const modal=$('design-popup'),items=guideEntries(kind);if(!modal||!items.length)return;
  const label={ceiling:'Trần phòng thang / Car ceiling',ceilingColor:'Màu sắc & vật liệu trần / Ceiling finishes',handrail:'Tay vịn / Handrail',mirror:'Gương / Mirror'};
  $('design-title').textContent=label[kind]+' · '+($('model').value==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02');
- $('design-subtitle').textContent=kind==='ceilingColor'?'Vật liệu theo hình catalogue. Các màu bổ sung chỉ áp dụng khi có dữ liệu SpecTool tương ứng.':'Chọn mẫu bằng ảnh. Các mẫu chưa có trong Excel source được hiển thị để tham khảo.';
+ $('design-subtitle').textContent=kind==='mirror'?'':kind==='ceilingColor'?'Vật liệu theo hình catalogue. Các màu bổ sung chỉ áp dụng khi có dữ liệu SpecTool tương ứng.':'Chọn mẫu bằng ảnh. Các mẫu chưa có trong Excel source được hiển thị để tham khảo.';
+ const generalFootnote=modal.querySelector('.design-footnote');if(generalFootnote)generalFootnote.hidden=kind==='mirror';
  const root=$('design-cards');root.replaceChildren();
  const selected=selectedGuideItem(kind)?.code;
  for(const item of items){
@@ -714,6 +756,8 @@ function openDesignGuide(kind){
     const cell=kind==='ceiling'?($('model').value==='MR'?'D45':'D41'):$('model').value==='MR'?(kind==='handrail'?'D67':'D69'):(kind==='handrail'?'D64':'D66');
     const input=activeInput(cell);if(!input)return;input.value=allowed;input.dispatchEvent(new Event('change',{bubbles:true}));closeDesignGuide();
    };foot.append(button);
+  }else if(kind==='mirror'){
+   // No informational note for mirror selection; the technical validation is authoritative.
   }else if(kind!=='ceilingColor'){
    const note=document.createElement('span');note.className='design-unavailable';note.textContent='Mẫu tham khảo · chưa có trong dropdown Excel hiện tại';foot.append(note);
   }else{
@@ -773,9 +817,6 @@ function row(field,displayName='',compact=false){
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
- if(field.name==='K33_Mirror'){
-  const hint=document.createElement('small');hint.className='mirror-weight-hint';hint.dataset.mirrorHint='1';box.append(hint);
- }
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
   const hint=document.createElement('small');hint.className='fan-guidance';
   hint.textContent='Theo Sales Manual G11L1P: Plasma Quad™ là quạt tuần hoàn tùy chọn riêng (từ 825 kg, còn tùy kích thước cabin), không phải tên khác của quạt thông gió tiêu chuẩn.';
@@ -901,15 +942,26 @@ function fieldRole(field){
  return xrules().labels[field.cell]||field.label||n.replace(/^K\d+_/,'').replaceAll('_',' ');
 }
 function headingText(label){return String(label||'').replace(/\s+/g,' ').trim().replace(/\s*:\s*$/,'');}
-function refreshMirrorWeightHint(){
- const el=document.querySelector('[data-mirror-hint]');if(!el||!window.SPEC_MIRROR_RULES)return;
- const m=$('model').value,mr=m==='MR',cap=currentValue('D13');const val=String(currentValue(mr?'D69':'D66')||'');
- if(mr){const delta=window.SPEC_MIRROR_RULES.adjustment(cap,val);
-  el.textContent=delta===null?(val==='By Local'?'Gương Local: nhập riêng khối lượng vật tư vào khối lượng trang trí. / Local mirror mass must be included in decoration input.':'Chưa có bảng hiệu chỉnh cho cấu hình này. / Mirror weight table not available.'):
-   'Điều chỉnh mức khối lượng trang trí cho phép / Permissible decoration-weight adjustment: '+(delta>=0?'+':'')+delta.toLocaleString('vi-VN')+' kg (AES13-006, Table 11-C).';
- }else{
-  el.textContent='Điều kiện AA / Width restrictions: YZ-52A/YZ-53A 1000–2200 mm; YZ-55SN 1100–2100 mm. Local: enter actual decoration mass separately.';
+function refreshMirrorWeightHint(){ /* Hidden: mirror mass corrections run only in DataTable formulas. */ }
+// Visual Hall Lantern catalog: only names and extracted manual images.
+function openHallLanternGallery(fieldKey,select){
+ const source=window.SPEC_HALL_LANTERN;if(!source||$('model').value!=='MRL')return;
+ document.querySelector('.hall-lantern-overlay')?.remove();
+ const overlay=document.createElement('div');overlay.className='hall-lantern-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Hall Lanterns gallery');
+ const modal=document.createElement('div');modal.className='hall-lantern-modal';
+ const bar=document.createElement('div');bar.className='hall-lantern-header';
+ const title=document.createElement('h3');title.textContent='Đèn báo tầng / Hall Lanterns — NEXIEZ-MRL Version02';
+ const close=document.createElement('button');close.className='btn';close.type='button';close.textContent='Đóng / Close';close.onclick=()=>overlay.remove();bar.append(title,close);
+ const grid=document.createElement('div');grid.className='hall-lantern-gallery';
+ for(const rec of source.catalog){
+  const button=document.createElement('button');button.type='button';button.className='hall-lantern-card';
+  if(select.value===rec.code)button.classList.add('is-current');
+  const img=document.createElement('img');img.src=rec.image;img.alt=rec.code;img.loading='lazy';
+  const name=document.createElement('strong');name.textContent=rec.code;button.append(img,name);
+  button.onclick=()=>{select.value=rec.code;select.dispatchEvent(new Event('change',{bubbles:true}));overlay.remove()};grid.append(button);
  }
+ modal.append(bar,grid);overlay.append(modal);overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
+ overlay.addEventListener('keydown',e=>{if(e.key==='Escape')overlay.remove()});document.body.append(overlay);close.focus();
 }
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
@@ -980,6 +1032,29 @@ function renderAllSpecRows(){
     const label=document.createElement('label');label.className='hall-choice-label';label.textContent=labels[i];
     item.append(label,wrapper);content.append(item);oldRow.remove();
    }
+   if($('model').value==='MRL'&&window.SPEC_HALL_LANTERN){
+    const opts=window.SPEC_HALL_LANTERN;
+    const key=opts.keys[group.key];
+    const item=document.createElement('div');item.className='hall-choice-item hall-lantern-choice';
+    const label=document.createElement('label');label.className='hall-choice-label';
+    label.textContent='Đèn báo tầng (Hall Lanterns)';
+    const select=document.createElement('select');select.className='hall-lantern-select';select.dataset.cell=key;
+    const all=[opts.none,...opts.catalog.map(x=>x.code)];
+    for(const code of all){const el=document.createElement('option');el.value=code;el.textContent=code;select.append(el)}
+    let value=opts.selection(changes,key);select.value=value;
+    const thumb=document.createElement('img');thumb.className='hall-lantern-thumb';thumb.alt='Hall Lantern';
+    const view=document.createElement('button');view.type='button';view.className='btn hall-lantern-view';view.textContent='Xem bảng mẫu / Gallery';
+    function preview(){const val=opts.byCode.get(select.value);if(val){thumb.src=val.image;thumb.alt=val.code;thumb.hidden=false}else{thumb.hidden=true;thumb.removeAttribute('src')}}
+    select.onchange=()=>{
+      changes[key]=select.value;preview();
+      const fhl=sourceFeatureRows().find(f=>f.code==='FHL');
+      if(fhl){if(opts.any(changes)){changes[fhl.cell]='1';featureTouched.delete(fhl.cell)}else{changes[fhl.cell]='0';featureTouched.delete(fhl.cell)}}
+      renderFeatures();invalidateCheck();status('Đã cập nhật đèn báo tầng và tính năng FHL / Hall Lantern & FHL updated. Cần Check Spec.');
+    };
+    view.onclick=()=>openHallLanternGallery(key,select);
+    const control=document.createElement('div');control.className='hall-lantern-controls';control.append(thumb,view);
+    item.append(label,select,control);content.append(item);preview();
+   }
    if(content.children.length){card.append(content);grid.append(card)}
   }
   panel.append(grid);
@@ -1011,7 +1086,20 @@ function invalidateCheck(){
  const top=$('check-top');if(top){top.className='check-top partial';top.textContent='Đã thay đổi — cần kiểm tra lại';}
  const issues=$('check-issues');if(issues)issues.replaceChildren();
 }
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function restoreHallLanternFromSource(){
+ if($('model').value!=='MRL'||!window.SPEC_HALL_LANTERN)return;
+ const rules=window.SPEC_HALL_LANTERN,db=workbookEngineData();
+ const sh=db?.sheets?.HallLantern_V02;
+ if(!sh)return;
+ for(const [key,addr] of [['HL_TOP','B21'],['HL_OTHER','B22'],['HL_MAIN','B23']]){
+  const entry=sh[addr],v=typeof entry==='object'?(entry.v??''):entry;
+  if(v&&rules.allowed(String(v))&&String(v)!==rules.none)changes[key]=String(v);
+ }
+ if(rules.any(changes)){
+  const fhl=sourceFeatureRows().find(f=>f.code==='FHL');if(fhl)changes[fhl.cell]='1';
+ }
+}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1091,8 +1179,8 @@ function check(){
  const engineData=workbookEngineData();
  const result=window.SPEC_SOURCE_CHECK?.(model,changes,engineData);
  if(!result)throw Error('Source Check Engine chưa được tải / Calculation engine not loaded');
- if(window.SPEC_MIRROR_RULES){
-  const mr=model==='MR',val=currentValue(mr?'D69':'D66'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue(mr?'D29':'D28'),val);
+ if(window.SPEC_MIRROR_RULES && model==='MR'){
+  const mr=true,val=currentValue('D69'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue('D29'),val);
   if(!check.ok){result.errors.push({id:'Mirror!Eligibility',cell:mr?'D69':'D66',message:check.message});result.status='FAIL';}
  }
  renderSourceCheck(result);
@@ -1236,6 +1324,25 @@ async function exportWorking(){
    else {c.setAttribute('t','inlineStr');let is=xml.createElementNS(NS,'is'),t=xml.createElementNS(NS,'t');t.textContent=value;is.append(t);c.append(is)}
   }
   zip.file(path,new XMLSerializer().serializeToString(xml));
+  // Preserve the additional MRL Hall Lantern selections when exporting an editable source workbook.
+  if(model==='MRL'&&window.SPEC_HALL_LANTERN){
+   const hallSheet=each(workbook,'sheet').find(x=>x.getAttribute('name')==='HallLantern_V02');
+   const hrid=hallSheet?.getAttributeNS(NSREL,'id');
+   const target2=Array.from(rels.documentElement.children).find(x=>x.getAttribute('Id')===hrid)?.getAttribute('Target');
+   const hallPath=target2?getSheetPath(target2):null;
+   if(hallPath&&zip.file(hallPath)){
+    const hxml=X(await zip.file(hallPath).async('string'));
+    const cells2=new Map(each(hxml,'c').map(c=>[c.getAttribute('r'),c]));
+    for(const [key,addr] of [['HL_TOP','B21'],['HL_OTHER','B22'],['HL_MAIN','B23']]){
+     let c=cells2.get(addr);if(!c)continue;
+     for(const child of Array.from(c.childNodes))if(['v','f','is'].includes(child.localName))c.removeChild(child);
+     c.setAttribute('t','inlineStr');
+     const is=hxml.createElementNS(NS,'is'),t=hxml.createElementNS(NS,'t');
+     t.textContent=window.SPEC_HALL_LANTERN.selection(changes,key);is.append(t);c.append(is);
+    }
+    zip.file(hallPath,new XMLSerializer().serializeToString(hxml));
+   }
+  }
   const output=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
   download(output,'SpecForm_Working_'+model+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   status('Đã tạo bản Working Excel: các ô đã chỉnh sửa được ghi vào SpecForm, các sheet khác giữ nguyên.\nĐây KHÔNG phải kết quả Export Spec chính thức của Tool.exe.','ok');
