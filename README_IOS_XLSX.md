@@ -1,7 +1,8 @@
-# v5.9.2 – iOS XLSX relationship fix
+# v5.8.2 – iOS XLSX export compatibility (based strictly on v5.8.1)
 
-Fixes `No workbook relationship for Export sheet` in the XLSX generator by finding relationships through XML namespace-aware traversal rather than `.children`, which may behave inconsistently in WebKit XML documents. Also handles UTF-8 BOM and a missing qualified r:id attribute.
-
-Deploy the *entire* folder contents to the GitHub Pages publication folder, then verify v5.9.2 in the header. PDF export, database, and engineering validation were not changed.
-
-Test on a real iOS device is still required; JS syntax and XLSX reference IDs were checked locally.
+- Core SpecFormExport generator, styles, merged cells, hidden D/E, excluded X rows, PDF and technical databases are unchanged from v5.8.1.
+- iOS XML namespace fallback for workbook-to-export sheet relationship.
+- iOS XLSX presents a Save/Share button after file creation (Web Share API); a normal Blob download link is offered as a fallback.
+- No window.open or Data URL for Excel.
+- Non-iOS download remains direct; no change to PDF.
+- Requires validation on a physical iPhone/iPad; JavaScript and XLSX package compatibility checks alone cannot prove it.

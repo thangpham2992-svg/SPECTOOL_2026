@@ -11,7 +11,12 @@
  const text=v=>v==null?'':typeof v==='boolean'?(v?'TRUE':'FALSE'):String(v);
  const parse=s=>new DOMParser().parseFromString(s,'application/xml');
  const serial=d=>new XMLSerializer().serializeToString(d);
- const all=(node,tag)=>Array.from(node.getElementsByTagNameNS(n,tag));
+ // Namespace-aware, WebKit-safe traversal. Do not rebuild any format/style XML.
+ const all=(node,tag)=>{
+   if(!node)return [];
+   const list=Array.from(node.getElementsByTagNameNS?.(n,tag)||[]);
+   return list.length?list:Array.from(node.getElementsByTagName('*')).filter(el=>el.localName===tag);
+ };
  const child=(node,tag)=>Array.from(node?.childNodes||[]).find(x=>x.localName===tag)||null;
  const cellRow=address=>Number(/\d+$/.exec(address)?.[0]||0);
  const safe=(obj,path)=>obj?.[path];
@@ -191,44 +196,34 @@
    c.setAttribute('t','inlineStr');if(/^\s|\s$|\n/.test(String(v)))t.setAttribute('xml:space','preserve');t.textContent=String(v);inline.appendChild(t);c.appendChild(inline);
  }
  async function xlsxFromModel(zip, model, db, doc){
-   if(window.SPEC_PORTABLE_XLSX) return window.SPEC_PORTABLE_XLSX.create(zip,doc);
-   // iOS WebKit: XML documents do not consistently expose namespace-prefixed
-   // relationship attributes through element.children/getAttributeNS.
-   // Resolve the OpenXML r:id using namespace-independent element traversal;
-   // retain a matching relationship node so the subsequent ZIP cleanup works.
-   const workbookXml=(await zip.file('xl/workbook.xml').async('string')).replace(/^\uFEFF/,'');
-   const relsXml=(await zip.file('xl/_rels/workbook.xml.rels').async('string')).replace(/^\uFEFF/,'');
-   const workbook=parse(workbookXml);
-   const rels=parse(relsXml);
+   const workbookXML=await zip.file('xl/workbook.xml').async('string');
+   const relsXML=await zip.file('xl/_rels/workbook.xml.rels').async('string');
+   const workbook=parse(workbookXML);
+   const rels=parse(relsXML);
+   if(workbook.getElementsByTagName('parsererror').length||rels.getElementsByTagName('parsererror').length){
+     throw Error('Workbook XML parsing failed');
+   }
    const sheetnodes=all(workbook,'sheet');
    const sheet=sheetnodes.find(x=>x.getAttribute('name')==='SpecFormExport');
    if(!sheet)throw Error('Không có SpecFormExport / Missing sheet');
-   // Cross-platform XML mapping. iOS WebKit can expose a different namespace
-   // representation for r:id and Relationship nodes. Read authoritative raw
-   // OOXML attributes rather than relying on DOMParser for the lookup.
-   const attr=(tag,name)=>{
-     const match=tag.match(new RegExp(String.raw`(?:^|\s)${name}\s*=\s*(["'])(.*?)\1`,'i'));
-     return match?match[2]:'';
-   };
-   const xmlTags=(xml,tag)=>Array.from(xml.matchAll(new RegExp('<(?:[\\w.-]+:)?'+tag+'\\b[^>]*>','gi')),m=>m[0]);
-   const rawSheet=xmlTags(workbookXml,'sheet').find(tag=>attr(tag,'name')==='SpecFormExport');
-   const exportRid=rawSheet?(attr(rawSheet,'r:id')||attr(rawSheet,'id')):'';
-   const rawRel=xmlTags(relsXml,'Relationship').find(tag=>attr(tag,'Id')===exportRid);
-   let target=rawRel?attr(rawRel,'Target'):'';
-   // Diagnostic fallback: only accept the well-known SpecFormExport sheet2
-   // when the workbook identifies it as the second sheet AND it exists in ZIP.
-   if(!target){
-     const exportIndex=xmlTags(workbookXml,'sheet').findIndex(tag=>attr(tag,'name')==='SpecFormExport');
-     if(exportIndex===1 && zip.file('xl/worksheets/sheet2.xml'))target='worksheets/sheet2.xml';
+   // iOS WebKit occasionally fails to expose an r:id in a namespaced XML node.
+   // Look up the ID from raw source XML as a fallback; retain original workbook.
+   let exportRid=sheet.getAttributeNS(r,'id')||sheet.getAttribute('r:id');
+   if(!exportRid){
+     const tag=workbookXML.match(/<(?:[\w.-]+:)?sheet\b[^>]*\bname=["']SpecFormExport["'][^>]*>/i)?.[0];
+     exportRid=tag?.match(/\br:id=["']([^"']+)["']/i)?.[1]||'';
    }
-   if(!target)throw Error('Cannot locate SpecFormExport relationship (r:id='+exportRid+', rawRelationships='+xmlTags(relsXml,'Relationship').length+')');
-   const relationships=Array.from(rels.getElementsByTagName('*'))
-     .filter(el=>el.localName==='Relationship'||el.nodeName==='Relationship');
-   const ref=relationships.find(x=>x.getAttribute('Id')===exportRid)||null;
-   const normalized=target.replace(/^\//,'').replace(/^xl\//,'');
-   const finalpath='xl/'+normalized.replace(/^\.\//,'');
-   const worksheet=zip.file(finalpath);
-   if(!worksheet)throw Error('Missing export XML: '+finalpath);
+   const relationships=Array.from(rels.documentElement.childNodes).filter(x=>x.nodeType===1);
+   let ref=relationships.find(x=>x.getAttribute('Id')===exportRid);
+   if(!ref && exportRid){
+     const tag=relsXML.match(/<Relationship\b[^>]*\bId=["']([^"']+)["'][^>]*\/?>(?:<\/Relationship>)?/gi)?.find(x=>x.includes(exportRid));
+     const target=tag?.match(/\bTarget=["']([^"']+)["']/i)?.[1];
+     if(target)ref=relationships.find(x=>x.getAttribute('Target')===target);
+   }
+   if(!ref)throw Error('No workbook relationship for Export sheet: '+(exportRid||'missing r:id'));
+   const sheetpath=ref.getAttribute('Target').replace(/^\//,'').replace(/^xl\//,'');
+   const finalpath='xl/'+sheetpath;
+   const worksheet=zip.file(finalpath);if(!worksheet)throw Error('Missing export XML: '+finalpath);
    const x=parse(await worksheet.async('string'));
    const cellNodes=all(x,'c');let freezeCount=0;
    for(const c of cellNodes){const addr=c.getAttribute('r');if(!addr)continue;
@@ -261,22 +256,7 @@
      if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}
      // Expanded bilingual Hall Lantern description needs a taller Excel row;
      // all existing wrapped-cell and merged-cell geometry is retained.
-     else if(doc.model==='MR' && (num===29 || num===30)){
-       // The source template hardcodes row 29 at only 11.4 pt, causing its
-       // bilingual content to overlap merged A29:A30 on Android/desktop.
-       // Set both member rows to a legible height, preserving the merged cells.
-       const contents=['A','B','C'].map(col=>String(doc.cells[col+num]||''));
-       const visualLines=Math.max(2,...contents.map(v=>v.split(/\r?\n/).reduce((t,line)=>t+Math.max(1,Math.ceil(line.length/62)),0)));
-       row.setAttribute('ht',String(Math.max(33,Math.min(85,visualLines*15+9))));
-       row.setAttribute('customHeight','1');
-    }
-    else if(doc.model==='MRL' && (num===29 || num===30)){
-       const contents=['A','B','C'].map(col=>String(doc.cells[col+num]||''));
-       const visualLines=Math.max(2,...contents.map(v=>v.split(/\r?\n/).reduce((t,line)=>t+Math.max(1,Math.ceil(line.length/62)),0)));
-       row.setAttribute('ht',String(Math.max(32,Math.min(85,visualLines*15+9))));
-       row.setAttribute('customHeight','1');
-    }
-    else if(doc.hallLanternExportRows?.includes(num)){
+     else if(doc.hallLanternExportRows?.includes(num)){
        const base=Number(row.getAttribute('ht'))||24;
        const description=String(doc.cells['C'+num]||'');
        const lines=description.split(/\r?\n/).reduce((total,line)=>total+Math.max(1,Math.ceil(line.length/69)),0);

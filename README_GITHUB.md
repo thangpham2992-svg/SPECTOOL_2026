@@ -1,1 +1,1 @@
-Deploy all files including portable-xlsx.js to the published GitHub Pages directory. After deploy confirm SPEC ENGINEERING v5.9.4. Test iOS XLSX, Excel desktop merged cells and section heading backgrounds.
+Upload all files in this folder to the same GitHub Pages directory as v5.8.1. Confirm index.html asset version ?v=5.8.2. Do not mix 5.9.x export files. Test iOS XLSX save and open in Excel, plus PC/Android XLSX and PDF.

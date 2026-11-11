@@ -1280,68 +1280,42 @@ function renderSourceCheck(result){
  addFloorLedWarning();
 }
 
-const IS_IOS_DEVICE=(()=>{const ua=navigator.userAgent||'';return /iPad|iPhone|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)})();
-function exportErrorMessage(error,kind){
- const detail=String(error?.message||error||'Không xác định');
- console.error(kind+' failed:',error);
- status(kind+' gặp lỗi: '+detail,'error');
- alert('Không thể xuất '+kind+'.\nChi tiết: '+detail+'\nVui lòng gửi nội dung này để kiểm tra.');
-}
 function download(bytes,name,type){
- let blob=new Blob([bytes],{type});let url=URL.createObjectURL(blob);
- let a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
- // iOS may defer opening the download until the Files/share sheet is shown.
- setTimeout(()=>URL.revokeObjectURL(url),IS_IOS_DEVICE?120000:15000);
-}
-// iOS: never open an empty tab for Excel. Prepare the file on this page, then
-// require a second user gesture to share/save it via the native Files sheet.
-let iosPreparedExcel=null;
-function iosExcelPanel(){
- let panel=document.getElementById('ios-excel-ready');
- if(panel)return panel;
- panel=document.createElement('section');
- panel.id='ios-excel-ready';
- panel.setAttribute('role','region');
- panel.setAttribute('aria-label','Tải file Excel trên iOS');
- panel.style.cssText='display:none;position:sticky;bottom:12px;z-index:3000;max-width:720px;margin:16px auto;padding:16px;border:2px solid #24649b;border-radius:12px;background:#fff;color:#152b40;box-shadow:0 4px 25px #0003';
- const heading=document.createElement('strong');heading.textContent='Excel đã sẵn sàng / Excel ready';
- const note=document.createElement('p');note.style.margin='8px 0';note.textContent='Trên iPhone/iPad: chọn Lưu vào Tệp trong bảng Chia sẻ. Không cần mở tab mới.';
- const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
- const share=document.createElement('button');share.type='button';share.id='ios-share-xlsx';share.textContent='Chia sẻ / Lưu vào Tệp';share.style.cssText='padding:11px 15px;background:#165b9c;color:#fff;border:0;border-radius:7px';
- const fallback=document.createElement('a');fallback.id='ios-data-xlsx';fallback.textContent='Mở/Tải Excel (dự phòng)';fallback.style.cssText='padding:11px 15px;color:#165b9c;border:1px solid #165b9c;border-radius:7px;text-decoration:none';
- const close=document.createElement('button');close.type='button';close.textContent='Đóng';close.style.cssText='padding:11px;border:1px solid #aaa;border-radius:7px;background:white';close.onclick=()=>{panel.style.display='none'};
- share.onclick=async()=>{
-  if(!iosPreparedExcel)return;
-  try{
-   if(navigator.share&&navigator.canShare?.({files:[iosPreparedExcel.file]})){
-    await navigator.share({files:[iosPreparedExcel.file],title:iosPreparedExcel.name});
-   }else{
-    alert('Thiết bị không hỗ trợ Chia sẻ tệp XLSX. Dùng nút Mở/Tải Excel (dự phòng) bên cạnh.');
-   }
-  }catch(err){if(err?.name!=='AbortError')exportErrorMessage(err,'Chia sẻ Excel')}
- };
- actions.append(share,fallback,close);panel.append(heading,note,actions);
- (document.querySelector('.action-panel')||document.body).append(panel);
- return panel;
-}
-async function iosDownloadReady(bytes,name,type){
- const file=new File([bytes],name,{type});
- iosPreparedExcel={file,name};
- const panel=iosExcelPanel();
- const share=panel.querySelector('#ios-share-xlsx');
- share.style.display=(navigator.share&&navigator.canShare?.({files:[file]}))?'':'none';
- const fallback=panel.querySelector('#ios-data-xlsx');
- // A Data URL works on some iOS environments where blob: links are blocked.
- // It can still be restricted by WebKit for downloads; the native Share API is preferred.
+ // Keep the exact XLSX bytes produced by the original v5.8.1 export engine.
+ // iOS has different download/Share behavior; never convert XLSX to a data URL.
  const blob=new Blob([bytes],{type});
- const dataUrl=await new Promise((resolve,reject)=>{
-  const reader=new FileReader();reader.onload=()=>resolve(reader.result);
-  reader.onerror=()=>reject(reader.error||Error('Không đọc được XLSX'));
-  reader.readAsDataURL(blob);
- });
- fallback.href=dataUrl;fallback.download=name;
- panel.style.display='block';
- panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+ const url=URL.createObjectURL(blob);
+ const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+   (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ if(isIOS){
+   // A fresh tap is required for Web Share on iOS after an async XLSX build.
+   document.getElementById('ios-xlsx-save-dialog')?.remove();
+   const panel=document.createElement('div');panel.id='ios-xlsx-save-dialog';
+   panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Lưu Excel trên iOS');
+   panel.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#0008;display:flex;align-items:center;justify-content:center;padding:20px;font-family:Arial,sans-serif';
+   const card=document.createElement('div');card.style.cssText='background:#fff;color:#172b4d;border-radius:12px;max-width:400px;width:100%;padding:22px;box-shadow:0 12px 48px #0005';
+   const msg=document.createElement('p');msg.textContent='File Excel đã tạo xong. Chọn Chia sẻ / Lưu vào Tệp để lưu đúng định dạng .xlsx.';
+   msg.style.cssText='line-height:1.5;margin:0 0 16px';
+   const save=document.createElement('button');save.type='button';save.textContent='Chia sẻ / Lưu vào Tệp';
+   save.style.cssText='width:100%;border:0;background:#1764a5;color:white;padding:12px;border-radius:8px;font-size:16px';
+   const fallback=document.createElement('a');fallback.href=url;fallback.download=name;
+   fallback.textContent='Tải Excel theo cách thông thường';fallback.style.cssText='display:block;text-align:center;margin-top:15px;color:#1764a5';
+   const close=document.createElement('button');close.type='button';close.textContent='Đóng';
+   close.style.cssText='width:100%;margin-top:12px;border:0;background:#e5e7eb;padding:10px;border-radius:8px';
+   const dispose=()=>{panel.remove();setTimeout(()=>URL.revokeObjectURL(url),120000);};
+   close.onclick=dispose;
+   save.onclick=async()=>{
+     try{
+       const file=new File([blob],name,{type,lastModified:Date.now()});
+       if(!navigator.share||!navigator.canShare?.({files:[file]}))throw Error('Thiết bị không hỗ trợ chia sẻ file');
+       await navigator.share({files:[file],title:name});dispose();
+     }catch(err){if(err?.name!=='AbortError')alert('Không mở được Share Sheet. Hãy chọn Tải Excel theo cách thông thường.');}
+   };
+   card.append(msg,save,fallback,close);panel.append(card);document.body.append(panel);
+   return;
+ }
+ const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),120000);
 }
 async function buildFinalExport(){
   const model=$('model').value,db=workbookEngineData();
@@ -1367,34 +1341,27 @@ function canExportBriefly(){
 async function exportFinalExcel(){
  if(!canExportBriefly())return;
  const button=$('final-xlsx');button.disabled=true;
- try{
-  status('Đang tạo SpecFormExport / Building final export...');
+ try{status('Đang tạo SpecFormExport từ logic Tool.exe / Building final export...');
   const result=await buildFinalExport();
-  const filename=result.filename+'.xlsx';
-  if(IS_IOS_DEVICE){
-   await iosDownloadReady(result.data,filename,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-   status('Excel đã sẵn sàng. Chạm Chia sẻ / Lưu vào Tệp để lưu trên iPhone/iPad.','ok');
-  }else{
-   download(result.data,filename,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-   status('Đã tạo Excel SpecFormExport. File ready.','ok');
-  }
- }catch(error){exportErrorMessage(error,'Excel')}
- finally{button.disabled=false}
+  download(result.data,result.filename+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  status('Đã xuất Excel SpecFormExport theo source C# / Excel ready. '+result.evaluation.includedFeatures.length+' features applied; '+result.evaluation.removedFeatures.length+' removed; '+result.evaluation.hiddenHall+' hall rows hidden; '+result.evaluation.totalFormulaUnresolved+' formula(s) excluded in unused feature rows.','ok');
+ }catch(error){console.error('Excel Export:',error);alert('Không thể xuất Excel. Chi tiết: '+(error?.message||String(error)))}
+ finally{button.disabled=false;}
 }
 async function exportFinalPdf(){
  if(!canExportBriefly())return;
  const button=$('final-pdf');button.disabled=true;
- // Open synchronously from the user's tap; opening after await is blocked on iOS.
+ // Create window in direct click handler to avoid browser popup blockers during async processing.
  const popup=window.open('','_blank');
- if(popup){popup.document.write('<!doctype html><html><meta name="viewport" content="width=device-width, initial-scale=1"><meta charset="utf-8"><title>Creating A4 Preview</title><body>Đang tạo A4 PDF / Preparing A4 layout...</body></html>');popup.document.close();}
+ if(popup){popup.document.write('<!doctype html><html><meta charset="utf-8"><title>Creating A4 Preview</title><body>Đang tạo A4 PDF / Preparing A4 layout...</body></html>');popup.document.close();}
  try{
   const result=await buildFinalExport();
   const html=await window.SPEC_PRINT_LAYOUT.fromXlsx(result.data,result.model);
-  if(!popup)throw Error('Trình duyệt chặn tab xem trước PDF. Vui lòng cho phép cửa sổ bật lên.');
+  if(!popup)throw Error('Trình duyệt đã chặn tab mới. Hãy cho phép mở cửa sổ / Enable popups.');
   popup.document.open();popup.document.write(html);popup.document.close();
   popup.focus();
-  status('Đã mở bản in A4. Trên iOS, dùng Chia sẻ → In → Lưu vào Tệp để lưu PDF.','ok');
- }catch(error){if(popup&&!popup.closed)popup.close();exportErrorMessage(error,'PDF')}
+  status('Đã mở bản in A4 dọc theo bố cục SpecFormExport. Chọn In / Save as PDF để lưu tài liệu.','ok');
+ }catch(error){if(popup&&!popup.closed)popup.close();console.error('PDF Export:',error);alert('Không thể xuất file. Vui lòng kiểm tra lại spec.')}
  finally{button.disabled=false;}
 }
 async function exportWorking(){
