@@ -341,6 +341,20 @@ function refreshLocks(){
   }
  }
 
+ // MR v5.8.1: N300S/L210S/L200S have one permitted ceiling material,
+ // SUS-HL. A stale LightUp source must not grey out this essential selection.
+ if($('model').value==='MR'&&['L200S','L210S','N300S'].includes(String(currentValue('D45')||'').trim().toUpperCase())){
+  const f=activeInput('D46');
+  if(f){
+   if(f.tagName==='SELECT'&&!Array.from(f.options).some(o=>o.value==='SUS-HL')){
+    const option=document.createElement('option');option.value='SUS-HL';option.textContent='SUS-HL';f.replaceChildren(option);
+   }
+   f.value='SUS-HL';changes['D46']='SUS-HL';f.disabled=false;
+   delete f.dataset.cfLocked;
+   f.closest('.field')?.classList.remove('locked','cf-locked');
+   f.title='Vật liệu trần cố định: SUS-HL / Fixed ceiling finish: SUS-HL';
+  }
+ }
  refreshCalculatedOutputs();
 }
 
