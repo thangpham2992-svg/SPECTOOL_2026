@@ -191,6 +191,7 @@
    c.setAttribute('t','inlineStr');if(/^\s|\s$|\n/.test(String(v)))t.setAttribute('xml:space','preserve');t.textContent=String(v);inline.appendChild(t);c.appendChild(inline);
  }
  async function xlsxFromModel(zip, model, db, doc){
+   if(window.SPEC_PORTABLE_XLSX) return window.SPEC_PORTABLE_XLSX.create(zip,doc);
    // iOS WebKit: XML documents do not consistently expose namespace-prefixed
    // relationship attributes through element.children/getAttributeNS.
    // Resolve the OpenXML r:id using namespace-independent element traversal;
