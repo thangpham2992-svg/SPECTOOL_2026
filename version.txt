@@ -1,1 +1,1 @@
-SpecWebTool v5.9.0 — iOS XLSX download compatibility
+v5.9.1 — iOS Excel native Share + Data URL fallback

@@ -1,9 +1,9 @@
-# v5.9.0 — iOS Excel export compatibility
+# v5.9.1 iOS Excel fix
 
-- On iPhone/iPad, Excel Export opens a download tab synchronously during the user click, then populates its XLSX link once the workbook has been generated. Users tap **Tải Excel (.xlsx)** and use Share > Save to Files if the file is previewed.
-- If pop-ups are blocked, an in-page XLSX link is displayed.
-- The temporary Blob URL is retained for 5 minutes rather than immediately revoked.
-- Errors in Excel generation are now shown with detail rather than generic Check Spec wording.
-- PDF flow, underlying source workbooks, technical rules and feature conditions have not been intentionally changed.
-- Upload ALL contents of this directory to the GitHub Pages publishing root. Check that website header reads v5.9.0.
-- Actual iOS Safari/Chrome/Edge device testing is required before considering the fix confirmed.
+- No new blank window/tab when exporting XLSX on iOS.
+- Generate XLSX on the original page; show a dedicated ready-to-save panel.
+- Prefer native Web Share API with XLSX File on a separate user tap (Save to Files).
+- If the API is unavailable, provide a Data URL download link in the same page.
+- iOS can restrict Data URL downloads: native sharing is preferable, and actual iOS testing is required.
+- Keep PDF export and non-iOS Excel behavior unchanged.
+- Upload all files to GitHub Pages publishing root, then hard refresh.
