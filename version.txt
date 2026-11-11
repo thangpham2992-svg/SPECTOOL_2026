@@ -1,1 +1,1 @@
-v5.9.1 — iOS Excel native Share + Data URL fallback
+v5.9.3

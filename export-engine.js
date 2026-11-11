@@ -202,21 +202,32 @@
    const sheetnodes=all(workbook,'sheet');
    const sheet=sheetnodes.find(x=>x.getAttribute('name')==='SpecFormExport');
    if(!sheet)throw Error('Không có SpecFormExport / Missing sheet');
-   let exportRid=sheet.getAttribute('r:id')||sheet.getAttributeNS(r,'id');
-   if(!exportRid){
-     // Recover in case an iOS XML parser drops the qualified r:id attribute.
-     const rawSheet=workbookXml.match(/<(?:[\w.-]+:)?sheet\b(?=[^>]*\bname=[\"']SpecFormExport[\"'])[^>]*>/i);
-     exportRid=rawSheet?.[0].match(/\br:id=[\"']([^\"']+)/)?.[1]||'';
+   // Cross-platform XML mapping. iOS WebKit can expose a different namespace
+   // representation for r:id and Relationship nodes. Read authoritative raw
+   // OOXML attributes rather than relying on DOMParser for the lookup.
+   const attr=(tag,name)=>{
+     const match=tag.match(new RegExp(String.raw`(?:^|\s)${name}\s*=\s*(["'])(.*?)\1`,'i'));
+     return match?match[2]:'';
+   };
+   const xmlTags=(xml,tag)=>Array.from(xml.matchAll(new RegExp('<(?:[\\w.-]+:)?'+tag+'\\b[^>]*>','gi')),m=>m[0]);
+   const rawSheet=xmlTags(workbookXml,'sheet').find(tag=>attr(tag,'name')==='SpecFormExport');
+   const exportRid=rawSheet?(attr(rawSheet,'r:id')||attr(rawSheet,'id')):'';
+   const rawRel=xmlTags(relsXml,'Relationship').find(tag=>attr(tag,'Id')===exportRid);
+   let target=rawRel?attr(rawRel,'Target'):'';
+   // Diagnostic fallback: only accept the well-known SpecFormExport sheet2
+   // when the workbook identifies it as the second sheet AND it exists in ZIP.
+   if(!target){
+     const exportIndex=xmlTags(workbookXml,'sheet').findIndex(tag=>attr(tag,'name')==='SpecFormExport');
+     if(exportIndex===1 && zip.file('xl/worksheets/sheet2.xml'))target='worksheets/sheet2.xml';
    }
+   if(!target)throw Error('Cannot locate SpecFormExport relationship (r:id='+exportRid+', rawRelationships='+xmlTags(relsXml,'Relationship').length+')');
    const relationships=Array.from(rels.getElementsByTagName('*'))
      .filter(el=>el.localName==='Relationship'||el.nodeName==='Relationship');
-   const ref=relationships.find(x=>x.getAttribute('Id')===exportRid);
-   if(!ref)throw Error('No workbook relationship for Export sheet (r:id='+exportRid+', available='+relationships.length+')');
-   const target=ref.getAttribute('Target')||'';
-   // Targets can be absolute (/xl/...) or relative (worksheets/...).
-   const sheetpath=target.replace(/^\//,'').replace(/^xl\//,'');
-   const finalpath='xl/'+sheetpath;
-   const worksheet=zip.file(finalpath);if(!worksheet)throw Error('Missing export XML: '+finalpath);
+   const ref=relationships.find(x=>x.getAttribute('Id')===exportRid)||null;
+   const normalized=target.replace(/^\//,'').replace(/^xl\//,'');
+   const finalpath='xl/'+normalized.replace(/^\.\//,'');
+   const worksheet=zip.file(finalpath);
+   if(!worksheet)throw Error('Missing export XML: '+finalpath);
    const x=parse(await worksheet.async('string'));
    const cellNodes=all(x,'c');let freezeCount=0;
    for(const c of cellNodes){const addr=c.getAttribute('r');if(!addr)continue;
@@ -249,7 +260,22 @@
      if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}
      // Expanded bilingual Hall Lantern description needs a taller Excel row;
      // all existing wrapped-cell and merged-cell geometry is retained.
-     else if(doc.hallLanternExportRows?.includes(num)){
+     else if(doc.model==='MR' && (num===29 || num===30)){
+       // The source template hardcodes row 29 at only 11.4 pt, causing its
+       // bilingual content to overlap merged A29:A30 on Android/desktop.
+       // Set both member rows to a legible height, preserving the merged cells.
+       const contents=['A','B','C'].map(col=>String(doc.cells[col+num]||''));
+       const visualLines=Math.max(2,...contents.map(v=>v.split(/\r?\n/).reduce((t,line)=>t+Math.max(1,Math.ceil(line.length/62)),0)));
+       row.setAttribute('ht',String(Math.max(33,Math.min(85,visualLines*15+9))));
+       row.setAttribute('customHeight','1');
+    }
+    else if(doc.model==='MRL' && (num===29 || num===30)){
+       const contents=['A','B','C'].map(col=>String(doc.cells[col+num]||''));
+       const visualLines=Math.max(2,...contents.map(v=>v.split(/\r?\n/).reduce((t,line)=>t+Math.max(1,Math.ceil(line.length/62)),0)));
+       row.setAttribute('ht',String(Math.max(32,Math.min(85,visualLines*15+9))));
+       row.setAttribute('customHeight','1');
+    }
+    else if(doc.hallLanternExportRows?.includes(num)){
        const base=Number(row.getAttribute('ht'))||24;
        const description=String(doc.cells['C'+num]||'');
        const lines=description.split(/\r?\n/).reduce((total,line)=>total+Math.max(1,Math.ceil(line.length/69)),0);
