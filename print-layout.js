@@ -5,6 +5,9 @@
 (()=>{
  const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
  const OFFICE='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+ // Safari, Chrome and other browsers on iPhone/iPad all use the iOS WebKit printing engine.
+ // Keep the original print stylesheet completely unchanged on PC and Android.
+ const isIOS=(()=>{const ua=navigator.userAgent||'';return /iPad|iPhone|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1)})();
  const q=(node,n)=>Array.from(node?.childNodes||[]).find(x=>x.localName===n)||null;
  const qa=(node,n)=>Array.from(node?.getElementsByTagNameNS(ns,n)||[]);
  const attr=(node,n,defaultValue='')=>node?.getAttribute(n)??defaultValue;
@@ -110,6 +113,7 @@
        const val=cells.get(key)||{value:'',style:0};const merge=merges.get(key)||{colspan:1,rowspan:1};
        const extra=merge.colspan>1?' colspan="'+merge.colspan+'"':'';const vextra=merge.rowspan>1?' rowspan="'+merge.rowspan+'"':'';
        let style=formatStyle(val.style,styles);
+       if(isIOS)style=style.replace(/(border-(?:left|right|top|bottom):)0\.45px solid /g,'$1'+'0.8px solid ');
        // Explicit inline background prevents theme tint and browser print defaults
        // from suppressing the original pale-blue I/II/III/IV section headers.
        if(blueRomanRows.has(rowNum))style+=';background-color:#d9edf7;color:#173c56;font-weight:700';
@@ -122,6 +126,12 @@
      const cl=(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
      printRows.push('<tr class="excel-row'+cl+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
    }
+   const iosPrintCSS=isIOS?`
+   /* iOS-only: make native XLSX borders visible without inventing borders on unbordered cells. */
+   @media print {
+     html,body,.paper,table.excel,table.excel td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+   }
+   `:'';
    const css=`
    @page { size: A4 portrait; margin: 10mm 9mm 11mm 9mm; }
    html,body{margin:0;padding:0;color:#212a35;font-family:Arial,'Times New Roman',sans-serif;font-size:8.4pt;background:white}
@@ -135,7 +145,7 @@
    tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
    @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;padding:0;margin:0;width:100%;max-width:100%}table.excel{width:100%;} .paper{zoom:.96;width:104.17%;} }
    `;
-   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+'</style></head><body>'+
+   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+'</style></head><body>'+
    '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc / A4 Portrait · Dựa trên SpecFormExport</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+
    '<main class="paper"><table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
  }
