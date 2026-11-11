@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const NSREL='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-const X=(txt)=>new DOMParser().parseFromString(txt,'application/xml');
+const X=(txt)=>new DOMParser().parseFromString(String(txt).replace(/^\uFEFF/, '').replace(/^\s+(?=<\?xml\b)/, ''),'application/xml');
 const each=(node,tag)=>Array.from(node.getElementsByTagNameNS(NS,tag));
 const first=(node,tag)=>node.getElementsByTagNameNS(NS,tag)[0];
 const get=(node,tag)=>first(node,tag)?.textContent||'';
@@ -1361,7 +1361,17 @@ async function exportFinalPdf(){
   popup.document.open();popup.document.write(html);popup.document.close();
   popup.focus();
   status('Đã mở bản in A4 dọc theo bố cục SpecFormExport. Chọn In / Save as PDF để lưu tài liệu.','ok');
- }catch(error){if(popup&&!popup.closed)popup.close();console.error('PDF Export:',error);alert('Không thể xuất file. Vui lòng kiểm tra lại spec.')}
+ }catch(error){
+   console.error('PDF Export:',error);
+   const detail=String(error?.message||error||'Unknown error');
+   if(popup&&!popup.closed){
+     try{
+       popup.document.open();popup.document.write('<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font:16px Arial;padding:22px;line-height:1.5"><h3>Không tạo được bản PDF / PDF export failed</h3><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><button onclick="window.close()">Đóng / Close</button></body></html>');popup.document.close();
+       popup.document.querySelector('pre').textContent=detail;
+     }catch(_e){}
+   }
+   alert('Không thể xuất PDF. Chi tiết: '+detail);
+ }
  finally{button.disabled=false;}
 }
 async function exportWorking(){

@@ -12,7 +12,7 @@
  const colNo=s=>[...String(s)].reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
  const colAddr=n=>{let s='';while(n>0){s=String.fromCharCode(65+(n-1)%26)+s;n=Math.floor((n-1)/26)}return s};
  const addrParts=a=>{const m=/^([A-Z]+)(\d+)$/.exec(a||'');return m?{col:colNo(m[1]),row:+m[2]}:null};
- const parse=str=>new DOMParser().parseFromString(str,'application/xml');
+ const parse=str=>new DOMParser().parseFromString(String(str).replace(/^\uFEFF/, '').replace(/^\s+(?=<\?xml\b)/, ''),'application/xml');
  function color(node,defaultColor){if(!node)return defaultColor;const rgb=attr(node,'rgb');if(/^[0-9a-f]{8}$/i.test(rgb))return '#'+rgb.slice(2);if(/^[0-9a-f]{6}$/i.test(rgb))return '#'+rgb;
    const theme=attr(node,'theme');if(theme!=='')return ({0:'#ffffff',1:'#1b2635',2:'#f6f8fa',3:'#24364a',4:'#22587d',5:'#b1222a'})[Number(theme)]||defaultColor;
    return defaultColor;

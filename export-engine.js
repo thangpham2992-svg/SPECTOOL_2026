@@ -9,7 +9,7 @@
  const r='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
  const pkg='http://schemas.openxmlformats.org/package/2006/relationships';
  const text=v=>v==null?'':typeof v==='boolean'?(v?'TRUE':'FALSE'):String(v);
- const parse=s=>new DOMParser().parseFromString(s,'application/xml');
+ const parse=s=>new DOMParser().parseFromString(String(s).replace(/^\uFEFF/, '').replace(/^\s+(?=<\?xml\b)/, ''),'application/xml');
  const serial=d=>new XMLSerializer().serializeToString(d);
  // Namespace-aware, WebKit-safe traversal. Do not rebuild any format/style XML.
  const all=(node,tag)=>{

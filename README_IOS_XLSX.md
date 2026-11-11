@@ -1,8 +1,15 @@
-# v5.8.2 – iOS XLSX export compatibility (based strictly on v5.8.1)
+# v5.8.3 – iOS XML BOM fix (based on v5.8.1)
 
-- Core SpecFormExport generator, styles, merged cells, hidden D/E, excluded X rows, PDF and technical databases are unchanged from v5.8.1.
-- iOS XML namespace fallback for workbook-to-export sheet relationship.
-- iOS XLSX presents a Save/Share button after file creation (Web Share API); a normal Blob download link is offered as a fallback.
-- No window.open or Data URL for Excel.
-- Non-iOS download remains direct; no change to PDF.
-- Requires validation on a physical iPhone/iPad; JavaScript and XLSX package compatibility checks alone cannot prove it.
+## Nguyên nhân được xác định trong file nguồn
+`xl/_rels/workbook.xml.rels` của cả hai Excel source có UTF-8 BOM ngay trước `<?xml ...?>`. Khi đọc chuỗi bằng JSZip, BOM trở thành ký tự U+FEFF. Một số XML parser trên iOS có thể báo `parsererror` nếu XML declaration không đứng ở đầu chuỗi.
+
+## Sửa đổi
+- Bỏ BOM U+FEFF khi đưa XML vào `DOMParser` trong export-engine.js và print-layout.js (cả app.js).
+- Giữ nguyên layout XLSX/PDF, merge, styles, hidden rows/columns, logic Feature từ v5.8.1.
+- PDF báo nguyên nhân thực tế trong tab thay vì trang “Preparing A4 layout…” trắng khi có lỗi.
+- Giữ cách chia sẻ/tải file iOS v5.8.2.
+
+## Kiểm thử cần làm trên iPhone
+Check Spec = Đạt → Xuất XLSX → Share/Save to Files → mở Excel; sau đó xuất A4 PDF.
+
+Chưa chạy thử trên thiết bị iOS thật.
