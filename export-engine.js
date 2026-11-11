@@ -191,16 +191,30 @@
    c.setAttribute('t','inlineStr');if(/^\s|\s$|\n/.test(String(v)))t.setAttribute('xml:space','preserve');t.textContent=String(v);inline.appendChild(t);c.appendChild(inline);
  }
  async function xlsxFromModel(zip, model, db, doc){
-   const workbook=parse(await zip.file('xl/workbook.xml').async('string'));
-   const rels=parse(await zip.file('xl/_rels/workbook.xml.rels').async('string'));
+   // iOS WebKit: XML documents do not consistently expose namespace-prefixed
+   // relationship attributes through element.children/getAttributeNS.
+   // Resolve the OpenXML r:id using namespace-independent element traversal;
+   // retain a matching relationship node so the subsequent ZIP cleanup works.
+   const workbookXml=(await zip.file('xl/workbook.xml').async('string')).replace(/^\uFEFF/,'');
+   const relsXml=(await zip.file('xl/_rels/workbook.xml.rels').async('string')).replace(/^\uFEFF/,'');
+   const workbook=parse(workbookXml);
+   const rels=parse(relsXml);
    const sheetnodes=all(workbook,'sheet');
    const sheet=sheetnodes.find(x=>x.getAttribute('name')==='SpecFormExport');
    if(!sheet)throw Error('Không có SpecFormExport / Missing sheet');
-   const exportRid=sheet.getAttributeNS(r,'id')||sheet.getAttribute('r:id');
-   const relationships=Array.from(rels.documentElement.children);
+   let exportRid=sheet.getAttribute('r:id')||sheet.getAttributeNS(r,'id');
+   if(!exportRid){
+     // Recover in case an iOS XML parser drops the qualified r:id attribute.
+     const rawSheet=workbookXml.match(/<(?:[\w.-]+:)?sheet\b(?=[^>]*\bname=[\"']SpecFormExport[\"'])[^>]*>/i);
+     exportRid=rawSheet?.[0].match(/\br:id=[\"']([^\"']+)/)?.[1]||'';
+   }
+   const relationships=Array.from(rels.getElementsByTagName('*'))
+     .filter(el=>el.localName==='Relationship'||el.nodeName==='Relationship');
    const ref=relationships.find(x=>x.getAttribute('Id')===exportRid);
-   if(!ref)throw Error('No workbook relationship for Export sheet');
-   const sheetpath=ref.getAttribute('Target').replace(/^\//,'').replace(/^xl\//,'');
+   if(!ref)throw Error('No workbook relationship for Export sheet (r:id='+exportRid+', available='+relationships.length+')');
+   const target=ref.getAttribute('Target')||'';
+   // Targets can be absolute (/xl/...) or relative (worksheets/...).
+   const sheetpath=target.replace(/^\//,'').replace(/^xl\//,'');
    const finalpath='xl/'+sheetpath;
    const worksheet=zip.file(finalpath);if(!worksheet)throw Error('Missing export XML: '+finalpath);
    const x=parse(await worksheet.async('string'));

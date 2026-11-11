@@ -1,9 +1,7 @@
-# v5.9.1 iOS Excel fix
+# v5.9.2 – iOS XLSX relationship fix
 
-- No new blank window/tab when exporting XLSX on iOS.
-- Generate XLSX on the original page; show a dedicated ready-to-save panel.
-- Prefer native Web Share API with XLSX File on a separate user tap (Save to Files).
-- If the API is unavailable, provide a Data URL download link in the same page.
-- iOS can restrict Data URL downloads: native sharing is preferable, and actual iOS testing is required.
-- Keep PDF export and non-iOS Excel behavior unchanged.
-- Upload all files to GitHub Pages publishing root, then hard refresh.
+Fixes `No workbook relationship for Export sheet` in the XLSX generator by finding relationships through XML namespace-aware traversal rather than `.children`, which may behave inconsistently in WebKit XML documents. Also handles UTF-8 BOM and a missing qualified r:id attribute.
+
+Deploy the *entire* folder contents to the GitHub Pages publication folder, then verify v5.9.2 in the header. PDF export, database, and engineering validation were not changed.
+
+Test on a real iOS device is still required; JS syntax and XLSX reference IDs were checked locally.
