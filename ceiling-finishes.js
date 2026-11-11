@@ -3,7 +3,7 @@ window.SPEC_CEILING_FINISH={
  options(model,ceiling){
    const c=String(ceiling||'').toUpperCase();
    if(model==='MR'){
-     if(['L210S','L200S','N300S'].includes(c))return ['SUS-HL'];
+     if(['L200S','L210S','N300S'].includes(c))return ['SUS-HL'];
      if(['S300','L310','N120','N130','N140','S200'].includes(c))return [''];
      return ['Y033','Y055','Y073'];
    }

@@ -647,6 +647,15 @@ function syncDropdownOptions(){
    // keep the last known Workbook-compatible options rather than a free text box.
    if(!opts.length)opts=technicalOptions(f);
   }
+  // MR suffix-S ceilings have one fixed SUS-HL finish. Never retain a stale
+  // Y033/Y055/Y073 color as an invalid extra dropdown choice after model change.
+  if($('model').value==='MR'&&f.name==='K22_CeilingColor'&&opts.length===1&&opts[0]==='SUS-HL'){
+   if(old!=='SUS-HL'){
+    changes[f.cell]='SUS-HL';
+    old='SUS-HL';
+    el.classList.add('dirty');
+   }
+  }
   const before=[...el.options].map(o=>o.value);
   const isJJ=$('model').value==='MRL'&&f.name==='K18_CarJJ';
   if(before.length===opts.length&&before.every((v,i)=>v===opts[i]) &&
