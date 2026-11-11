@@ -1,12 +1,11 @@
-# Webtool v5.8 – NEXIEZ-MR trần hậu tố S / suffix-S ceiling fix
+# SPECTOOL 2026 v5.8.6 — Auto floor granite weight
 
-## Updated
-- NEXIEZ-MR L200S / L210S / N300S only allow SUS-HL; paint colors are not selectable.
-- Changing from a painted model immediately forces the proper SUS-HL option.
-- Check Spec uses the original DataTable!D509 validation with model-specific options.
-- Export XLSX/PDF does not describe SUS-HL as a catalogue paint color.
-- Original MR Excel source included as SpecToolGXLM2P_v5.8_Ceiling_SUSHL_SOURCE.xlsx.
-- NEXIEZ-MRL Version02 unchanged.
+Based directly on v5.8.5; PDF/XLSX export modules are unchanged.
 
-## Usage
-Open `index.html` after unpacking; no server needed. Verify ceiling model and finish at Car design.
+- NEXIEZ-MR flooring weight at SpecForm D60.
+- NEXIEZ-MRL Version02 flooring weight at SpecForm D56.
+- Automatic on load and changes to flooring type, AA, BB, JJ or capacity.
+- Excel-equivalent formula: If Local granite (20 mm), add 5 kg when JJ < 1000 mm, otherwise 10 kg, plus ROUND(AA*BB*0.02*2.7*0.001,0). Other flooring: 0 kg.
+- Weight field remains manually editable. User-entered weight is preserved until a dependent technical input changes; 'Tính lại / Recalculate' restores the calculated weight.
+- Original Excel source files already have this formula and are included unchanged in database/.
+- XLSX/PDF formatting and export scripts are completely unchanged.

@@ -216,6 +216,40 @@ const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS)(?:\b|\s|\-)
 function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell===addr)?.value??''}
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
 function selectedCapacity(){return current.capacity.find(c=>String(c.EleCapacityName)===String(currentValue('D13')))||{}}
+// FlooringWeight: evaluate the original SpecForm Excel expression in the browser.
+// AA, BB and JJ are in mm. Thickness 0.02 m; density 2700 kg/m3.
+// Hence AA * BB * 0.02 * 2.7 * 0.001 is weight in kg.
+let flooringManual=false;
+function flooringAddresses(model=$('model').value){
+ return model==='MR'
+  ?{type:'D59',weight:'D60',aa:'D29',bb:'D30',jj:'D32'}
+  :{type:'D55',weight:'D56',aa:'D28',bb:'D29',jj:'D31'};
+}
+function computedFlooringWeight(){
+ const a=flooringAddresses();
+ if(String(currentValue(a.type)).trim()!=='Local granite (20 mm)')return 0;
+ const aa=Number(currentValue(a.aa)),bb=Number(currentValue(a.bb)),jj=Number(currentValue(a.jj));
+ if(![aa,bb,jj].every(Number.isFinite)||aa<=0||bb<=0||jj<=0)return null;
+ // Match Excel ROUND(x,0): for nonnegative x, round halves away from zero.
+ return (jj<1000?5:10)+Math.floor(aa*bb*0.02*2.7*0.001+0.5);
+}
+function updateFlooringWeight(force=false){
+ if(flooringManual&&!force)return;
+ const a=flooringAddresses(),v=computedFlooringWeight();
+ if(v===null)return;
+ flooringManual=false;
+ const input=activeInput(a.weight);
+ if(input){input.value=String(v);input.classList.add('dirty');}
+ changes[a.weight]=String(v);
+}
+function flooringDependencyChanged(cell){
+ const a=flooringAddresses();
+ if([a.type,a.aa,a.bb,a.jj,'D13'].includes(cell)){
+  flooringManual=false;
+  updateFlooringWeight(true);
+ }
+}
+
 
 const NY40_POPUP_DATA={
  'NY-40A':{vi:'Kính phía sau và hai bên',en:'Rear & both sides',img:'assets/NY-40A.png'},
@@ -812,6 +846,8 @@ function row(field,displayName='',compact=false){
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
+   if(field.name==='K28_FlooringWeight')flooringManual=true;
+   else flooringDependencyChanged(field.cell);
    if(field.name==='K5_Capacity' || field.name==='K17_CarW')refreshMirrorWeightHint();
    // A new ceiling model immediately changes its finish choices, instead of
    // falsely flagging the old paint color when switching to SUS-HL.
@@ -839,6 +875,13 @@ function row(field,displayName='',compact=false){
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
+ if(field.name==='K28_FlooringWeight'){
+  const btn=document.createElement('button');btn.type='button';btn.className='btn btn-small';
+  btn.textContent='Tính lại / Recalculate';
+  btn.title='Tính lại từ AA × BB, JJ và loại sàn theo công thức Excel';
+  btn.addEventListener('click',()=>{updateFlooringWeight(true);invalidateCheck();status('Đã tính lại khối lượng sàn đá theo công thức nguồn / Flooring weight recalculated.');});
+  box.append(btn);
+ }
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
   const hint=document.createElement('small');hint.className='fan-guidance';
@@ -1122,7 +1165,7 @@ function restoreHallLanternFromSource(){
   const fhl=sourceFeatureRows().find(f=>f.code==='FHL');if(fhl)changes[fhl.cell]='1';
  }
 }
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
