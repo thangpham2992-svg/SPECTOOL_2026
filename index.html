@@ -2,9 +2,27 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.40-mrl-cop-n-preview">
+<meta name="specweb-build" content="5.8.44-link-icon-preview">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
+<!-- Browser icon / Home screen icon -->
+<link rel="icon" type="image/png" sizes="256x256" href="assets/specweb-icon.png">
+<link rel="shortcut icon" href="assets/specweb-icon.png">
+<link rel="apple-touch-icon" sizes="256x256" href="assets/specweb-icon.png">
+<meta name="theme-color" content="#f7f8fa">
+<!-- Social sharing metadata (the final og:image URL is resolved in JavaScript for browsers;
+     static preview crawlers may require an absolute deployed GitHub Pages URL) -->
+<meta name="description" content="SpecWebTool – Elevator specification tool for NEXIEZ-MR and NEXIEZ-MRL Version02.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SpecWebTool | NEXIEZ-MR &amp; NEXIEZ-MRL V02">
+<meta property="og:description" content="Elevator specification and technical check webtool.">
+<meta property="og:image" content="assets/specweb-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SpecWebTool | NEXIEZ-MR &amp; NEXIEZ-MRL V02">
+<meta name="twitter:image" content="assets/specweb-share.jpg">
+
 <style>
 :root{font-family:"Segoe UI",Arial,sans-serif;color:#243142;background:#f7f8fa;font-synthesis:none}
 *{box-sizing:border-box}body{margin:0;line-height:1.45}button,input,select{font:inherit}
@@ -86,7 +104,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 }
 .leadtime-check{background:#fff;border:1px solid #d7e3ef;border-radius:7px;padding:11px 16px;margin:-7px 0 15px}.leadtime-label{font-size:13px;font-weight:750;color:#254564}.leadtime-label span{font-size:11px;color:#697a8c;font-weight:500}.leadtime-main{display:flex;align-items:center;gap:14px;margin-top:5px}.leadtime-main strong{font-size:21px;color:#a22c34;white-space:nowrap}.leadtime-reasons{font-size:12px;line-height:1.45;color:#465c70}.leadtime-reasons div+div{margin-top:3px}@media(max-width:580px){.leadtime-check{padding:9px 11px;margin:0 0 10px}.leadtime-main{gap:10px}.leadtime-main strong{font-size:18px}.leadtime-label span{display:block;font-size:10px}}
 </style>
-<link rel="stylesheet" href="responsive-ui.css?v=5.8.21">
+<link rel="stylesheet" href="responsive-ui.css?v=5.8.43">
 <link rel="stylesheet" href="design-guide.css?v=5.8.28">
 </head>
 <body>
@@ -156,6 +174,15 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <script src="panel-images.js?v=5.8.24"></script>
 <script src="material-finish.js?v=5.8.25"></script>
 <script src="app.js?v=5.8.40"></script>
+<script>
+/* Visual-only model watermark; no changes to spec data or export functions. */
+(function(){
+  const selector=document.getElementById('model');
+  const sync=()=>document.documentElement.setAttribute('data-spec-model',selector.value==='MRL'?'MRL':'MR');
+  sync();
+  selector.addEventListener('change',sync);
+})();
+</script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>

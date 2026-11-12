@@ -178,3 +178,83 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 .hall-lantern-card img{max-height:144px;max-width:100%;object-fit:contain}
 .hall-lantern-card strong{font-size:12px}
 @media(max-width:500px){.hall-lantern-gallery{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px}.hall-lantern-header h3{font-size:13px}}
+
+/* v5.8.42 – Features: aligned two-column desktop table with clear separation. */
+@media (min-width:741px) {
+  .features-panel .feature-list {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:0;
+    row-gap:0;
+    border:1px solid #d6e4f0;
+    border-bottom:0;
+    border-radius:5px;
+    overflow:hidden;
+    background:#fff;
+    align-items:stretch;
+  }
+  .features-panel .feature-line {
+    min-width:0;
+    min-height:60px;
+    margin:0;
+    padding:10px 13px;
+    border-bottom:1px solid #d6e4f0;
+    display:grid;
+    grid-template-columns:minmax(55px,75px) minmax(0,1fr) 30px;
+    gap:9px;
+    align-items:center;
+  }
+  .features-panel .feature-line:nth-child(odd) {
+    border-right:2px solid #a8c9e5;
+  }
+  .features-panel .feature-line:nth-child(4n+3),
+  .features-panel .feature-line:nth-child(4n+4) {
+    background:#f7fbff;
+  }
+  .features-panel .feature-line .fdesc {overflow-wrap:anywhere}
+  .features-panel .feature-line input[type="checkbox"] {justify-self:center}
+}
+@media (max-width:740px) {
+  .features-panel .feature-list {display:block;border-top:1px solid #dce6f0}
+  .features-panel .feature-line {border-right:0!important;border-bottom:1px solid #dce6f0}
+}
+
+
+/* v5.8.43: low-opacity model-specific brochure cover as page watermark.
+   It is a screen-only decoration and is never part of SpecForm / exports. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("assets/background/nexiez-mr.jpg");
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: .20;
+}
+html[data-spec-model="MRL"] body::before {
+  background-image: url("assets/background/nexiez-mrl-v02.jpg");
+}
+/* Keep all interactive content above the watermark. */
+body > .site-header,
+body > main.workspace {position: relative;z-index: 1;}
+/* Slight transparency lets the cover show subtly behind grouped sections.
+   Input controls retain their fully opaque backgrounds for legibility. */
+body .workspace > .project-box,
+body .workspace > .action-panel,
+body .workspace > .fields-root .spec-section,
+body .workspace > .features-panel,
+body .workspace > .leadtime-check {
+  background-color: rgba(255,255,255,.86);
+}
+@media (max-width: 600px) {
+ body::before {background-size: auto 78%;background-position:center center;}
+ body .workspace > .project-box,
+ body .workspace > .action-panel,
+ body .workspace > .fields-root .spec-section,
+ body .workspace > .features-panel,
+ body .workspace > .leadtime-check {background-color:rgba(255,255,255,.93);}
+}
+@media print {body::before{display:none!important;}}
