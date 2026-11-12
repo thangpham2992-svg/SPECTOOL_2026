@@ -577,6 +577,13 @@ function renderFeatures(){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
   let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';
   const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
+  // NSCR-C and NSCR-H are independent options; the card-reader variant
+  // must never lock or overwrite the card-reader-free NSCR-C selection.
+  if(fCode==='NSCR-C'){
+    const ctl=currentValue($('model').value==='MR'?'D21':'D22');
+    const sourceStatus=window.SPEC_V52_FEATURES?.status($('model').value,'NSCR-C',ctl,db);
+    if(sourceStatus==='A'||sourceStatus==='S')disabled=false;
+  }
   if(fCode==='ACC'){
    const itv=features.find(z=>(window.SPEC_V52_FEATURES?.canonical(z.code)||z.code)==='ITV');
    const itvEnabled=!!itv&&featureIsSelected(itv);
@@ -591,6 +598,7 @@ function renderFeatures(){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
    featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
+   // NSCR-C changes only its own source cell. NSCR-H remains fully independent.
    if(code==='ITV'&&!chk.checked){changes.AC_TRAVEL_CABLE='0';featureTouched.delete('AC_TRAVEL_CABLE');}
 
    if($('model').value==='MRL'&&chk.checked&&['AECC','AECH','AIL'].includes(code)){

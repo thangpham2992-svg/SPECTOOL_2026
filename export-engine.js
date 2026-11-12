@@ -186,27 +186,9 @@
      cells.C94='Vận hành cứu hỏa theo cấu hình FE Hongkong, sử dụng công tắc MELCO (FE-C30).';
      includedFeatures.push({group:'Emergency',code:'FE-C30',row:null,option:'A',exportRows:[93,94]});
    }
-   // Supplemental features present in Manual Version02 but absent from Version01 SpecForm table.
-   // They are emitted in a separate clearly identified appendix; not silently discarded.
-   if(model==='MRL' && window.SPEC_V52_FEATURES){
-     const v52=window.SPEC_V52_FEATURES;
-     const op=text(eng.safe('SpecForm','D22').value);
-     const extras=v52.virtual(model,db);
-     let pos=312,started=false;
-     for(const f of extras){
-       const st=v52.status(model,f.code,op,db);
-       const enabled=Object.hasOwn(changes,f.cell)?on(changes[f.cell]):st==='S';
-       if(st==='X'||!enabled)continue;
-       if(!started){cells['A'+pos]='VI. Tính năng bổ sung theo Manual Version02 / Additional features';pos++;started=true;}
-       cells['A'+pos]='('+f.code+') '+f.en;
-       cells['C'+pos]='Feature listed in NEXIEZ-MRL Alpha Package Version02 manual. Application: '+(st==='S'?'Standard':'Available option')+'.';
-       pos++;
-       cells['A'+pos]=f.vi;
-       cells['C'+pos]='Tính năng theo Manual NEXIEZ-MRL Version02. Trạng thái: '+(st==='S'?'Tiêu chuẩn.':'Tùy chọn.');
-       includedFeatures.push({group:f.table.replace('TblFeature_',''),code:f.code,row:null,option:st,exportRows:[pos-1,pos]});
-       pos++;
-     }
-   }
+   // Hidden/manual-only Version02 feature definitions are used for source checks and
+   // availability, not shown in the customer-facing SpecFormExport appendix.
+   // Explicitly selected customer deliverables (e.g. ACC or NSCR-H) are handled below.
    // ACC: supplementary ITV-dependent traveling power cable, for both models.
    // Existing SpecFormExport rows, merges, source styles and feature categories are untouched.
    if(['1','TRUE','V','✓'].includes(text(changes.AC_TRAVEL_CABLE).toUpperCase())){
