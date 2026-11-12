@@ -165,6 +165,11 @@ function sourceFeatureRows(){
    const sh=db.sheets.SpecForm;
    const src=addr=>{const v=sh[addr];return v&&typeof v==='object'?(v.v??''):(v??'')};
    const code=String(src('B'+r)||'').trim();if(!code)continue;
+   // Some legacy workbooks store the complete Hall Call card-reader description
+   // in the feature CODE column. That source line is the same NSCR-H option,
+   // not another independently selectable feature. Use the single NSCR-H
+   // supplementary row below; keep the workbook/source calculation untouched.
+   if(/^Non-service\s+Temporary\s+Release\s+for\s+Hall\s+Call\s*[-–]\s*Card\s+Reader\s+Type/i.test(code))continue;
    fromSource.push({table:name,cell:'A'+r,code,en:String(src('C'+r)||''),vi:String(src('D'+r)||''),option:String(src('E'+r)||''),suggestion:String(src('F'+r)||''),apply:src('A'+r)});
   }
  }
@@ -197,8 +202,16 @@ function sourceFeatureRows(){
  if($('model').value==='MRL') fromSource.push(...(window.SPEC_V52_FEATURES?.virtual('MRL',db)||[]));
  // Supplemental NSCR-H card-reader contact feature. Keep MR and MRL catalogues independent,
  // but present the requested option directly after NSCR-C in each Operation list.
- if(!fromSource.some(f=>f.code==='NSCR-H')){
-  const after=fromSource.findIndex(f=>f.code==='NSCR-C');
+ // Remove any duplicate supplemental records on repeated model loads.
+ // NSCR-C is the CAR-call reader, NSCR-H is the HALL-call reader.
+ const featureSeen=new Set();
+ for(let i=fromSource.length-1;i>=0;i--){
+  const key=String(fromSource[i].code||'').trim().toUpperCase();
+  if(!['NSCR-C','NSCR-H'].includes(key))continue;
+  if(featureSeen.has(key))fromSource.splice(i,1);else featureSeen.add(key);
+ }
+ if(!fromSource.some(f=>String(f.code).toUpperCase()==='NSCR-H')){
+  const after=fromSource.findIndex(f=>String(f.code).toUpperCase()==='NSCR-C');
   const supplementary={table:'TblFeature_Operation',cell:'NSCR_H',code:'NSCR-H',virtual:true,apply:0,option:'A',
    en:'Non-service Temporary Release for Hall Call - Card Reader Type (Only dry contact, not supply Card reader and card)',
    vi:'Hạn chế phục vụ cuộc gọi ở tầng - Dạng thẻ từ (Chỉ cung cấp tiếp điểm khô, không bao gồm đầu đọc thẻ và thẻ từ)',
@@ -580,9 +593,16 @@ function renderFeatures(){
   // NSCR-C and NSCR-H are independent options; the card-reader variant
   // must never lock or overwrite the card-reader-free NSCR-C selection.
   if(fCode==='NSCR-C'){
-    const ctl=currentValue($('model').value==='MR'?'D21':'D22');
-    const sourceStatus=window.SPEC_V52_FEATURES?.status($('model').value,'NSCR-C',ctl,db);
+    const model=$('model').value;
+    const ctl=currentValue(model==='MR'?'D21':'D22');
+    const sourceStatus=window.SPEC_V52_FEATURES?.status(model,'NSCR-C',ctl,db);
+    // Keep the native NSCR-C option available independently from virtual NSCR-H.
+    // Technical requirements (e.g. EVRC-C/S for COP C760) remain Check Spec rules.
     if(sourceStatus==='A'||sourceStatus==='S')disabled=false;
+    line.title='NSCR-C: hạn chế cuộc gọi trong cabin (CAR CALL). Khác NSCR-H: cuộc gọi tại tầng (HALL CALL).';
+  }
+  if(fCode==='NSCR-H'){
+    line.title='NSCR-H: hạn chế cuộc gọi tại tầng (HALL CALL). Không thay thế NSCR-C (CAR CALL).';
   }
   if(fCode==='ACC'){
    const itv=features.find(z=>(window.SPEC_V52_FEATURES?.canonical(z.code)||z.code)==='ITV');
@@ -598,6 +618,10 @@ function renderFeatures(){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
    featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
+   if(code==='NSCR-C'&&chk.checked&&$('model').value==='MR'&&String(currentValue('D65'))==='760'){
+     const evrc=features.filter(x=>['EVRC-C','EVRC-S'].includes(x.code));
+     if(!evrc.some(x=>featureIsSelected(x)))status('NSCR-C đã được chọn. Với COP C760, cần chọn thêm EVRC-C hoặc EVRC-S để Check Spec đạt. NSCR-H không liên quan.');
+   }
    // NSCR-C changes only its own source cell. NSCR-H remains fully independent.
    if(code==='ITV'&&!chk.checked){changes.AC_TRAVEL_CABLE='0';featureTouched.delete('AC_TRAVEL_CABLE');}
 
@@ -1386,7 +1410,9 @@ function renderSourceCheck(result){
   if(String(err.id)==='ITP!Required')name='Vui lòng chọn loại ITP';
   if(String(err.id).startsWith('ITP!')&&String(err.id)!=='ITP!Required')name=String(err.message||'Loại ITP không hợp lệ');
   if(!name||name===cell)name='Thông số kỹ thuật';
-  const message=isDimension(cell)?String(err.message||'').trim():'';
+  // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
+  // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
+  const message=(isDimension(cell)||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=isDimension(cell)?dimensionPriority(err):0;
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{name,message,priority});

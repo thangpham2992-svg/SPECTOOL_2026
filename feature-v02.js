@@ -29,6 +29,14 @@ function fixDatabase(model,db){
  const start=Number((t.ref.split(':')[0].match(/\d+/)||[])[0]||0)+1,end=Number((t.ref.split(':')[1].match(/\d+/)||[])[0]||0);
  for(let r=start;r<=end;r++){
   const code=String(dt['A'+r]||'');const k=canonical(code);
+  // The MR source contains EXCLC (Exclusive Operation Signal Light - Car)
+  // with A/A/A/X compatibility, but its ALPHA flag is blank in the
+  // distributed embedded database. Restore only this verified MR option.
+  // MRL Version02 explicitly disallows EXCLC (XXX) in its own manual.
+  if(model==='MR'&&k==='EXCLC'&&
+     ['G','H','I'].some(c=>String(dt[c+r]||'').toUpperCase()==='A')){
+   dt['Q'+r]='Y';
+  }
   if(model==='MRL'&&catalog[k]){
    const st=catalog[k].statuses;
    dt['G'+r]=st[0];dt['H'+r]=st[1];dt['I'+r]=st[2];dt['J'+r]=st[2];

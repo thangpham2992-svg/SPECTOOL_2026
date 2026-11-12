@@ -95,6 +95,16 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(model==='MR'&&sheet==='DataTable'&&addr==='AP4')msg='Cửa tầng khác không phù hợp kiểu cửa hoặc cấu hình hiện tại.';
    if(model==='MR'&&sheet==='DataTable'&&addr==='AP5')msg='Khối lượng sàn và trang trí vượt giới hạn cho phép của cấu hình.';
    if(model==='MR'&&sheet==='DataTable'&&addr==='AP10')msg='Chiều rộng cửa JJ hoặc Door Type không phù hợp Capacity.';
+   if(model==='MR'&&sheet==='DataTable'&&addr==='D494'){
+    // Retain the original Excel NSCR-C condition; only route the error to
+    // the EVRC choice the salesman needs to select (instead of NSCR-C again).
+    const evrcC=featureByCode['evrc-c'],evrcS=featureByCode['evrc-s'];
+    const selected=c=>c&&['1','TRUE','V','✓'].includes(String(changes[c]??db.sheets.SpecForm[c]?.v??db.sheets.SpecForm[c]??0).trim().toUpperCase());
+    if(evrcC&&!selected(evrcC)&&!selected(evrcS)){
+     field=evrcC;
+     msg='NSCR-C với COP C760: cần chọn EVRC-C hoặc EVRC-S trong Vận hành / Operation. Nhấn vào lỗi này để đến EVRC-C.';
+    }else msg='Điều kiện NSCR-C theo DataTable!D494 chưa đạt. Kiểm tra COP C760 và EVRC-C/EVRC-S.';
+   }
    if(model==='MR'&&sheet==='DataTable'&&addr==='D509')msg='Vật liệu trần không phù hợp: L200S, L210S, N300S chỉ được chọn SUS-HL (không dùng màu sơn Y033/Y055/Y073).';
    if(model==='MRL'&&sheet==='DataTable'&&row===522){
     // D522 combines AH and BH. Show the exact failing field and dynamic F33/F34 minimum.
