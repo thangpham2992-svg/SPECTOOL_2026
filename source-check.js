@@ -18,7 +18,7 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
  }
  const cellForCondition=(row)=>{
   if(model==='MRL'){
-   if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D23';
+   if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D14';
    if(row===525)return 'D14';if(row===526)return 'D62';if(row===528)return 'D66';
    if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
    if(row===514)return 'D35';if(row===515)return 'D18';if(row===516||row===517||row===518)return 'D41';
@@ -46,6 +46,14 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   return model==='MR'?'D21':'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
+ // Supplemental AC power traveling cable is possible only with ITV selected.
+ if(['1','TRUE','V','✓'].includes(String(changes.AC_TRAVEL_CABLE??'0').toUpperCase())){
+  const itvCell=featureByCode['itv']||featureByCode['itv cable'];
+  const raw=itvCell?changes[itvCell]??db.sheets.SpecForm[itvCell]??0:0;
+  const itvOn=['1','TRUE','V','✓'].includes(String(typeof raw==='object'?(raw.v??0):raw).toUpperCase());
+  if(!itvOn)issue('Supplement!ACC','AC_TRAVEL_CABLE','Phải chọn ITV trước khi chọn cáp động cấp nguồn cho điều hòa cabin / ITV is required for AC power traveling cable');
+ }
+
  // All displayed dimension limits are calculated by the workbook's current formulas.
  // Never guess a minimum/maximum or silently treat an unresolved lookup as a valid value.
  const fmtMm=x=>Number(x).toLocaleString('vi-VN')+' mm';
@@ -110,12 +118,21 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
      }
     }
     if(!found)issue(reference,'D37',msg);
+   }else if(model==='MRL'&&sheet==='DataTable'&&row===524){
+    // D524 = R23(CWT) & R46(Car door) & R73/R74(Landing doors).
+    // Never report a glazed-door failure as CWT.
+    let found=false;
+    for(const [r,cell,label] of [['R23','D23','Loại đối trọng'],['R46','D46','Cửa cabin'],['R73','E73','Cửa tầng chính'],['R74','E74','Cửa tầng khác']]){
+      const state=value('SpecForm',r);
+      if(state.ok&&state.value===false){issue(reference+'/'+r,cell,label+' không thỏa điều kiện kỹ thuật / Invalid source condition '+r);found=true;}
+    }
+    if(!found)issue(reference,'D14',msg);
    }else if(model==='MRL'&&sheet==='DataTable'&&row===525){
     const obs=value('SpecForm','D14'),gate=value('SpecForm','R14'),ceiling=value('SpecForm','D41'),handrail=value('SpecForm','D64');
     let found=false;
     if(!gate.ok||gate.value!==true){issue(reference+' / upstream','D14','Mẫu cabin quan sát không phù hợp tải trọng hoặc loại cửa.');found=true;}
     if(ceiling.ok&&String(ceiling.value)==='FL1'){issue(reference+' / ceiling','D41','Trần FL1 không phù hợp với cabin quan sát.');found=true;}
-    if(handrail.ok&&String(handrail.value)!=='YH-100SL (SUS304)'){issue(reference+' / handrail','D64','Cabin quan sát yêu cầu tay vịn YH-100SL (SUS304).');found=true;}
+    if(handrail.ok&&String(handrail.value)!=='YH-100SL (SUS304)'){issue(reference+' / handrail','D64','Theo bảng nguồn Version02, cabin quan sát yêu cầu mã tay vịn YH-100SL (SUS304).');found=true;}
     if(!found)issue(reference,'D14',msg);
    }else issue(reference,field,msg,'Calculated FALSE from workbook formula ='+db.sheets[sheet][addr]?.f);
    details.push({ref:reference,state:'FAIL',message:msg,cell:field});return false;
@@ -211,9 +228,20 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    else{verified.push('SpecForm!'+a);details.push({ref:'SpecForm!'+a,state:'CALCULATED',value:r.value});
     if(a==='B209'&&typeof r.value==='string'&&r.value.startsWith('Err -')){
      const match=/DataTable!D(\d{3})/.exec(r.value);
-     const existing=match&&issues.some(x=>x.id==='DataTable!D'+match[1]);
+     const existing=match&&issues.some(x=>x.id==='DataTable!D'+match[1]||x.id.startsWith('DataTable!D'+match[1]+'/'));
      if(!existing){
-      const target=match?cellForCondition(Number(match[1])):guessB209Cell(r.value);
+      let target=match?cellForCondition(Number(match[1])):guessB209Cell(r.value);
+      if(match&&Number(match[1])===524){
+        const checks=[['R46','D46'],['R73','E73'],['R74','E74'],['R23','D23']];
+        target=checks.find(([r])=>{const z=value('SpecForm',r);return z.ok&&z.value===false;})?.[1]||'D14';
+      }
+      if(match&&Number(match[1])===525){
+        const position=value('SpecForm','D65'),handrail=value('SpecForm','D64'),cop=value('SpecForm','D60'),entrance=value('SpecForm','D16');
+        const allowed=window.SPEC_NY40_RULES?.allowedLocations(value('SpecForm','D14').value);
+        if(allowed&&position.ok&&!allowed.includes(position.value))target='D65';
+        else if(handrail.ok&&(!handrail.value||handrail.value==='Not supplied'))target='D64';
+        else if(entrance.ok&&cop.ok&&entrance.value==='1D-2G'&&cop.value==='Side')target='D60';
+      }
       if(target)issue('SpecForm!B209',target,r.value,db.sheets.SpecForm.B209?.f||'');
       else warnings.push('SpecForm!B209: '+r.value);
      }
@@ -318,6 +346,13 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
     }
    }
   }
+ }
+ // Note 5: each NY-40 glass layout requires a compatible handrail position.
+ // This is a separate application check and MUST NOT be attributed to CWT/Capacity.
+ if(model==='MRL'&&window.SPEC_NY40_RULES){
+   const get=addr=>{const result=value('SpecForm',addr);return result.ok?result.value:'';};
+   for(const result of window.SPEC_NY40_RULES.validate(get))issue(result.id,result.cell,result.message);
+   verified.push('MRL NY-40 Note 5: handrail positions and two-gate COP condition');
  }
  // MRL COP: check each input independently using the source workbook's own
  // DataTable choice ranges. Do not treat a wrong fixture as invalid rated capacity.

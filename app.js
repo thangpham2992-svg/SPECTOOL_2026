@@ -195,6 +195,24 @@ function sourceFeatureRows(){
   }
  }
  if($('model').value==='MRL') fromSource.push(...(window.SPEC_V52_FEATURES?.virtual('MRL',db)||[]));
+ // Supplemental NSCR-H card-reader contact feature. Keep MR and MRL catalogues independent,
+ // but present the requested option directly after NSCR-C in each Operation list.
+ if(!fromSource.some(f=>f.code==='NSCR-H')){
+  const after=fromSource.findIndex(f=>f.code==='NSCR-C');
+  const supplementary={table:'TblFeature_Operation',cell:'NSCR_H',code:'NSCR-H',virtual:true,apply:0,option:'A',
+   en:'Non-service Temporary Release for Hall Call - Card Reader Type (Only dry contact, not supply Card reader and card)',
+   vi:'Hạn chế phục vụ cuộc gọi ở tầng - Dạng thẻ từ (Chỉ cung cấp tiếp điểm khô, không bao gồm đầu đọc thẻ và thẻ từ)',
+   suggestion:'Card reader and card by others / Chỉ cung cấp tiếp điểm khô'};
+  fromSource.splice(after>=0?after+1:fromSource.length,0,supplementary);
+ }
+
+ // ACC is a supplemental traveling cable choice, distinct from the ITV cable.
+ // Require the ITV feature in the respective model (never copy the other model's Feature table).
+ if(fromSource.some(f=>(window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)==='ITV')){
+  fromSource.push({table:'TblFeature_Signal',cell:'AC_TRAVEL_CABLE',code:'ACC',virtual:true,apply:0,option:'A',
+   vi:'Cáp động cấp nguồn cho điều hòa cabin, nằm bên trong giếng thang (hố thang máy).',
+   en:'Power supply traveling cable for the elevator car air conditioner, inside the hoistway.',suggestion:'Requires ITV'});
+ }
  return fromSource.length?fromSource:xrules().features||[];
 }
 const lockedNames=new Set(['K7_DoorType','K17_CarW','K17_CarD','K18_CarJJ']);
@@ -559,6 +577,13 @@ function renderFeatures(){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
   let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';
   const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
+  if(fCode==='ACC'){
+   const itv=features.find(z=>(window.SPEC_V52_FEATURES?.canonical(z.code)||z.code)==='ITV');
+   const itvEnabled=!!itv&&featureIsSelected(itv);
+   disabled=!itvEnabled;
+   if(!itvEnabled){changes.AC_TRAVEL_CABLE='0';chk.checked=false;}
+   line.title=itvEnabled?'':'Yêu cầu bật tính năng ITV / ITV must be selected first';
+  }
   if($('model').value==='MRL'&&fCode==='AIL'&&!window.SPEC_HALL_LANTERN?.any(changes))disabled=true;
   chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{
    const code=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
@@ -566,6 +591,8 @@ function renderFeatures(){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
    featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
+   if(code==='ITV'&&!chk.checked){changes.AC_TRAVEL_CABLE='0';featureTouched.delete('AC_TRAVEL_CABLE');}
+
    if($('model').value==='MRL'&&chk.checked&&['AECC','AECH','AIL'].includes(code)){
      // Apply the exclusivity notes from the Version02 Sales Manual.
      const conflicts=code==='AECC'?['AECH']:code==='AECH'?['AECC','AIL']:['AECH'];
@@ -576,7 +603,7 @@ function renderFeatures(){
    if(f.code==='FE-C30'&&chk.checked)changes.A93='0';
    if(f.code==='FE'&&chk.checked)changes.FE_C30='0';
    if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);
-   if(['FE','FE-C30','ITP','AECC','AECH','AIL'].includes(code)){
+   if(['FE','FE-C30','ITP','ITV','AECC','AECH','AIL'].includes(code)){
      if(code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();
    }
    invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.');
@@ -644,6 +671,7 @@ const supplementalListSources={
  K36_DoorFinishOtherFloorMaterial:['TblK36_EntranceDoorFinish','Finish']
 };
 function workbookChoices(field,engine=null){
+ if(field.name==='K35_Ventilation'&&$('model').value==='MRL')return ['No','DC axial flow fan','DC axial flow fan + Plasma Quad'];
  if(field.name==='K22_CeilingColor'&&window.SPEC_CEILING_FINISH){
   const model=$('model').value,ceiling=String(currentValue(model==='MR'?'D45':'D41'));
   return window.SPEC_CEILING_FINISH.options(model,ceiling);
@@ -674,6 +702,7 @@ function workbookChoices(field,engine=null){
  }
  if(!field.validation&& !supplementalListSources[field.name])list=technicalOptions(field);
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
+ if(field.cell==='D65'&&$('model').value==='MRL'&&ny40PositionChoices())list=ny40PositionChoices();
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
@@ -856,6 +885,10 @@ function row(field,displayName='',compact=false){
     if(fin){const chosen=window.SPEC_CEILING_FINISH.next(model,input.value,currentValue(fin.cell));
      if(String(currentValue(fin.cell))!==chosen)applyValue(fin.cell,chosen);}
    }
+   if($('model').value==='MRL'&&field.cell==='D14'&&window.SPEC_NY40_RULES){
+     const allowed=window.SPEC_NY40_RULES.allowedLocations(input.value);
+     if(allowed&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
+   }
    syncDropdownOptions();
    refreshSideDrop();
    refreshLocks();
@@ -882,10 +915,15 @@ function row(field,displayName='',compact=false){
   btn.addEventListener('click',()=>{updateFlooringWeight(true);invalidateCheck();status('Đã tính lại khối lượng sàn đá theo công thức nguồn / Flooring weight recalculated.');});
   box.append(btn);
  }
+ if($('model').value==='MRL'&&['K22_SUSType','K24_CarDoorFinish','K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial'].includes(field.name)){
+   const hint=document.createElement('small');hint.className='technical-material-hint';
+   hint.textContent='SUS Standard vẫn hợp lệ với NY-40. Chỉ cấu kiện cửa có kính DSJ1/DS1/Large Window dùng SUS304; khung cửa, transom và front return giữ vật liệu tiêu chuẩn.';
+   hint.style.cssText='display:block;margin-top:5px;color:#52677b;font-size:11px;';box.append(hint);
+ }
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
   const hint=document.createElement('small');hint.className='fan-guidance';
-  hint.textContent='Theo Sales Manual G11L1P: Plasma Quad™ là quạt tuần hoàn tùy chọn riêng (từ 825 kg, còn tùy kích thước cabin), không phải tên khác của quạt thông gió tiêu chuẩn.';
+  hint.textContent='DC axial flow fan: Quạt hướng trục DC; DC axial flow fan + Plasma Quad: Quạt hướng trục DC kết hợp với diệt khuẩn Plasma.';
   box.append(hint);
  }
  return box;
@@ -958,15 +996,20 @@ function allowedObservationCodes(){
  if(entrance==='1D-2G' && (/^P11-CO/.test(cap)||/^P13W-CO/.test(cap)) && String(currentValue('D60'))==='Front')return ['NY-40C'];
  return [];
 }
+function ny40PositionChoices(){
+ if($('model').value!=='MRL')return null;
+ return window.SPEC_NY40_RULES?.allowedLocations(String(currentValue('D14')))||null;
+}
 function technicalOptions(field){
  if($('model').value!=='MRL')return field.options||[];
  const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
  if(field.cell==='D16')return /^(P08|P11|P13|P17D|P21D)/.test(cap)?['1D-1G','1D-2G']:['1D-1G'];
  if(field.cell==='D14')return ['No',...allowedObservationCodes()];
+ if(field.cell==='D65'&&ny40PositionChoices())return ny40PositionChoices();
  return field.options||[];
 }
 function updateConditional(){
- for(let cell of ['D16','D14']){
+ for(let cell of ['D16','D14','D65']){
   const f=current.fields.find(x=>x.cell===cell),el=activeInput(cell);if(!f||!el)continue;
   const opts=technicalOptions(f);if(el.tagName!=='SELECT')continue;
   const old=String(currentValue(cell));el.replaceChildren();for(let value of opts){let op=document.createElement('option');op.value=value;op.textContent=value;el.append(op)}
@@ -1065,6 +1108,42 @@ function renderAllSpecRows(){
    const value=document.createElement('div');value.className='readonly-value';value.textContent=String(info.D||'');area.append(value);
   }
   sectionRow.append(text,area);sectionRows.append(sectionRow);
+ }
+ // v5.8.16: Arrange both models in wide, independently editable dimension groups.
+ // Move the existing input nodes (never clone them) so Check Spec / Export bindings stay unchanged.
+ {
+  const model=$('model').value;
+  const dimensionSection=[...root.querySelectorAll('.spec-section')].find(x=>x.dataset.section==='II');
+  const dimensionGrid=dimensionSection?.querySelector('.section-fields');
+  if(dimensionGrid){
+   const groups=model==='MRL' ? [
+    {title:'Kích thước thang máy',en:'Elevator dimensions',rows:[28,29,30,31,32],labels:['AA – Rộng / Width','BB – Sâu / Depth','HL – Cao / Height','JJ – Rộng cửa / Door width','HH – Cao cửa / Door height']},
+    {title:'Kích thước giếng thang máy',en:'Hoistway dimensions',rows:[33,34,35,37,36],labels:['AH – Rộng / Width','BH – Sâu / Depth','Travel – Hành trình','OH – Đỉnh hố thang','PD – Chiều sâu Pit']}
+   ] : [
+    {title:'Kích thước thang máy',en:'Elevator dimensions',rows:[29,30,31,32,33],labels:['AA – Rộng / Width','BB – Sâu / Depth','HL – Cao / Height','JJ – Rộng cửa / Door width','HH – Cao cửa / Door height']},
+    {title:'Kích thước giếng thang máy',en:'Hoistway dimensions',rows:[34,35,36,37,38,39,41,40],labels:['AH – Rộng / Width','BH – Sâu / Depth','AM – Rộng phòng máy / MR width','BM – Sâu phòng máy / MR depth','MH – Cao phòng máy / MR height','TR – Hành trình / Travel','OH – Đỉnh hố thang','PD – Chiều sâu Pit']}
+   ];
+   const grouped=document.createElement('div');grouped.className='dimension-groups';
+   grouped.dataset.model=model;
+   for(let groupIndex=0;groupIndex<groups.length;groupIndex++){
+    const group=groups[groupIndex];
+    const card=document.createElement('section');card.className='dimension-group';
+    card.classList.add(groupIndex===0?'dimension-car':'dimension-hoistway');
+    const heading=document.createElement('h3');heading.className='dimension-group-title';
+    heading.textContent=group.title+' / '+group.en;card.append(heading);
+    group.rows.forEach((sourceRow,i)=>{
+     const original=dimensionGrid.querySelector('.spec-row[data-row="'+sourceRow+'"]');
+     if(!original)return;
+     original.classList.add('dimension-entry');
+     const label=original.querySelector('.spec-row-title');
+     if(label)label.textContent=group.labels[i];
+     card.append(original);
+    });
+    grouped.append(card);
+   }
+   dimensionGrid.classList.add('dimension-section-fields');
+   dimensionGrid.prepend(grouped);
+  }
  }
  // Consolidate hall call / indicator fields by floor, rather than by Excel source row.
  // The original input nodes and their data-cell bindings are MOVED, not cloned.

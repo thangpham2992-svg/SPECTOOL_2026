@@ -143,6 +143,37 @@
      cells['C'+ceilingOutputRow]=`Trần phòng thang kiểu ${ceilingName}, ${mirror?'inox gương':'inox sọc nhuyễn'} (${ceilingFinish}).`;
      cells['C'+(ceilingOutputRow+1)]=`(Car ceiling model ${ceilingName}, ${mirror?'mirror-finish':'hairline-finish'} stainless steel ceiling (${ceilingFinish})).`;
    }
+   // Per-component material override: special glass door assemblies are SUS304,
+   // independent of the global SUS Standard selection. Never promote Jamb,
+   // Transom or Front return to SUS304 unless the global SUS304 option is chosen.
+   // The source formulas already handle DSJ1 and Large window; include DS1 here.
+   if(model==='MRL'){
+     const read=addr=>text(eng.safe('SpecForm',addr).value);
+     for(const [input,exportRows] of [['D46',[49,50]],['E73',[72,73]],['E74',[74,75]]]){
+       const selected=read(input);
+       if(window.SPEC_NY40_RULES?.isGlassDoor(selected) && /^SUS-HL/i.test(selected)){
+         for(const row of exportRows){const key='C'+row;
+           cells[key]=text(cells[key]).replace(/SUS430J1L|SUS430/gi,'SUS304');
+         }
+       }
+     }
+   }
+   // MRL Version02: export the live (and manually overridable) granite weight,
+   // not a cached SpecFormExport result from the source XLSX.
+   if(model==='MRL'){
+     const floorType=text(eng.safe('SpecForm','D55').value).trim();
+     if(floorType==='Local granite (20 mm)'){
+       const weightResult=eng.safe('SpecForm','D56');
+       // SourceEngine reads user overrides first. Retain a manually entered weight.
+       const AA=Number(eng.safe('SpecForm','D28').value),BB=Number(eng.safe('SpecForm','D29').value),JJ=Number(eng.safe('SpecForm','D31').value);
+       const computed=Number.isFinite(AA)&&Number.isFinite(BB)&&Number.isFinite(JJ)?Math.floor(AA*BB*0.02*2.7*0.001+0.5)+(JJ<1000?5:10):NaN;
+       const userWeight=Object.hasOwn(changes,'D56')?Number(changes.D56):(Number.isFinite(Number(weightResult.value))?Number(weightResult.value):computed);
+       if(Number.isFinite(userWeight)&&userWeight>=0){
+         const w=Number.isInteger(userWeight)?String(userWeight):String(userWeight);
+         cells.C56=`Sàn đá granite cung cấp trong nước, chiều dày hoàn thiện sau thi công 20mm, khối lượng ${w} Kg (Local natural granite, finishing thickness 20 mm, weight ${w} Kg).`;
+       }
+     }
+   }
    // Mirror weight adjustment is calculated in Excel only; do not append note in Export.
    // MR FE-Hongkong (FE-C30): the historical template omits a dedicated row.
    // In this variant the existing FE bilingual export slot represents FE-C30.
@@ -175,6 +206,30 @@
        includedFeatures.push({group:f.table.replace('TblFeature_',''),code:f.code,row:null,option:st,exportRows:[pos-1,pos]});
        pos++;
      }
+   }
+   // ACC: supplementary ITV-dependent traveling power cable, for both models.
+   // Existing SpecFormExport rows, merges, source styles and feature categories are untouched.
+   if(['1','TRUE','V','✓'].includes(text(changes.AC_TRAVEL_CABLE).toUpperCase())){
+     const source=db.sheets.SpecForm;
+     const itv=Object.entries(source).find(([k,v])=>/^B\d+$/.test(k)&&/^(ITV|ITV Cable)$/.test(text(v)));
+     const itvOn=itv&&on(changes['A'+itv[0].slice(1)]??source['A'+itv[0].slice(1)]);
+     if(!itvOn)throw Error('ACC requires ITV / Cáp động điều hòa yêu cầu ITV');
+     cells.A296='VI. Tính năng bổ sung / Additional feature';
+     cells.A297='ACC – Aircondition Cabin';
+     cells.C297='Power supply traveling cable for the elevator car air conditioner, inside the hoistway.';
+     cells.A298='Cáp động cấp nguồn điều hòa cabin';
+     cells.C298='Cáp động cấp nguồn cho điều hòa cabin, nằm bên trong giếng thang (hố thang máy).';
+     includedFeatures.push({group:'Signal',code:'ACC',row:null,option:'A',exportRows:[297,298]});
+   }
+   // NSCR-H supplementary feature: preserve original source export rows and styles.
+   // Rows 299–300 are unused in the standard feature print range; show only when selected.
+   if(on(changes.NSCR_H)){
+     if(!cells.A296)cells.A296='VI. Tính năng bổ sung / Additional features';
+     cells.A299='NSCR-H – Non-service Temporary Release for Hall Call - Card Reader Type';
+     cells.C299='Hall calls at restricted floors can be registered only by placing a card over a card reader. This function is automatically deactivated during emergency operation. Only dry contact is supplied; card reader and card are excluded.';
+     cells.A300='Hạn chế phục vụ cuộc gọi ở tầng – Dạng thẻ từ';
+     cells.C300='Các cuộc gọi ở tầng bị hạn chế chỉ được chấp nhận khi sử dụng thẻ từ. Chức năng tự động vô hiệu hóa trong chế độ khẩn cấp. Chỉ cung cấp tiếp điểm khô, không bao gồm đầu đọc thẻ và thẻ từ.';
+     includedFeatures.push({group:'Operation',code:'NSCR-H',row:null,option:'A',exportRows:[299,300]});
    }
    // v4.2: Remove the legacy decorative-weight exclusion note from any export.
    for(const addr of Object.keys(cells))if(typeof cells[addr]==='string')cells[addr]=cells[addr]
@@ -251,6 +306,67 @@
        }
      }
    }
+   // Supplemental Features (ACC, NSCR-H, and Version02-only options) must have
+   // exactly the same two-column label + description formatting as ordinary
+   // bilingual Feature rows. Blank rows 296+ in the source have style 0/25.
+   const extraPairs=(doc.includedFeatures||[]).filter(f=>Array.isArray(f.exportRows)&&f.exportRows.length===2&&f.exportRows[0]>=296);
+   const extraFeatureRows=new Set(extraPairs.flatMap(f=>f.exportRows));
+   const extraHeaders=new Set(extraFeatureRows.size&&doc.cells.A296?[296]:[]);
+   if(extraFeatureRows.size&&doc.cells.A312)extraHeaders.add(312);
+   if(extraFeatureRows.size){
+     const existingRows=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')),row]));
+     const templateEnglish=existingRows.get(171),templateVietnamese=existingRows.get(172);
+     const styleFor=(src,col)=>Array.from(src?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+src.getAttribute('r'))?.getAttribute('s')||'0';
+     const merged=all(x,'mergeCell');
+     let merges=all(x,'mergeCells')[0];
+     if(!merges){
+       merges=x.createElementNS(n,'mergeCells');
+       const anchor=Array.from(x.documentElement.children).find(el=>['conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup'].includes(el.localName));
+       if(anchor)x.documentElement.insertBefore(merges,anchor);else x.documentElement.appendChild(merges);
+     }
+     const overlaps=(rn)=>merged.some(m=>{
+       const match=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');
+       if(!match)return false;
+       const a=Number(match[2]),b=Number(match[4]);
+       return rn>=a&&rn<=b&&!(match[1]==='D'||match[3]==='D');
+     });
+     function ensureCell(row,rn,col,style){
+       let c=Array.from(row.children).find(el=>el.localName==='c'&&el.getAttribute('r')===col+rn);
+       if(!c){c=x.createElementNS(n,'c');c.setAttribute('r',col+rn);
+         const next=Array.from(row.children).find(el=>el.localName==='c'&&String(el.getAttribute('r')||'').charCodeAt(0)>col.charCodeAt(0));
+         if(next)row.insertBefore(c,next);else row.appendChild(c);
+       }
+       c.setAttribute('s',style);
+       if(Object.hasOwn(doc.cells,col+rn))updateCell(x,c,doc.cells[col+rn]);
+       return c;
+     }
+     for(const pair of extraPairs){
+       for(let i=0;i<2;i++){
+         const rn=pair.exportRows[i];const row=existingRows.get(rn);
+         if(!row)continue;
+         const src=i?templateVietnamese:templateEnglish;
+         for(const col of ['A','B','C'])ensureCell(row,rn,col,styleFor(src,col));
+         const aText=String(doc.cells['A'+rn]||''),cText=String(doc.cells['C'+rn]||'');
+         // Widths A+B and C are ~46/70 character units. Respect wrapped bilingual text.
+         const lines=Math.max(1,Math.ceil(aText.length/36),Math.ceil(cText.length/67));
+         row.setAttribute('ht',String(Math.min(140,Math.max(27.6,lines*14+7))));
+         row.setAttribute('customHeight','1');
+         if(!overlaps(rn)){
+           const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref',`A${rn}:B${rn}`);merges.appendChild(m);merged.push(m);
+         }
+       }
+     }
+     // Section headings use a full-width merged blue title, consistent with I–V.
+     for(const rn of extraHeaders){
+       const row=existingRows.get(rn);if(!row)continue;
+       for(const col of ['A','B','C'])ensureCell(row,rn,col,'25');
+       if(!overlaps(rn)){
+         const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref',`A${rn}:C${rn}`);merges.appendChild(m);merged.push(m);
+       }
+       row.setAttribute('ht','20');row.setAttribute('customHeight','1');
+     }
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+   }
    for(const row of all(x,'row')){
      const num=+(row.getAttribute('r')||0);
      if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}
@@ -269,7 +385,7 @@
    // exactly the same blue sections regardless of the source workbook theme/fill.
    const sectionTitle=/^\s*[IVXLCDM]+\.\s+/i;
    const blueRows=[...new Set(Object.entries(doc.cells)
-     .filter(([addr,value])=>/^A\d+$/.test(addr)&&cellRow(addr)<=300&&!doc.hiddenRows.has(cellRow(addr))&&sectionTitle.test(text(value)))
+     .filter(([addr,value])=>/^A\d+$/.test(addr)&&cellRow(addr)<=480&&!doc.hiddenRows.has(cellRow(addr))&&sectionTitle.test(text(value)))
      .map(([addr])=>cellRow(addr)))];
    if(blueRows.length){
      const stylePath='xl/styles.xml';const styleFile=zip.file(stylePath);
@@ -331,6 +447,53 @@
      const print=x.createElementNS(n,'definedName');print.setAttribute('name','_xlnm.Print_Area');print.setAttribute('localSheetId','0');print.textContent="'Specification'!$A$1:$C$"+Math.max(...Object.keys(doc.cells).filter(a=>/^[ABC]\d+$/.test(a)).map(cellRow));defs.appendChild(print);
    }
    const calc=all(workbook,'calcPr')[0];if(calc){calc.setAttribute('fullCalcOnLoad','0');calc.setAttribute('calcMode','manual');}
+   // Export-only rail rows for MRL Version02. Insert after the hoistway structure
+   // without modifying SpecForm or any technical DataTable formulas. This operates
+   // on the frozen export worksheet, preserving all existing styles and merges.
+   if(model==='MRL'){
+     const pivot=29,offset=2;
+     const shiftedRef=ref=>String(ref).replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g,(match,col,num)=>col+(Number(num)>pivot?Number(num)+offset:num));
+     // Move existing rows and cell references; preserve each cell's original style.
+     for(const row of all(x,'row')){
+       const old=Number(row.getAttribute('r'));
+       if(old>pivot){row.setAttribute('r',String(old+offset));
+         for(const c of Array.from(row.children).filter(el=>el.localName==='c')){
+           const addr=c.getAttribute('r');if(addr)c.setAttribute('r',shiftedRef(addr));
+         }
+       }
+     }
+     // Shift merged ranges and print/repeat references that are sheet-local.
+     for(const m of all(x,'mergeCell')){const ref=m.getAttribute('ref');if(ref)m.setAttribute('ref',shiftedRef(ref));}
+     const filt=all(x,'autoFilter')[0];if(filt?.getAttribute('ref'))filt.setAttribute('ref',shiftedRef(filt.getAttribute('ref')));
+     for(const br of all(x,'brk'))if(Number(br.getAttribute('id'))>pivot)br.setAttribute('id',String(Number(br.getAttribute('id'))+offset));
+     const dim=all(x,'dimension')[0];if(dim?.getAttribute('ref'))dim.setAttribute('ref',shiftedRef(dim.getAttribute('ref')));
+     // Reuse proven header/detail border styles from this exact workbook.
+     const source=all(x,'row').find(row=>Number(row.getAttribute('r'))===29);
+     const findStyle=(col,fall='0')=>Array.from(source?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+'29')?.getAttribute('s')||fall;
+     function addRailRow(num,label,top){
+       const row=x.createElementNS(n,'row');row.setAttribute('r',String(num));row.setAttribute('ht','17');row.setAttribute('customHeight','1');
+       for(const [col,value,style] of [
+         ['A',top?'Thanh dẫn hướng (Rail)':'',findStyle('A')],
+         ['B',label,findStyle('B')],
+         ['C','Mitsubishi Standard',findStyle('C')]]){
+         const c=x.createElementNS(n,'c');c.setAttribute('r',col+num);c.setAttribute('s',style);updateCell(x,c,value);row.appendChild(c);
+       }
+       const following=Array.from(sheetData.children).find(el=>el.localName==='row'&&Number(el.getAttribute('r'))>num);
+       if(following)sheetData.insertBefore(row,following);else sheetData.appendChild(row);
+     }
+     addRailRow(30,'Cabin (CAR)',true);
+     addRailRow(31,'Đối trọng (CWT)',false);
+     let merges=all(x,'mergeCells')[0];if(!merges){merges=x.createElementNS(n,'mergeCells');
+       const after=Array.from(x.documentElement.children).find(el=>['conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup'].includes(el.localName));
+       if(after)x.documentElement.insertBefore(merges,after);else x.documentElement.appendChild(merges);
+     }
+     const merge=x.createElementNS(n,'mergeCell');merge.setAttribute('ref','A30:A31');merges.appendChild(merge);
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+     // The new rail lines are part of the specification's full print area.
+     const printName=all(workbook,'definedName').find(el=>el.getAttribute('name')==='_xlnm.Print_Area');
+     if(printName)printName.textContent=printName.textContent.replace(/\$C\$(\d+)/,(_,num)=>'$C$'+(Number(num)+offset));
+   }
+
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){

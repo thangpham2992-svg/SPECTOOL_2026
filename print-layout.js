@@ -53,14 +53,23 @@
    const strings=zip.file('xl/sharedStrings.xml')?qa(parse(await zip.file('xl/sharedStrings.xml').async('string')),'si').map(si=>qa(si,'t').map(t=>t.textContent).join('')):[];
    const sheetData=q(data.documentElement,'sheetData'),rows=Array.from(sheetData?.children||[]).filter(x=>x.localName==='row');
    const visibleRows=new Map(),cells=new Map();let largest=0;
-   for(const row of rows){let rn=Number(attr(row,'r'));if(!rn||rn>300||attr(row,'hidden')==='1')continue;
+   // Rows above 300 are usually technical helpers. Only show the deliberate
+   // additional-feature appendix (VI.) and its bilingual entries.
+   const isExtraRow=(rn,row)=>{
+     if(rn<=300)return true;
+     if(rn<312||rn>475)return false;
+     const c=Array.from(row.children).find(el=>el.localName==='c'&&attr(el,'r')==='A'+rn);
+     const t=readText(c,strings).trim();
+     return /^VI\.\s|^\([A-Z0-9-]+\)\s|^Tính năng theo Manual|^Hạn chế|^Cáp động/i.test(t)||Boolean(c&&t&&rn>=313);
+   };
+   for(const row of rows){let rn=Number(attr(row,'r'));if(!rn||!isExtraRow(rn,row)||attr(row,'hidden')==='1')continue;
      visibleRows.set(rn,row);
      for(const c of Array.from(row.children).filter(x=>x.localName==='c')){const a=attr(c,'r'),p=addrParts(a);if(!p||p.col>3)continue;
        const v=readText(c,strings);cells.set(a,{value:v,style:Number(attr(c,'s',0))});if(v.trim())largest=Math.max(largest,rn);
      }
    }
    if(!largest)throw Error('Export SpecFormExport is empty');
-   const end=Math.min(largest,300);
+   const end=largest;
    // Merge map comes from original Excel print sheet; supports vertical and horizontal merges.
    const merges=new Map(),covered=new Set();
    for(const m of qa(data,'mergeCell')){const ref=attr(m,'ref'),sp=ref.split(':');if(sp.length!==2)continue;const a=addrParts(sp[0]),b=addrParts(sp[1]);if(!a||!b||a.col>3||b.col>3||a.row>end)continue;
