@@ -621,9 +621,15 @@ function renderFeatures(){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
    featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
-   if(code==='NSCR-C'&&chk.checked&&$('model').value==='MR'&&String(currentValue('D65'))==='760'){
-     const evrc=features.filter(x=>['EVRC-C','EVRC-S'].includes(x.code));
-     if(!evrc.some(x=>featureIsSelected(x)))status('NSCR-C đã được chọn. Với COP C760, cần chọn thêm EVRC-C hoặc EVRC-S để Check Spec đạt. NSCR-H không liên quan.');
+   // v5.8.41: EVRC-C (not EVRC-S) is mandatory with NSCR-C/AS/SCS-B/NS-CB
+   // for MR C760/C770/C780 and MRL V02 M*/P* COP codes.
+   if(chk.checked&&['NSCR-C','AS','SCS-B','NS-CB'].includes(code)){
+     const model=$('model').value;
+     const copCell=model==='MR'?'D65':'D61';
+     const selected=name=>features.some(x=>
+       (window.SPEC_V52_FEATURES?.canonical(x.code)||x.code)===name&&featureIsSelected(x));
+     const rule=window.SPEC_EVRC_C_RULE?.check(model,{ok:true,value:currentValue(copCell)},selected);
+     if(rule?.required&&!rule.evrcC)status('COP '+rule.cop+' với '+rule.triggered.join(', ')+': bắt buộc chọn EVRC-C trong Vận hành / Operation để Check Spec đạt.');
    }
    // NSCR-C changes only its own source cell. NSCR-H remains fully independent.
    if(code==='ITV'&&!chk.checked){changes.AC_TRAVEL_CABLE='0';featureTouched.delete('AC_TRAVEL_CABLE');}

@@ -16,6 +16,21 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    const key=String(db.sheets.SpecForm['B'+r]||'').toLowerCase().trim();if(key)featureByCode[key]='A'+r;
   }
  }
+ // v5.8.41: Special COPs require EVRC-C with selected security/operation options.
+ // This is an additional required-feature rule; original workbook checks remain intact.
+ const evrcDependency=window.SPEC_EVRC_C_RULE?.check(model,
+  model==='MR'?value('SpecForm','D65'):value('SpecForm','D61'),
+  code=>{const cell=featureByCode[code.toLowerCase()];if(!cell)return false;
+   const result=value('SpecForm',cell);
+   return result.ok&&[1,true,'1','TRUE','V','✓'].includes(
+    typeof result.value==='string'?result.value.trim().toUpperCase():result.value);
+  });
+ if(evrcDependency?.required&&!evrcDependency.evrcC){
+  const evrcCell=featureByCode['evrc-c'];
+  if(evrcCell)issues.push({id:'Feature!SpecialCOP_EVRC-C',cell:evrcCell,
+   message:`COP ${evrcDependency.cop} với ${evrcDependency.triggered.join(', ')} bắt buộc chọn EVRC-C / EVRC-C is required for this special COP.`,detail:''});
+  else unverified.push('Feature!SpecialCOP_EVRC-C — EVRC-C feature not found in source database');
+ }
  const cellForCondition=(row)=>{
   if(model==='MRL'){
    if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D14';
