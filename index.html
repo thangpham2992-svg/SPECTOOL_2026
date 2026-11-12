@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.20-dimension-layout">
+<meta name="specweb-build" content="5.8.21-dimension-layout">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <style>
@@ -55,7 +55,7 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 .check-error-row strong{font-size:13px;line-height:1.4;font-weight:650}
 .check-error-explanation{display:block;color:#a32d34;font-size:12px;line-height:1.55;font-weight:500;white-space:normal}
 
-/* v5.8.20: full-width, balanced dimension groups for MR and MRL. */
+/* v5.8.21: full-width, balanced dimension groups for MR and MRL. */
 .dimension-section-fields{display:block!important;width:100%;min-width:0}
 .dimension-groups{display:grid!important;grid-template-columns:minmax(0,.94fr) minmax(0,1.16fr);gap:16px;width:100%;grid-column:1/-1;align-items:start}
 .dimension-group{border:1px solid #d6e5f3;border-radius:9px;overflow:hidden;min-width:0;background:#fff}
@@ -85,11 +85,11 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
  .dimension-group-title{padding:12px}
 }
 </style>
-<link rel="stylesheet" href="responsive-ui.css?v=5.8.20">
-<link rel="stylesheet" href="design-guide.css?v=5.8.20">
+<link rel="stylesheet" href="responsive-ui.css?v=5.8.21">
+<link rel="stylesheet" href="design-guide.css?v=5.8.27">
 </head>
 <body>
-<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.20</span></header>
+<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.24</span></header>
 <main class="workspace">
 <div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version02 ALPHA</option></select></div></div>
 <details class="database-options"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
@@ -124,33 +124,35 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
   </div>
 </div>
 
-<script src="vendor/jszip.min.js?v=5.8.20"></script>
-<script src="embedded-data.js?v=5.8.20"></script>
-<script src="workbooks.js?v=5.8.20"></script>
-<script src="excel-rules.js?v=5.8.20"></script>
-<script src="specform-layout.js?v=5.8.20"></script>
-<script src="formula-catalog.js?v=5.8.20"></script>
-<script src="formula-check.js?v=5.8.20"></script>
-<script src="technical-checks.js?v=5.8.20"></script>
-<script src="engineering-source.js?v=5.8.20"></script>
-<script src="source-validations.js?v=5.8.20"></script>
-<script src="ordered-b209.js?v=5.8.20"></script>
-<script src="engine-database.js?v=5.8.20"></script>
-<script src="ceiling-finishes.js?v=5.8.20"></script>
-<script src="cwt-dimensions.js?v=5.8.20"></script>
-<script src="spec-conditional.js?v=5.8.20"></script>
-<script src="source-engine.js?v=5.8.20"></script>
-<script src="legacy-step1.js?v=5.8.20"></script>
-<script src="conditional-check.js?v=5.8.20"></script>
-<script src="hall-lantern.js?v=5.8.20"></script>
-<script src="ny40-rules.js?v=5.8.20"></script>
-<script src="source-check.js?v=5.8.20"></script>
-<script src="feature-v02.js?v=5.8.20"></script>
-<script src="mirror-rules.js?v=5.8.20"></script>
-<script src="export-engine.js?v=5.8.20"></script>
-<script src="print-layout.js?v=5.8.20"></script>
-<script src="design-guide.js?v=5.8.20"></script>
-<script src="app.js?v=5.8.20"></script>
+<script src="vendor/jszip.min.js?v=5.8.21"></script>
+<script src="embedded-data.js?v=5.8.21"></script>
+<script src="workbooks.js?v=5.8.21"></script>
+<script src="excel-rules.js?v=5.8.21"></script>
+<script src="specform-layout.js?v=5.8.21"></script>
+<script src="formula-catalog.js?v=5.8.21"></script>
+<script src="formula-check.js?v=5.8.21"></script>
+<script src="technical-checks.js?v=5.8.21"></script>
+<script src="engineering-source.js?v=5.8.21"></script>
+<script src="source-validations.js?v=5.8.21"></script>
+<script src="ordered-b209.js?v=5.8.21"></script>
+<script src="engine-database.js?v=5.8.21"></script>
+<script src="ceiling-finishes.js?v=5.8.21"></script>
+<script src="cwt-dimensions.js?v=5.8.21"></script>
+<script src="spec-conditional.js?v=5.8.21"></script>
+<script src="source-engine.js?v=5.8.21"></script>
+<script src="legacy-step1.js?v=5.8.21"></script>
+<script src="conditional-check.js?v=5.8.21"></script>
+<script src="hall-lantern.js?v=5.8.21"></script>
+<script src="ny40-rules.js?v=5.8.21"></script>
+<script src="source-check.js?v=5.8.21"></script>
+<script src="feature-v02.js?v=5.8.21"></script>
+<script src="mirror-rules.js?v=5.8.21"></script>
+<script src="export-engine.js?v=5.8.21"></script>
+<script src="print-layout.js?v=5.8.21"></script>
+<script src="design-guide.js?v=5.8.21"></script>
+<script src="panel-images.js?v=5.8.24"></script>
+<script src="material-finish.js?v=5.8.25"></script>
+<script src="app.js?v=5.8.26"></script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>

@@ -139,6 +139,7 @@ function xrules(){return window.SPEC_RULES?.[$('model').value]||{labels:{},featu
 function workbookEngineData(){
  const model=$('model').value;
  const db=sourceFiles[model]?.engineData||window.SPEC_ENGINE_DATABASE?.[model];
+ if(model==='MRL')window.SPEC_MATERIAL_5825?.patchDatabase(db);
  if(model==='MR'&&db?.sheets?.DataTable){
   const cells=db.sheets.DataTable;
   const added=['24V – 5 Lines – 2 Master Stations','24V – 5 Lines – 3 Master Stations'];
@@ -243,7 +244,7 @@ const finishDependents=[
  ['K36_DoorFinishOtherFloorMaterial','K36_DoorFinishOtherFloorPaint',null]
 ];
 const paintedMaterial=v=>/^Painted(?:\b|\s|\-)/i.test(String(v||'').trim());
-const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS)(?:\b|\s|\-)/i.test(String(v||'').trim());
+const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS|Laminated steel sheet)(?:\b|\s|\-)/i.test(String(v||'').trim());
 function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell===addr)?.value??''}
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
 function selectedCapacity(){return current.capacity.find(c=>String(c.EleCapacityName)===String(currentValue('D13')))||{}}
@@ -420,7 +421,9 @@ function refreshLocks(){
    f.title='Vật liệu trần cố định: SUS-HL / Fixed ceiling finish: SUS-HL';
   }
  }
+ refreshCarDesignStates();
  refreshCalculatedOutputs();
+ refreshPanelImagePreviews();
 }
 
 // Controlled constraints. Workbook is the source of allowed raw variants.
@@ -740,6 +743,7 @@ function workbookChoices(field,engine=null){
    const model=$('model').value;
    list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'));
  }
+ list=window.SPEC_MATERIAL_5825?.choices($('model').value,field,list)||list;
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
 function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
@@ -890,6 +894,93 @@ $('design-close')?.addEventListener('click',closeDesignGuide);
 $('design-popup')?.addEventListener('click',event=>{if(event.target===$('design-popup'))closeDesignGuide()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('design-popup')?.classList.contains('show'))closeDesignGuide()});
 
+// v5.8.21 – User-supplied display/indicator illustrations. No changes to source values.
+function panelIllustrationKey(kind,value){
+ const s=String(value??'').trim().toUpperCase();
+ if(!s||/^(NO|NONE|NOT SUPPLIED|N\/A|STANDARD|0)$/.test(s))return '';
+ if(kind==='COP'){
+  const m=s.match(/(?:^|[-\s])([CMP]\d{3,4}(?:ETL|E)?)\b/);
+  return m?m[1]:s;
+ }
+ if(kind==='CBV'){
+  const m=s.match(/CBV\d+/);
+  return m?m[0]:s;
+ }
+ if(kind==='PIV'){
+  const m=s.match(/PIV\d*[- ]?([A-Z]\d{3,4})/);
+  return m?'PIV*-'+m[1]+'*':'';
+ }
+ if(kind==='PIH_PID')return s;
+ return '';
+}
+function renderPanelImagePreview(fieldBox,kind,value){
+ const source=window.SPEC_PANEL_IMAGES;
+ if(!source)return;
+ let panel=fieldBox.querySelector('.panel-image-preview');
+ const key=panelIllustrationKey(kind,value);
+ const filenames=source.catalog?.[kind]?.[key]||[];
+ if(!filenames.length){
+  panel?.remove();fieldBox.classList.remove('panel-preview-inline');
+  return;
+ }
+ fieldBox.classList.add('panel-preview-inline');
+ if(!panel){panel=document.createElement('div');panel.className='panel-image-preview';fieldBox.append(panel)}
+ if(panel.dataset.key===key&&panel.dataset.kind===kind)return;
+ panel.dataset.key=key;panel.dataset.kind=kind;
+ panel.replaceChildren();
+ const gallery=document.createElement('div');gallery.className='panel-preview-gallery';
+ for(const filename of filenames){
+  const url=source.media?.[filename];if(!url)continue;
+  const img=document.createElement('img');img.src=url;img.alt=key+' – '+filename;
+  img.title=kind==='CBV'?'Nút bấm cabin / Car operating button':'Ảnh chỉ thể hiện loại màn hình hiển thị';
+  img.loading='lazy';img.decoding='async';gallery.append(img);
+ }
+ if(!gallery.children.length){panel.remove();fieldBox.classList.remove('panel-preview-inline');return}
+ panel.append(gallery);
+ if(kind!=='CBV'){
+  const note=document.createElement('small');note.className='panel-preview-note';
+  note.textContent='Ảnh chỉ thể hiện loại màn hình hiển thị';
+  panel.append(note);
+ }
+}
+function refreshPanelImagePreviews(){
+ if(!window.SPEC_PANEL_IMAGES)return;
+ for(const input of document.querySelectorAll('#fields [data-cell]')){
+  const box=input.closest('.field');if(!box)continue;
+  const field=current.fields.find(x=>x.cell===input.dataset.cell);if(!field)continue;
+  const name=String(field.name||'');
+  // No images for HBV or Hall Lantern – those are handled separately.
+  let kind='';
+  if(/COPButton$/i.test(name))kind='CBV';
+  else if(/COPModel$/i.test(name))kind='COP';
+  else if(/PIV/i.test(name)||(/K36_/i.test(name)&&/Hall.*(?:Indicator|Button)/i.test(name)))kind='PIV';
+  else if(/PIH_PID|PIH|PID/i.test(name))kind='PIH_PID';
+  if(!kind)continue;
+  renderPanelImagePreview(box,kind,input.value);
+ }
+}
+function updateFinishPreviews(){
+ const rules=window.SPEC_MATERIAL_5825,model=$('model').value;
+ if(!rules)return;
+ for(const field of current.fields){
+  const el=activeInput(field.cell);if(!el)continue;
+  const box=el.closest('.field');if(!box)continue;
+  const v=rules.preview(model,field,String(el.value||''));
+  let panel=box.querySelector('.finish-preview-box');
+  if(!v || !v.src){panel?.remove();box.classList.remove('finish-preview-inline');continue;}
+  if(!panel){
+   panel=document.createElement('div');panel.className='finish-preview-box';
+   const img=document.createElement('img');img.className='finish-preview-thumb';
+   const caption=document.createElement('small');caption.className='finish-preview-caption';
+   panel.append(img,caption);box.append(panel);
+  }
+  box.classList.add('finish-preview-inline');
+  panel.querySelector('img').src=v.src;
+  panel.querySelector('img').alt=String(el.value);
+  panel.querySelector('small').textContent=v.caption+(v.approx?' · Reference color':'');
+ }
+}
+
 function row(field,displayName='',compact=false){
  const box=document.createElement('div');box.className='field';
  box.dataset.sourceCell=field.cell;
@@ -925,6 +1016,7 @@ function row(field,displayName='',compact=false){
    refreshSideDrop();
    refreshLocks();
    refreshDesignHints();
+   updateFinishPreviews();
    refreshMirrorWeightHint();
    if($('model').value==='MRL'){
     refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));
@@ -1104,6 +1196,76 @@ function openHallLanternGallery(fieldKey,select){
  modal.append(bar,grid);overlay.append(modal);overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
  overlay.addEventListener('keydown',e=>{if(e.key==='Escape')overlay.remove()});document.body.append(overlay);close.focus();
 }
+// v5.8.26: one device per line, moving original SpecForm nodes (no cloned input).
+function buildCarDesignLines(){
+ const section=[...document.querySelectorAll('#fields .spec-section')].find(x=>x.dataset.section==='III');
+ if(!section)return;
+ const grid=section.querySelector('.section-fields');if(!grid)return;
+ const model=$('model').value;
+ const specs=[
+  ['K22_SUSType','Inox sọc nhuyễn / Full SUS-HL','single'],
+  ['K22_CeilingModel','Trần phòng thang / Car ceiling','K22_CeilingColor'],
+  ['K23_WallFinish','Vách phòng thang / Car wall','K23_WallPaintedColor','K23_WallPattern'],
+  ['K24_CarDoorFinish','Cửa phòng thang / Car door','K24_CarDoorPaintedColor','K24_CarDoorPattern'],
+  ['K25_CarTransomFinish','Đố cửa trên / Transom panel','K25_CarTransomPainted','K25_CarTransomPattern'],
+  ['K26_CarFrontFinish','Vách trước / Front return panel','K26_CarFrontPainted']
+ ];
+ const wrapper=document.createElement('div');wrapper.className='car-design-lines';wrapper.dataset.model=model;
+ for(const [parentName,title,paintName,patternName] of specs){
+  const parent=current.fields.find(f=>f.name===parentName);if(!parent)continue;
+  const node=activeInput(parent.cell)?.closest('.field');if(!node)continue;
+  const line=document.createElement('div');line.className='car-design-line';line.dataset.device=parentName;
+  const label=document.createElement('div');label.className='car-design-label';label.textContent=title;
+  const material=document.createElement('div');material.className='car-design-material';material.append(node);
+  const variants=document.createElement('div');variants.className='car-design-variants';
+  if(paintName!=='single')for(const [name,kind] of [[paintName,'paint'],[patternName,'pattern']]){
+   if(!name)continue;
+   const f=current.fields.find(x=>x.name===name);if(!f)continue;
+   const fieldNode=activeInput(f.cell)?.closest('.field');if(!fieldNode)continue;
+   fieldNode.dataset.finishKind=kind;
+   const nm=fieldNode.querySelector('.nm');if(nm)nm.textContent=kind==='paint'?'Màu sơn / Paint color':'Hoa văn / Pattern';
+   variants.append(fieldNode);
+  }
+  line.append(label,material,variants);wrapper.append(line);
+ }
+ // Move just the car-design block, retaining all SpecForm cell IDs for Export & Check.
+ grid.prepend(wrapper);grid.classList.add('car-design-section-fields');
+ // Empty source wrappers may be deleted only after all input nodes have been moved.
+ for(const oldRow of [...grid.querySelectorAll(':scope > .spec-row')]){
+  if(!oldRow.querySelector('[data-cell]') && !oldRow.querySelector('.readonly-value'))oldRow.remove();
+ }
+ refreshCarDesignStates();
+}
+function refreshCarDesignStates(){
+ const panel=document.querySelector('.car-design-lines');if(!panel)return;
+ const model=$('model').value;
+ for(const line of panel.querySelectorAll('.car-design-line')){
+  const parent=current.fields.find(f=>f.name===line.dataset.device);if(!parent)continue;
+  const value=String(currentValue(parent.cell)||'');
+  const usePaint=paintedMaterial(value),usePattern=patternedMaterial(value);
+  const variants=line.querySelector('.car-design-variants');
+  const hasVariant=!!variants?.querySelector('.field');
+  if(variants)variants.classList.toggle('car-design-no-variant',!hasVariant||(!usePaint&&!usePattern && parent.name!=='K22_CeilingModel'));
+  for(const box of variants?.querySelectorAll('.field')||[]){
+   const input=box.querySelector('[data-cell]');if(!input)continue;
+   const isCeiling=parent.name==='K22_CeilingModel';
+   const active=isCeiling || box.dataset.finishKind===(usePaint?'paint':usePattern?'pattern':'');
+   box.classList.toggle('car-finish-inactive',!active);
+   if(!active)continue;
+   // Conditional formatting from the old PPS sheet must not hide a valid
+   // Painted/Laminated selection. Preserve workbook options and checks.
+   input.disabled=false;delete input.dataset.cfLocked;
+   box.classList.remove('cf-locked','locked');input.title='';
+   if(input.tagName==='SELECT'){
+    const choices=[...input.options].filter(o=>!o.dataset.invalid && o.value).map(o=>o.value);
+    const currentVal=String(currentValue(input.dataset.cell)||'');
+    if(choices.length && !choices.includes(currentVal)){
+     const next=choices[0];input.value=next;changes[input.dataset.cell]=next;
+    }
+   }
+  }
+ }
+}
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
@@ -1141,6 +1303,7 @@ function renderAllSpecRows(){
   }
   sectionRow.append(text,area);sectionRows.append(sectionRow);
  }
+ buildCarDesignLines();
  // v5.8.16: Arrange both models in wide, independently editable dimension groups.
  // Move the existing input nodes (never clone them) so Check Spec / Export bindings stay unchanged.
  {
@@ -1276,7 +1439,7 @@ function restoreHallLanternFromSource(){
   const fhl=sourceFeatureRows().find(f=>f.code==='FHL');if(fhl)changes[fhl.cell]='1';
  }
 }
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1356,6 +1519,13 @@ function check(){
  const engineData=workbookEngineData();
  const result=window.SPEC_SOURCE_CHECK?.(model,changes,engineData);
  if(!result)throw Error('Source Check Engine chưa được tải / Calculation engine not loaded');
+ if(model==='MRL'&&window.SPEC_MATERIAL_5825){
+  const r=window.SPEC_MATERIAL_5825;
+  for(const f of current.fields){if(!/^(K22_CeilingColor|K23_WallFinish|K24_CarDoorFinish|K25_CarTransomFinish|K23_WallPaintedColor|K24_CarDoorPaintedColor|K25_CarTransomPainted|K26_CarFrontPainted|K23_WallPattern|K24_CarDoorPattern|K25_CarTransomPattern)$/.test(f.name))continue;
+   const v=String(currentValue(f.cell)||'').trim();if(v&&!r.check(model,f,v))result.errors.push({id:'Material!'+f.name,cell:f.cell,message:'Mã vật liệu / màu không hợp lệ với MRL V02: '+v});
+  }
+  if(result.errors.length)result.status='FAIL';
+ }
  if(window.SPEC_MIRROR_RULES && model==='MR'){
   const mr=true,val=currentValue('D69'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue('D29'),val);
   if(!check.ok){result.errors.push({id:'Mirror!Eligibility',cell:mr?'D69':'D66',message:check.message});result.status='FAIL';}
@@ -1586,6 +1756,8 @@ async function applyWorkbook(model,name,bytes,quiet=false){
  }
  const fire=parsed.fields.find(f=>f.name==='K36_FireproofDoor');
  if(fire){fire.options=['Not supplied','GHCL E30','EN81-58(II)'];fire.validation='"Not supplied,GHCL E30,EN81-58(II)"';}
+ window.SPEC_MATERIAL_5825?.patchFields(model,parsed.fields);
+ window.SPEC_MATERIAL_5825?.patchDatabase(model==='MRL'?parsed.engineData:null);
  parsed.fields.sort((a,b)=>split(a.cell)[1]-split(b.cell)[1]);
  // Apply the versioned CWT source table and ceiling-finish checks to imported old databases.
  window.SPEC_CWT_ENGINE?.applyDataset(parsed.engineData,model);
