@@ -58,9 +58,11 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
     const max=num(row[column]),actual=num(n(dimension));
     if(Number.isFinite(max)&&max>0&&Number.isFinite(actual)&&actual>max){
      mark(dimension,`${shaftName[code]} ${mm(actual)} vượt quá giới hạn tối đa ${mm(max)} theo DataTable (${isFire?'cửa chống cháy':'cửa thường'}).`);
-    }else if(!Number.isFinite(max)||max<=0){
-     unverified.push('DataTable!TblK5_Capacity: missing '+column+' for '+capacity);
     }
+    // A blank AH-Max/BH-Max in the source is an intentionally unspecified
+    // upper envelope, not a failed/unverified formula. Do not invent a max.
+    // Minimum dimensions and counterweight-specific layouts remain enforced
+    // by DataTable D522 and SPEC_CWT_ENGINE.
    }
   }
   if(model==='MR'){

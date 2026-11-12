@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.29-error-jump-fix">
+<meta name="specweb-build" content="5.8.40-mrl-cop-n-preview">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <style>
@@ -84,16 +84,18 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
  .dimension-hoistway .dimension-entry .cwt-minimum-hint,.dimension-hoistway .dimension-entry .oh-minimum-hint{grid-column:2;grid-row:auto;margin-top:-2px!important}
  .dimension-group-title{padding:12px}
 }
+.leadtime-check{background:#fff;border:1px solid #d7e3ef;border-radius:7px;padding:11px 16px;margin:-7px 0 15px}.leadtime-label{font-size:13px;font-weight:750;color:#254564}.leadtime-label span{font-size:11px;color:#697a8c;font-weight:500}.leadtime-main{display:flex;align-items:center;gap:14px;margin-top:5px}.leadtime-main strong{font-size:21px;color:#a22c34;white-space:nowrap}.leadtime-reasons{font-size:12px;line-height:1.45;color:#465c70}.leadtime-reasons div+div{margin-top:3px}@media(max-width:580px){.leadtime-check{padding:9px 11px;margin:0 0 10px}.leadtime-main{gap:10px}.leadtime-main strong{font-size:18px}.leadtime-label span{display:block;font-size:10px}}
 </style>
 <link rel="stylesheet" href="responsive-ui.css?v=5.8.21">
 <link rel="stylesheet" href="design-guide.css?v=5.8.28">
 </head>
 <body>
-<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.28</span></header>
+<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.31</span></header>
 <main class="workspace">
 <div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version02 ALPHA</option></select></div></div>
 <details class="database-options"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
 <section class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="project-fields" class="project-grid"></div></section>
+<section class="leadtime-check" id="product-leadtime" aria-live="polite"><div class="leadtime-label">Product Lead Time (CTE) <span>· Kiểm tra nội bộ / Internal check only</span></div><div class="leadtime-main"><strong id="leadtime-days">—</strong><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div></div></section>
 <section class="action-panel"><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary" id="final-xlsx" type="button">Xuất Excel (.xlsx)</button><button class="btn btn-secondary" id="final-pdf" type="button">Xuất A4 PDF</button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
 <nav class="spec-nav" id="spec-nav" aria-label="Điều hướng nhóm thông số / Sections"></nav>
 <div class="fields-root" id="fields"></div>
@@ -146,13 +148,13 @@ input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:poin
 <script src="ny40-rules.js?v=5.8.21"></script>
 <script src="source-check.js?v=5.8.21"></script>
 <script src="feature-v02.js?v=5.8.21"></script>
-<script src="mirror-rules.js?v=5.8.21"></script>
+<script src="mirror-rules.js?v=5.8.30"></script>
 <script src="export-engine.js?v=5.8.21"></script>
 <script src="print-layout.js?v=5.8.21"></script>
 <script src="design-guide.js?v=5.8.21"></script>
 <script src="panel-images.js?v=5.8.24"></script>
 <script src="material-finish.js?v=5.8.25"></script>
-<script src="app.js?v=5.8.26"></script>
+<script src="app.js?v=5.8.40"></script>
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>

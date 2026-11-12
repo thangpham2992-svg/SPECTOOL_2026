@@ -4,14 +4,23 @@
 const source='AES13-006 Rev AM, Table 11-C (14/N), 2026-02-13';
 const weights={"P6":[-26.0,-41.0,-3.3],"P6C3":[-23.0,-35.0,-3.3],"P8":[-26.0,-41.0,-3.3],"P9":[-26.0,-41.0,-3.3],"P10":[-26.0,-41.0,-3.3],"P11":[-26.0,-41.0,-3.3],"P11C1":[-27.0,-41.0,-3.3],"P11C3":[-26.0,-39.0,-3.3],"P13":[-31.0,-47.0,-2.1],"P15":[-31.0,-47.0,-2.1],"P15W":[-30.0,-46.0,-7.4],"P15D":[-20.0,-32.0,-1.0],"P15C1":[-21.0,-32.0,-1.0],"P15C2":[-31.0,-47.0,-2.1],"P15C8":[-21.0,-32.0,-3.9],"P15C10":[-23.0,-35.0,-3.3],"P15C11":[-23.0,-35.0,-3.3],"P17":[-30.0,-46.0,-7.4],"P17W":[-34.0,-52.0,-7.4],"P17C4":[-23.0,-35.0,-3.3],"P17C5":[-23.0,-35.0,-3.3],"P20":[-30.0,-46.0,-7.4],"P20W":[-33.0,-52.0,-7.4],"P20C4":[-25.0,-38.0,-3.3],"P20C5":[-25.0,-38.0,-3.3],"P20C6":[-27.0,-41.0,-3.3],"P20C7":[-27.0,-41.0,-3.3],"P20C8":[-27.0,-41.0,-3.3],"P20C9":[-27.0,-41.0,-3.3]};
 const models=['YZ-52A','YZ-53A','YZ-55SN'];
+// NEXIEZ-MR Note24: YZ-55SN is restricted to these exact car codes and HL=2200 mm.
+// Normalize P06 to P6, but retain door configuration (CO versus 2S).
+const yz55MrCodes=new Set(['P6-CO','P8-CO','P9-CO','P10-CO','P11-CO','P13-CO','P15-CO','P15W-CO','P15D-2S','P17-CO','P17W-CO','P20-CO','P20W-CO']);
+const mrCarCode=value=>String(value||'').trim().toUpperCase().match(/^P0*(\d+[A-Z]*)-(CO|2S)(?=\s|\(|$)/)?.slice(1).join('-').replace(/^(\d)/,'P$1')||'';
+const yz55MrAllowed=(capacity,hl)=>yz55MrCodes.has(mrCarCode(capacity))&&Number(hl)===2200;
 const norm=code=>String(code||'').toUpperCase().replace(/^P0+(\d+)/,'P$1').replace(/[-_\s].*$/,'');
 const codeOf=name=>norm(String(name||'').split('-')[0]);
 const selected=model=>String(model||'').trim().toUpperCase();
-const allOptions=(model,capacity,aa)=>{
+const allOptions=(model,capacity,aa,hl)=>{
  const base=['Not supplied'];
  if(model==='MR'){
    const code=codeOf(capacity);
-   if(!/^B(?:750|1000)$/.test(code))base.push(...models,'By Local');
+   if(!/^B(?:750|1000)$/.test(code)){
+     base.push('YZ-52A','YZ-53A');
+     if(yz55MrAllowed(capacity,hl))base.push('YZ-55SN');
+     base.push('By Local');
+   }
  } else {
    const width=Number(aa);
    if(width>=1000&&width<2201)base.push('YZ-52A','YZ-53A');
@@ -91,10 +100,10 @@ function fixDatabase(model,db){
  }
  return db;
 }
-function validate(model,capacity,aa,mirror){
- const opt=selected(mirror);const allowed=allOptions(model,capacity,aa);
- if(!allowed.some(x=>selected(x)===opt))return {ok:false,message:model==='MR'?'Gương không áp dụng cho cabin B750/B1000 / Mirrors are not applicable to bed lifts':'Loại gương không phù hợp chiều rộng AA / Mirror option not applicable to car width AA'};
+function validate(model,capacity,aa,mirror,hl){
+ const opt=selected(mirror);const allowed=allOptions(model,capacity,aa,hl);
+ if(!allowed.some(x=>selected(x)===opt))return {ok:false,message:model==='MR'?(opt==='YZ-55SN'?'Gương YZ-55SN chỉ áp dụng cho 13 Car Code theo Note24 và HL = 2200 mm / YZ-55SN requires a listed car code and HL 2200 mm':'Gương không áp dụng cho cabin B750/B1000 / Mirrors are not applicable to bed lifts'):'Loại gương không phù hợp chiều rộng AA / Mirror option not applicable to car width AA'};
  return {ok:true};
 }
-window.SPEC_MIRROR_RULES={weights,source,models,allOptions,adjustment,fixDatabase,validate,codeOf};
+window.SPEC_MIRROR_RULES={weights,source,models,allOptions,adjustment,fixDatabase,validate,codeOf,mrCarCode,yz55MrAllowed,yz55MrCodes:[...yz55MrCodes]};
 })();

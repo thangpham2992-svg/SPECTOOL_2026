@@ -705,6 +705,25 @@ const supplementalListSources={
  K36_DoorFinishMainFloorMaterial:['TblK36_EntranceDoorFinish','Finish'],
  K36_DoorFinishOtherFloorMaterial:['TblK36_EntranceDoorFinish','Finish']
 };
+// Landing-door finish options are NOT the two-row entrance-finish table.
+// Both models use an explicit workbook Data Validation source for these cells:
+// MR: DataTable!AJ617:AJ621; MRL V02: DataTable!B930:B939.
+// Read that source, preserving DSJ1/DS1/Large Window and any future changes
+// made in the user's imported source workbook.
+function landingDoorChoices(field,workbook){
+ if(!['K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial'].includes(field.name))return null;
+ const model=$('model').value;
+ const range=model==='MR'?['AJ',617,621]:['B',930,939];
+ const sheet=workbook?.sheets?.DataTable||{};
+ const result=[];
+ for(let r=range[1];r<=range[2];r++){
+  const v=sheet[range[0]+r];
+  const raw=v&&typeof v==='object'&&'v' in v?v.v:v;
+  const value=String(raw??'').trim();
+  if(value&&!result.includes(value))result.push(value);
+ }
+ return result.length?result:null;
+}
 function workbookChoices(field,engine=null){
  if(field.name==='K35_Ventilation'&&$('model').value==='MRL')return ['No','DC axial flow fan','DC axial flow fan + Plasma Quad'];
  if(field.name==='K22_CeilingColor'&&window.SPEC_CEILING_FINISH){
@@ -741,8 +760,12 @@ function workbookChoices(field,engine=null){
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
-   list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'));
+   list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'),model==='MR'?currentValue('D31'):undefined);
  }
+ // Use the actual landing-door validation range rather than the two-item
+ // TblK36_EntranceDoorFinish list used by door jamb and basic material fields.
+ const landingOptions=landingDoorChoices(field,workbook);
+ if(landingOptions)list=landingOptions;
  list=window.SPEC_MATERIAL_5825?.choices($('model').value,field,list)||list;
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
@@ -899,7 +922,7 @@ function panelIllustrationKey(kind,value){
  const s=String(value??'').trim().toUpperCase();
  if(!s||/^(NO|NONE|NOT SUPPLIED|N\/A|STANDARD|0)$/.test(s))return '';
  if(kind==='COP'){
-  const m=s.match(/(?:^|[-\s])([CMP]\d{3,4}(?:ETL|E)?)\b/);
+  const m=s.match(/(?:^|[-\s])([CMPN]\d{3,4}(?:ETL|E)?)\b/);
   return m?m[1]:s;
  }
  if(kind==='CBV'){
@@ -918,7 +941,14 @@ function renderPanelImagePreview(fieldBox,kind,value){
  if(!source)return;
  let panel=fieldBox.querySelector('.panel-image-preview');
  const key=panelIllustrationKey(kind,value);
- const filenames=source.catalog?.[kind]?.[key]||[];
+ // MRL Version02: N-series COP panel models share the corresponding M-series
+ // illustration when no N-specific artwork is available. Display only.
+ const catalog=source.catalog?.[kind]||{};
+ let filenames=catalog[key]||[];
+ if(kind==='COP'&&$('model')?.value==='MRL'&&/^N\d{3,4}(?:ETL|E)?$/.test(key)&&!filenames.length){
+  const equivalent='M'+key.slice(1);
+  filenames=catalog[equivalent]||(!/E(?:TL)?$/.test(equivalent)?catalog[equivalent+'E']:null)||[];
+ }
  if(!filenames.length){
   panel?.remove();fieldBox.classList.remove('panel-preview-inline');
   return;
@@ -1439,7 +1469,92 @@ function restoreHallLanternFromSource(){
   const fhl=sourceFeatureRows().find(f=>f.code==='FHL');if(fhl)changes[fhl.cell]='1';
  }
 }
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');}
+
+/* v5.8.36: Lead Time is display-only, deliberately NOT a SpecForm field,
+   not included in Excel/PDF or Check Spec payloads. MRL rules require its
+   separate factory table; MR rules follow the supplied (revised) table. */
+function calculateMRLeadTime(){
+ const val=(cell)=>String(currentValue(cell)||'').trim();
+ const reasons50=[],reasons90=[];
+ const ceiling=val('D45').toUpperCase();
+ const mirror=val('D69').toUpperCase();
+ const handrail=val('D67').toUpperCase();
+ const carDoor=val('D50').toUpperCase();
+ const landingDoor=[val('E76'),val('E77')].map(x=>x.toUpperCase());
+ const features=sourceFeatureRows().filter(x=>featureIsSelected(x)).map(x=>String(x.code||'').toUpperCase());
+ const obs=[val('D14'),val('D50'),...landingDoor].some(x=>/OBSERVATION|NY-40|SEE[ -]?THROUGH/i.test(x));
+ if(obs||features.some(x=>/^(?:OBS|STH)$/.test(x)))reasons50.push('Observation elevator / Thang quan sát');
+ const allDoorValues=[carDoor,...landingDoor];
+ const glassDoor=allDoorValues.filter(x=>/GLASS WINDOW|GLASS-WINDOW|LARGE WINDOW|200\s*[X×]\s*1300/i.test(x));
+ if(glassDoor.some(x=>!/(?:200\s*[X×]\s*1300)/i.test(x)))reasons50.push('Glass window (khác 200×1300 mm)');
+ const seeThrough=allDoorValues.some(x=>/SEE[ -]?THROUGH|DSJ/i.test(x));
+ if(seeThrough){
+  const dsj1=allDoorValues.some(x=>/DSJ1/i.test(x));
+  const exception=dsj1&&Number(val('D33'))===2100&&[800,900].includes(Number(val('D32')));
+  if(!exception)reasons50.push('See-through door (không thuộc ngoại lệ DSJ1, HH 2100, JJ 800/900)');
+ }
+ if(['L200','L200S','N130','L400'].some(x=>ceiling===x||ceiling.startsWith(x+'-')))reasons50.push('Ceiling '+val('D45'));
+ if(/YZ[ -]?5(?:2A|3A|5SN)/i.test(mirror))reasons50.push('Mirror '+val('D69'));
+ if(/YH[ -]?59M/i.test(handrail))reasons50.push('Handrail '+val('D67'));
+ const reasons120=[];
+ if(/(?:^|[^A-Z0-9])(?:FEVN10|FE10)(?=$|[^A-Z0-9])|VIETNAM/i.test(ceiling))reasons120.push('Ceiling FEVN10 (FE10 / Vietnam type): Extra 120 days');
+ const extra=reasons120.length?120:(reasons90.length?90:(reasons50.length?50:0));
+ return {extra,days:30+extra,reasons:[...reasons120,...reasons90,...reasons50]};
+}
+/* v5.8.36: factory table for NEXIEZ-MRL Version02; apply
+   standard 30 days plus the highest applicable extra lead time.
+   Only assess factory conditions with an actual corresponding input in
+   the current SpecForm; never assume country/regulatory/COP material. */
+function calculateMRLLeadTime(){
+ const val=(cell)=>String(currentValue(cell)||'').trim();
+ const norm=(v)=>String(v||'').trim().toUpperCase().replace(/\s+/g,' ');
+ const ceiling=norm(val('D41'));
+ const cap=norm(val('D13')).split(/\s*\(/)[0].trim();
+ const aa=Number(val('D28')),jj=Number(val('D31'));
+ const mirror=norm(val('D66'));
+ const featureCodes=new Set(sourceFeatureRows().filter(f=>featureIsSelected(f)).map(f=>norm(f.code)));
+ const triggered=[];
+ const add=(extra,why)=>triggered.push({extra,why});
+ // 50 days: eligible window dimensions, DS1/DSJ1 except JJ 800/900,
+ // selected mirrors (with AA restriction) and NY-40 observation car.
+ const doorValues=['D46','E73','E74','D14'].map(val).map(norm);
+ if(doorValues.some(v=>/(?:200\s*[X×]\s*800|300\s*[X×]\s*1300)/.test(v)))
+   add(50,'Glass window 200×800 / 300×1300 mm');
+ if(![800,900].includes(jj)&&doorValues.some(v=>/\bDSJ?1\b|SEE[ -]?THROUGH/.test(v)))
+   add(50,'See-through door DS1/DSJ1 (JJ khác 800/900 mm)');
+ if((/YZ[- ]?5(?:2A|3A)/.test(mirror)&&![1000,1100].includes(aa))||/YZ[- ]?55SN/.test(mirror))
+   add(50,'Mirror '+val('D66')+( /YZ[- ]?55SN/.test(mirror)?'':' (AA không phải 1000/1100 mm)'));
+ if(/^NY-40/.test(norm(val('D14'))))add(50,'Observation NY-40');
+ // 50-day CL1 exception is for named regulation packages, not every CL1.
+ // 90 days: CL2/DL5/DL6/DL7 only when SUS-M finish is positively selected.
+ const finishInfo=[val('D40'),val('D42'),ceiling].map(norm).join(' ');
+ if(/^(?:CL2|DL5|DL6|DL7)(?:[- ]|$)/.test(ceiling)&&/SUS[- ]?M\b/.test(finishInfo))
+   add(90,'Ceiling '+val('D41')+' with SUS-M finish');
+ // 120 days: CL1 for EN81-20/50 Malaysia and insulation require
+ // an explicit regulatory option, which current SpecForm does not expose.
+ const specialCar=new Set(['P06-2S','P13D-CO','P13D-2S']);
+ if(/^DL7-[CW](?:$|[- ])/i.test(ceiling)&&specialCar.has(cap))
+   add(120,'Ceiling '+val('D41')+' with car '+cap);
+ if(/^FL1(?:$|[- ])/i.test(ceiling)&&!new Set(['P13D-CO','P13D-2S']).has(cap))
+   add(120,'Ceiling FL1 (car khác P13D-CO/2S)');
+ const pivCells=['E75','E78','E81'];
+ const pivTriggered=pivCells.map(val).some(v=>/PIV\w*[- ]?(?:1210|1230|1280|1220|1240|1290)BA\b/i.test(v));
+ if(featureCodes.has('HOS')&&pivTriggered)add(120,'HOS switch với PIVx-1210BA / 1230BA / 1280BA / 1220BA / 1240BA / 1290BA');
+ if(featureCodes.has('SNCD'))add(120,'SNCD feature');
+ const extra=triggered.length?Math.max(...triggered.map(x=>x.extra)):0;
+ return {extra,days:30+extra,reasons:triggered.sort((a,b)=>b.extra-a.extra).map(x=>x.why)};
+}
+function refreshLeadTime(){
+ const days=document.getElementById('leadtime-days'),reason=document.getElementById('leadtime-reasons');if(!days||!reason||!current)return;
+ const r=$('model').value==='MRL'?calculateMRLLeadTime():calculateMRLeadTime();days.textContent=r.days+' days';reason.replaceChildren();
+ const lines=r.reasons.length?r.reasons:['Không có điều kiện kéo dài thời gian / Standard lead time.'];
+ for(const line of lines){const div=document.createElement('div');div.textContent=line;reason.append(div)}
+}
+// Re-evaluate after the existing event handler updates `changes`, including
+// delegated controls and model/database reloads. No export pipeline changes.
+document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
+
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1539,7 +1654,7 @@ function check(){
   if(result.errors.length)result.status='FAIL';
  }
  if(window.SPEC_MIRROR_RULES && model==='MR'){
-  const mr=true,val=currentValue('D69'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue('D29'),val);
+  const mr=true,val=currentValue('D69'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue('D29'),val,currentValue('D31'));
   if(!check.ok){result.errors.push({id:'Mirror!Eligibility',cell:mr?'D69':'D66',message:check.message});result.status='FAIL';}
  }
  renderSourceCheck(result);
