@@ -1457,16 +1457,28 @@ function issueDetails(raw){
  return {cell,reason,label,value,action,feature};
 }
 function focusIssue(cell){
+ // Dimension rows use display:contents for .field and .spec-row-inputs;
+ // scrolling those elements has no physical box. Scroll a visible row instead.
  const feature=sourceFeatureRows().find(x=>x.cell===cell||(x.code==='ITP'&&cell===('H'+x.cell.slice(1))));
  if(feature&&activeFeatureTable!==feature.table){activeFeatureTable=feature.table;renderFeatures()}
  const input=Array.from(document.querySelectorAll('[data-cell]')).find(x=>x.dataset.cell===cell);
  if(!input)return;
- const wrapper=input.closest('.field,.feature-line')||input;
- wrapper.scrollIntoView({behavior:'smooth',block:'center'});
- wrapper.classList.add('issue-focus');
- setTimeout(()=>wrapper.classList.remove('issue-focus'),2600);
- if(!input.disabled)input.focus({preventScroll:true});
+ const section=input.closest('.spec-section,.features-panel');
+ // Reveal the destination if a section has been collapsed elsewhere.
+ if(section?.hidden)section.hidden=false;
+ const row=input.closest('.dimension-entry,.hall-choice-item,.spec-row,.feature-line,.field')||input;
+ const visible=node=>node&&node.getClientRects().length&&getComputedStyle(node).display!=='contents';
+ const target=visible(row)?row:input;
+ // Use a viewport coordinate for a stable offset below the top header.
+ const topOffset=Math.max(14,Math.min(96,(document.querySelector('.site-header')?.getBoundingClientRect().bottom||0)+12));
+ const y=window.scrollY+target.getBoundingClientRect().top-topOffset-18;
+ window.scrollTo({top:Math.max(0,y),behavior:'smooth'});
+ row.classList.add('issue-focus');input.classList.add('issue-input-focus');
+ setTimeout(()=>{row.classList.remove('issue-focus');input.classList.remove('issue-input-focus')},3000);
+ // Do not let focus trigger a second scrolling action on mobile browsers.
+ if(!input.disabled)try{input.focus({preventScroll:true})}catch(e){input.focus()}
 }
+
 function renderCheckIssues(result){
  const wrap=$('check-issues');if(!wrap)return;wrap.replaceChildren();
  const all=[...result.errors.map(x=>({raw:x,type:'error'})),...result.warnings.filter(x=>/^[A-Z]{1,3}\d+:/.test(x)).map(x=>({raw:x,type:'warning'}))];
