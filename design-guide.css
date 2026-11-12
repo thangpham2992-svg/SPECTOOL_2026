@@ -216,3 +216,43 @@
  #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row{grid-template-columns:minmax(110px,33%) minmax(0,1fr)!important;gap:6px!important}
  #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .spec-row-inputs{grid-template-columns:minmax(0,1fr)!important}
 }
+
+
+/* v5.8.28 — concise mobile UI, validation remains in Check Spec. */
+/* Hide descriptive notes, keep image previews, controls, validation and error messages. */
+#fields .cwt-minimum-hint,#fields .oh-minimum-hint,
+#fields .technical-material-hint,#fields .design-hint,
+#fields .finish-preview-caption{display:none!important}
+/* Remove placeholder dash; rows without a dependent choice take one grid row. */
+#fields .car-design-variants.car-design-no-variant{display:none!important}
+#fields .car-design-variants.car-design-no-variant::after{content:none!important}
+#fields .car-design-line:has(>.car-design-variants.car-design-no-variant){align-items:center!important}
+/* Remove extra vertical space around preview/image and single line controls. */
+#fields .car-design-line .finish-preview-box{gap:0!important}
+#fields .car-design-line .design-inline{margin-top:2px!important}
+#fields .car-design-section-fields>.spec-row .design-hint{display:none!important}
+@media(max-width:680px){
+  #fields .spec-section[data-section="III"] .car-design-line{padding:5px 7px!important;gap:4px 7px!important;min-height:0!important}
+  #fields .spec-section[data-section="III"] .car-design-label{grid-row:1!important;font-size:11px!important;line-height:1.28!important}
+  #fields .spec-section[data-section="III"] .car-design-variants{grid-row:2!important}
+  #fields .spec-section[data-section="III"] .car-design-line:has(>.car-design-variants:not(.car-design-no-variant)) .car-design-label{grid-row:1 / span 2!important}
+  #fields .spec-section[data-section="III"] .car-design-line select,
+  #fields .spec-section[data-section="III"] .car-design-line input{height:30px!important;min-height:30px!important;padding:3px 7px!important;font-size:12px!important}
+  #fields .spec-section[data-section="III"] .car-design-line .finish-preview-thumb{height:30px!important;width:32px!important}
+  #fields .spec-section[data-section="III"] .car-design-line .field.finish-preview-inline{grid-template-columns:minmax(0,1fr) 34px!important;gap:3px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row{padding:5px 7px!important;gap:7px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .spec-row-title{font-size:11px!important;line-height:1.25!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row select,
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row input{height:30px!important;min-height:30px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .readonly-value{min-height:30px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .design-inline-btn{min-height:23px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .design-thumb{height:27px!important;width:31px!important}
+  .dimension-entry,.dimension-hoistway .dimension-entry{min-height:0!important;padding:6px 9px!important;gap:6px!important}
+  .dimension-entry input,.dimension-entry select{height:34px!important;min-height:34px!important}
+  .dimension-entry .spec-row-title{font-size:12px!important;line-height:1.3!important}
+  .dimension-hoistway .dimension-entry input,.dimension-hoistway .dimension-entry select{grid-column:2!important}
+  .dimension-group-title{min-height:0!important;padding:9px 11px!important;font-size:13px!important}
+  .dimension-groups{gap:9px!important}
+  .spec-section{margin-bottom:12px!important;padding-bottom:12px!important}
+  .section-heading{padding-top:12px!important;padding-bottom:12px!important;margin-bottom:10px!important;font-size:17px!important}
+}
