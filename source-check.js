@@ -451,6 +451,48 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    }
   }
  }
+ // Source SDE checks have priority over their derivative DSJ1 door-finish
+ // warnings. MR: DataTable!AP12, MRL V02: SpecForm!B209 source formula.
+ // Keep the underlying validity formulas; after SDE is corrected, a genuinely
+ // invalid door finish will show up on the next Check Spec run.
+ {
+  const doorAddr=model==='MR'?'D50':'D46',typeAddr=model==='MR'?'D14':'D15';
+  const oneCell=featureByCode['sde - one side']||(model==='MR'?'A116':'A118');
+  const bothCell=featureByCode['sde - both sides']||(model==='MR'?'A117':'A119');
+  const door=value('SpecForm',doorAddr),type=value('SpecForm',typeAddr);
+  const checked=cell=>{
+   const v=value('SpecForm',cell);
+   return v.ok&&[1,true,'1','TRUE','V','✓'].includes(
+    typeof v.value==='string'?v.value.trim().toUpperCase():v.value);
+  };
+  const finish=door.ok?String(door.value||''):'';
+  const dsj1=/DSJ1/i.test(finish),ds1=!dsj1&&/\bDS1\b/i.test(finish);
+  if((dsj1||model==='MRL'&&ds1)&&type.ok){
+   const kind=String(type.value||'').trim().toUpperCase();
+   const one=checked(oneCell),both=checked(bothCell);
+   const conflict=(dsj1&&kind==='CO'&&one)||
+                  (dsj1&&kind==='2S'&&both)||
+                  (ds1&&(one||both))||(one&&both);
+   if(conflict){
+    // Remove only the redundant door-finish/SDE symptoms during this check;
+    // avoid suppressing separate errors on landing doors, dimensions, etc.
+    const derivative=it=>{
+     const id=String(it.id||''),cell=String(it.cell||'');
+     if(model==='MR'&&/^(?:DataTable!D48[789]|DataTable!AP19|DataTable!AP2|DataTable!AP16)(?:$|\/)/.test(id))return true;
+     if(model==='MRL'&&id==='SpecForm!B209'&&/SDE|door finish|DSJ1/i.test(it.message||''))return true;
+     if(model==='MRL'&&/^DataTable!D49[5-8](?:$|\/)/.test(id))return true;
+     return cell===doorAddr&&/DSJ1|DS1|Car door|hoàn thiện cửa/i.test(it.message||'');
+    };
+    for(let i=issues.length-1;i>=0;i--)if(derivative(issues[i]))issues.splice(i,1);
+    const target=(kind==='CO'&&one)?oneCell:(kind==='2S'&&both)?bothCell:(one?oneCell:bothCell);
+    const explanation=ds1?'DS1 chỉ cho phép SDE No / DS1 requires no SDE.':
+      kind==='CO'?'DSJ1 với cửa CO: không được chọn SDE One Side; chỉ No hoặc Both Sides.':
+      'DSJ1 với cửa 2S: không được chọn SDE Both Sides; chỉ No hoặc One Side.';
+    issue('Feature!DSJ1-SDE-Priority',target,
+      'Sửa SDE trước / Correct SDE first. '+explanation);
+   }
+  }
+ }
  // No silent full PASS: errors in unknown cells make verification INCOMPLETE / BLOCKED.
  const unique=[];const seen=new Set();for(const issueItem of issues){const key=issueItem.id+'|'+issueItem.message;if(!seen.has(key)){unique.push(issueItem);seen.add(key)}}
  const status=unique.length?'FAIL':unverified.length?'INCOMPLETE':'PASS';

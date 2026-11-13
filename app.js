@@ -370,6 +370,31 @@ function refreshCalculatedOutputs(){
   }
  }
 }
+function enforceMRSingleEntrance(){
+ // NEXIEZ-MR Door-Gate (SpecForm D20) is fixed to 1D-1G.
+ // SpecForm D14 is the actual CO/2S Door type and must retain its Capacity value.
+ if($('model').value!=='MR')return;
+ const f=current.fields.find(x=>x.cell==='D20'); // Door-Gate type, NOT D14 (CO/2S).
+ if(!f)return;
+ const el=activeInput(f.cell);
+ if(!el)return;
+ const fixedValue='1D-1G';
+ if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===fixedValue)){
+  const op=document.createElement('option');op.value=fixedValue;op.textContent=fixedValue;el.append(op);
+ }
+ if(String(currentValue(f.cell))!==fixedValue){changes[f.cell]=fixedValue;el.classList.add('dirty');}
+ // Repair the v5.8.59 regression only when D14 contains a Door-Gate token.
+ // Never suppress a genuine JJ or Door type validation failure.
+ const doorType=activeInput('D14');
+ const capacityDoorType=String(selectedCapacity().DoorType||'').trim();
+ if(doorType && /^(?:\d+D[-–]\d+G)$/i.test(String(currentValue('D14')).trim()) && /^(?:CO|2S)$/i.test(capacityDoorType)){
+  changes.D14=capacityDoorType;doorType.value=capacityDoorType;doorType.classList.add('dirty');
+ }
+ el.value=fixedValue;
+ el.disabled=true;
+ el.closest('.field')?.classList.add('locked');
+ el.title='NEXIEZ-MR: cố định 1D-1G / Fixed door-gate type';
+}
 function refreshLocks(){
  // Release only locks previously applied by the workbook's conditional formatting.
  for(const el of document.querySelectorAll('[data-cf-locked="1"]')){
@@ -423,6 +448,25 @@ function refreshLocks(){
    f.title='Vật liệu trần cố định: SUS-HL / Fixed ceiling finish: SUS-HL';
   }
  }
+ // Fixed factory configuration: counterweight safety gear is not supplied
+ // on both MR and MRL Version02. Keep rail fields unrestricted.
+ const cwtSafety=current.fields.find(f=>f.name==='K15_CWTSafety');
+ if(cwtSafety){
+  const el=activeInput(cwtSafety.cell);
+  if(el){
+   const fixedValue='Không cung cấp (Not provided)';
+   if(el.tagName==='SELECT'&&!Array.from(el.options).some(o=>o.value===fixedValue)){
+    const option=document.createElement('option');option.value=fixedValue;option.textContent=fixedValue;el.append(option);
+   }
+   el.value=fixedValue;
+   if(String(cwtSafety.value)!==fixedValue)changes[cwtSafety.cell]=fixedValue;
+   else delete changes[cwtSafety.cell];
+   el.disabled=true;
+   el.closest('.field')?.classList.add('locked');
+   el.title='Cố định theo tiêu chuẩn / Fixed factory standard';
+  }
+ }
+ enforceMRSingleEntrance();
  refreshCarDesignStates();
  refreshCalculatedOutputs();
  refreshPanelImagePreviews();

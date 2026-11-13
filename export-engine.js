@@ -494,7 +494,7 @@
        if(following)sheetData.insertBefore(row,following);else sheetData.appendChild(row);
      }
      addRailRow(30,'Cabin (CAR)',true);
-     addRailRow(31,'Đối trọng (CWT)',false);
+     addRailRow(31,'Rail đối trọng (CWT)',false);
      let merges=all(x,'mergeCells')[0];if(!merges){merges=x.createElementNS(n,'mergeCells');
        const after=Array.from(x.documentElement.children).find(el=>['conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup'].includes(el.localName));
        if(after)x.documentElement.insertBefore(merges,after);else x.documentElement.appendChild(merges);
