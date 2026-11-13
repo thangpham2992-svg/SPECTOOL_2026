@@ -810,6 +810,13 @@ function workbookChoices(field,engine=null){
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
  if(field.cell==='D65'&&$('model').value==='MRL'&&ny40PositionChoices())list=ny40PositionChoices();
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
+ // MRL Version02: wheelchair COP models are available only with Front COP.
+ // Keep the original source-driven model choices for Front; Side permits No only.
+ if($('model').value==='MRL'&&field.cell==='D62'&&
+    String(currentValue('D60')).trim().toLowerCase()==='side')list=['No'];
+ // MRL Version02: factory handrail location is restricted to the rear wall.
+ if($('model').value==='MRL'&&field.name==='K32_HandrailQuantity'&&
+    String(currentValue('D64')).trim()!=='Not supplied')list=['1 pc on rear wall'];
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
    list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'),model==='MR'?currentValue('D31'):undefined);

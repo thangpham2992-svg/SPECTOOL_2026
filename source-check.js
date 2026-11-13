@@ -31,6 +31,23 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    message:`COP ${evrcDependency.cop} với ${evrcDependency.triggered.join(', ')} bắt buộc chọn EVRC-C / EVRC-C is required for this special COP.`,detail:''});
   else unverified.push('Feature!SpecialCOP_EVRC-C — EVRC-C feature not found in source database');
  }
+ // MRL Version02: wheelchair COP is permitted only at Front. The handrail
+ // installation position is Rear Wall only (regardless of the handrail model).
+ // Validate original/current values independently of dropdown filtering so
+ // imported or previously stored specifications cannot bypass these rules.
+ if(model==='MRL'){
+  const actual=(addr)=>{const result=value('SpecForm',addr);return result.ok?String(result.value??'').trim():'';};
+  const copLocation=actual('D60'),wheelchair=actual('D62');
+  if(wheelchair&&wheelchair.toUpperCase()!=='NO'&&copLocation.toLowerCase()!=='front'){
+   issues.push({id:'MRL!WheelchairCOP_Front',cell:'D62',
+    message:'Wheelchair COP chỉ áp dụng khi COP ở vị trí Front / Wheelchair COP requires Front COP location.',detail:''});
+  }
+  const handrail=actual('D64'),handrailPosition=actual('D65');
+  if(handrail&&handrail!=='Not supplied'&&handrailPosition&&handrailPosition!=='1 pc on rear wall'){
+   issues.push({id:'MRL!Handrail_RearWall',cell:'D65',
+    message:'Tay vịn MRL Version02 chỉ lắp ở Rear Wall / Handrail location must be 1 pc on rear wall.',detail:''});
+  }
+ }
  const cellForCondition=(row)=>{
   if(model==='MRL'){
    if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D14';
