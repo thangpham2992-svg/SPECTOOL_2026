@@ -23,7 +23,17 @@ function patchFields(model,fields){if(model!=='MRL'||!fields)return;
  if(typeof f.validation==='string')f.validation=f.validation.replaceAll(old,fresh);
  }
 }
+function patchConditionalRules(meta){
+ if(!meta?.lightUp)return;
+ // Workbook conditional formatting was extracted before the PPS -> Laminated rename.
+ // Align the LightUp (grey/required cell) rules with the current visible material.
+ for(const rule of meta.lightUp){
+  if(typeof rule.formula==='string')rule.formula=rule.formula.replaceAll(old,fresh);
+ }
+}
 function patchDatabase(db){if(!db?.sheets?.DataTable)return db;
+ patchConditionalRules(db.conditional);
+ patchConditionalRules(window.SPEC_CONDITIONAL?.MRL);
  if(db.__material5825)return db;
  const s=db.sheets.DataTable;
  // Update model-specific real DataTable rows used by its Excel-formula evaluator.

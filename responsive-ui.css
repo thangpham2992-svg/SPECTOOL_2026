@@ -220,41 +220,11 @@ body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothin
 }
 
 
-/* v5.8.43: low-opacity model-specific brochure cover as page watermark.
-   It is a screen-only decoration and is never part of SpecForm / exports. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url("assets/background/nexiez-mr.jpg");
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  opacity: .20;
-}
-html[data-spec-model="MRL"] body::before {
-  background-image: url("assets/background/nexiez-mrl-v02.jpg");
-}
-/* Keep all interactive content above the watermark. */
-body > .site-header,
-body > main.workspace {position: relative;z-index: 1;}
-/* Slight transparency lets the cover show subtly behind grouped sections.
-   Input controls retain their fully opaque backgrounds for legibility. */
+/* v5.8.45: brochure watermark deliberately removed for a clean, readable UI. */
+body::before {content:none!important;background-image:none!important;}
+body > .site-header, body > main.workspace {position:relative;z-index:auto;}
 body .workspace > .project-box,
 body .workspace > .action-panel,
 body .workspace > .fields-root .spec-section,
 body .workspace > .features-panel,
-body .workspace > .leadtime-check {
-  background-color: rgba(255,255,255,.86);
-}
-@media (max-width: 600px) {
- body::before {background-size: auto 78%;background-position:center center;}
- body .workspace > .project-box,
- body .workspace > .action-panel,
- body .workspace > .fields-root .spec-section,
- body .workspace > .features-panel,
- body .workspace > .leadtime-check {background-color:rgba(255,255,255,.93);}
-}
-@media print {body::before{display:none!important;}}
+body .workspace > .leadtime-check {background-color:#fff;}
