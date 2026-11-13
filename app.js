@@ -810,13 +810,6 @@ function workbookChoices(field,engine=null){
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
  if(field.cell==='D65'&&$('model').value==='MRL'&&ny40PositionChoices())list=ny40PositionChoices();
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
- // MRL Version02: wheelchair COP models are available only with Front COP.
- // Keep the original source-driven model choices for Front; Side permits No only.
- if($('model').value==='MRL'&&field.cell==='D62'&&
-    String(currentValue('D60')).trim().toLowerCase()==='side')list=['No'];
- // MRL Version02: factory handrail location is restricted to the rear wall.
- if($('model').value==='MRL'&&field.name==='K32_HandrailQuantity'&&
-    String(currentValue('D64')).trim()!=='Not supplied')list=['1 pc on rear wall'];
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
    list=window.SPEC_MIRROR_RULES.allOptions(model,currentValue('D13'),model==='MR'?currentValue('D29'):currentValue('D28'),model==='MR'?currentValue('D31'):undefined);
@@ -1137,6 +1130,11 @@ function row(field,displayName='',compact=false){
    const hint=document.createElement('small');hint.className='technical-material-hint';
    hint.textContent='SUS Standard vẫn hợp lệ với NY-40. Chỉ cấu kiện cửa có kính DSJ1/DS1/Large Window dùng SUS304; khung cửa, transom và front return giữ vật liệu tiêu chuẩn.';
    hint.style.cssText='display:block;margin-top:5px;color:#52677b;font-size:11px;';box.append(hint);
+ }
+ if($('model').value==='MRL'&&field.name==='K29_DecorWeight'){
+  box.classList.add('mrl-decoration-field');
+  const hint=document.createElement('span');hint.className='mrl-decoration-maximum unavailable';
+  hint.id='mrl-decor-maximum';hint.textContent='Maximum: —';box.append(hint);
  }
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
@@ -1516,6 +1514,7 @@ function renderAllSpecRows(){
  if(missing.length)status('Thiếu trường trong giao diện: '+missing.map(x=>x.row).join(', '),'error');
 }
 function invalidateCheck(){
+ if($('model').value==='MRL')refreshMRLDecorationMaximum();
  window.__lastCheck=null;
  const top=$('check-top');if(top){top.className='check-top partial';top.textContent='Đã thay đổi — cần kiểm tra lại';}
  const issues=$('check-issues');if(issues)issues.replaceChildren();
@@ -1618,7 +1617,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1705,11 +1704,46 @@ function runCheckSpec(){
   return [message];
  }
 }
+function mrlDecorationFeatureSelected(code){
+ if($('model').value!=='MRL')return false;
+ const canon=x=>String(x||'').toUpperCase().replace(/[\s_-]+/g,'').trim();
+ const want=canon(code);
+ return sourceFeatureRows().some(f=>{
+  if(canon(f.code)!==want)return false;
+  const state=changes[f.cell]??f.apply;
+  return ['1','TRUE','YES','V','✓'].includes(String(state).toUpperCase());
+ });
+}
+function evaluateMRLDecoration(){
+ if($('model').value!=='MRL'||!window.SPEC_MRL_V02_DECOR)return null;
+ return window.SPEC_MRL_V02_DECOR.validate(currentValue,mrlDecorationFeatureSelected);
+}
+function refreshMRLDecorationMaximum(){
+ if($('model').value!=='MRL')return;
+ const hint=$('mrl-decor-maximum');if(!hint)return;
+ let r;
+ try{r=evaluateMRLDecoration()}
+ catch(e){r={state:'unavailable',reason:String(e?.message||e)}}
+ hint.textContent=r?.state==='ready'?'Maximum: '+r.max.toLocaleString('en-US')+' kg':'Maximum: —';
+ hint.classList.toggle('unavailable',r?.state!=='ready');
+ hint.classList.toggle('overlimit',!!r?.errors?.some(x=>x.id==='MRL_V02_DECOR!Maximum'));
+ hint.title=r?.reason||'Chưa xác định được kết quả theo Technical Study G11L1';
+}
 function check(){
  const model=$('model').value;
  const engineData=workbookEngineData();
  const result=window.SPEC_SOURCE_CHECK?.(model,changes,engineData);
  if(!result)throw Error('Source Check Engine chưa được tải / Calculation engine not loaded');
+ if(model==='MRL'){
+  const decor=evaluateMRLDecoration();
+  if(decor){
+   result.errors.push(...decor.errors);
+   if(decor.state==='unavailable')result.unverified.push('Decoration Weight Maximum Version02: '+decor.reason);
+   if(decor.errors.length)result.status='FAIL';
+   else if(decor.state==='unavailable'&&result.status==='PASS')result.status='INCOMPLETE';
+   if(decor.state==='ready')result.verified.push('Technical Study G11L1 v2.5.0.0: '+decor.max+' kg excluding flooring');
+  }
+ }
  if(model==='MRL'&&window.SPEC_MATERIAL_5825){
   const r=window.SPEC_MATERIAL_5825;
   for(const f of current.fields){if(!/^(K22_CeilingColor|K23_WallFinish|K24_CarDoorFinish|K25_CarTransomFinish|K23_WallPaintedColor|K24_CarDoorPaintedColor|K25_CarTransomPainted|K26_CarFrontPainted|K23_WallPattern|K24_CarDoorPattern|K25_CarTransomPattern)$/.test(f.name))continue;
@@ -1745,7 +1779,16 @@ function renderSourceCheck(result){
   notice.title='Tên tầng theo DataTable: '+result.dotLedFloorNames.join(', ');
   wrap.append(notice);
  };
- if(!failed){addFloorLedWarning();return;}
+ if(!failed){
+  // When the Version02 mass table is incomplete, show a direct link at D57
+  // without pretending this is an incorrect user input.
+  if(incomplete && $('model').value==='MRL' && (result.unverified||[]).some(x=>/Decoration Weight Maximum Version02/.test(String(x)))){
+   const notice=document.createElement('button');notice.type='button';notice.className='check-error-row';
+   notice.textContent='Chưa xác minh Maximum Decoration Weight (D57) — '+(result.unverified||[]).filter(x=>/Decoration Weight Maximum Version02/.test(String(x))).map(x=>String(x).replace(/^Decoration Weight Maximum Version02:\s*/, '')).join('; ');
+   notice.onclick=()=>focusIssue('D57');wrap.append(notice);
+  }
+  addFloorLedWarning();return;
+ }
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
  const primaries=result.errors.filter(x=>!aggregates.test(x.id));
  const detailedObservation=primaries.some(x=>String(x.id).startsWith('DataTable!D525 /'));
@@ -1755,9 +1798,11 @@ function renderSourceCheck(result){
   if(dimensionDetails&&x.id==='SpecForm!B209'&&/OH\/PD|DataTable!D522|AH\/BH/i.test(x.message))return false;
   return true;
  });
+ // Display errors of MRL Version02 from the bottom of SpecForm upwards.
+ // This is UI ordering only: no input, shaft-size or validation formula changes.
  const issues=[...(filtered.length?filtered:result.errors)].sort((a,b)=>{
   const num=error=>{const cell=String(error.cell||'');const m=/\d+/.exec(cell);return m?Number(m[0]):9999;};
-  return num(a)-num(b);
+  return $('model').value==='MRL' ? num(b)-num(a) : num(a)-num(b);
  });
  const fields=new Map(),features=sourceFeatureRows();
  const sizeLabel={D33:'Chiều rộng hố thang (AH)',D34:'Chiều sâu hố thang (BH)',D36:'Chiều sâu hố PIT (PD)',D37:'Đỉnh hố thang (OH)',D40:'Chiều sâu hố PIT (PD)',D41:'Đỉnh hố thang (OH)',D35:'Chiều sâu hố thang (BH)'};
@@ -1773,7 +1818,7 @@ function renderSourceCheck(result){
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(isDimension(cell)||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=(isDimension(cell)||String(err.id).startsWith('MRL_V02_DECOR!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=isDimension(cell)?dimensionPriority(err):0;
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{name,message,priority});
@@ -1850,6 +1895,15 @@ async function buildFinalExport(){
 function canExportBriefly(){
  try{
   const model=$('model').value;
+  // Only MRL Version02 requires the decoration limit to be checked in addition
+  // to the existing source check. The same validation is used on the Check Spec
+  // button and before Excel/PDF export, so an over-limit input cannot bypass it.
+  if(model==='MRL'){
+   check();
+   if(window.__lastCheck?.status==='PASS')return true;
+   alert('Spec chưa đạt hoặc Maximum Decoration Weight chưa được xác minh. Vui lòng xem Check Spec.');
+   return false;
+  }
   const result=window.SPEC_SOURCE_CHECK?.(model,changes,workbookEngineData());
   if(result?.status==='PASS')return true;
   renderSourceCheck(result||{status:'INCOMPLETE',errors:[]});
