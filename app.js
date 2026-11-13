@@ -1560,7 +1560,7 @@ function calculateMRLLeadTime(){
 function refreshLeadTime(){
  const days=document.getElementById('leadtime-days'),reason=document.getElementById('leadtime-reasons');if(!days||!reason||!current)return;
  const r=$('model').value==='MRL'?calculateMRLLeadTime():calculateMRLeadTime();days.textContent=r.days+' days';reason.replaceChildren();
- const lines=r.reasons.length?r.reasons:['Không có điều kiện kéo dài thời gian / Standard lead time.'];
+ const lines=r.reasons.length?r.reasons:[];
  for(const line of lines){const div=document.createElement('div');div.textContent=line;reason.append(div)}
 }
 // Re-evaluate after the existing event handler updates `changes`, including
