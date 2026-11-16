@@ -111,7 +111,7 @@
    for(const entry of Array.from(cols?.children||[])){const min=Number(attr(entry,'min')),max=Number(attr(entry,'max')),width=Number(attr(entry,'width'));for(let i=1;i<=3;i++)if(i>=min&&i<=max&&width>0)widths[i-1]=width}
    const sum=widths.reduce((a,b)=>a+b,0);const colgroup=widths.map(w=>'<col style="width:'+(w/sum*100).toFixed(5)+'%">').join('');
    const first=Array.from(cells.entries()).find(([a])=>a==='B8')?.[1]?.value||'';
-   const project=esc(first);const modelName=model==='MR'?'NEXIEZ-MR ALPHA':'NEXIEZ-MRL Version02 ALPHA';
+   const project=esc(first);const modelName=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
    const printRows=[];
    for(let rowNum=1;rowNum<=end;rowNum++){
      const row=visibleRows.get(rowNum);if(!row)continue;

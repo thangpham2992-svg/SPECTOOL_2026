@@ -243,6 +243,22 @@
      cells.C300='Các cuộc gọi ở tầng bị hạn chế chỉ được chấp nhận khi sử dụng thẻ từ. Chức năng tự động vô hiệu hóa trong chế độ khẩn cấp. Chỉ cung cấp tiếp điểm khô, không bao gồm đầu đọc thẻ và thẻ từ.';
      includedFeatures.push({group:'Operation',code:'NSCR-H',row:null,option:'A',exportRows:[299,300]});
    }
+   // Export presentation only (5.8.87): model name is a product name, not the
+   // workbook's detailed configuration code. Both XLSX and PDF use doc.cells.
+   const exportModelRow=model==='MR'?13:14;
+   cells['C'+exportModelRow]=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
+   // Obsolete MBSS: hide the bilingual pair even if the historic MR workbook
+   // contains it in SpecFormExport but no longer lists it as an active feature.
+   // Do not remove unrelated door-sensor features.
+   if(model==='MR'){
+     for(let rn=1;rn<=305;rn++){
+       if(text(cells['D'+rn]).trim().toUpperCase()==='MBSS'||
+          /^\s*\(MBSS\)(?:\s|$)/i.test(text(cells['A'+rn]))){
+         hiddenRows.add(rn);
+         if(text(cells['D'+(rn+1)]).trim().toUpperCase()==='MBSS')hiddenRows.add(rn+1);
+       }
+     }
+   }
    // v4.2: Remove the legacy decorative-weight exclusion note from any export.
    for(const addr of Object.keys(cells))if(typeof cells[addr]==='string')cells[addr]=cells[addr]
      .replace(/\s*[-–]?\s*Trừ\s*:\s*Handrail\s*&\s*mirror\s*nhập khẩu\s*;\s*sàn\s*\(By local\)/gi,'');
@@ -391,6 +407,37 @@
        row.setAttribute('ht',String(Math.max(base,Math.min(185,lines*16+14))));
        row.setAttribute('customHeight','1');
      }
+   }
+   // Make the exact Model value bold in the *actual* XLSX cell, preserving the
+   // workbook font family, color, size, cell borders, number format and merges.
+   // The PDF renderer reads this XLSX font style so both export formats agree.
+   {
+     const address='C'+(model==='MR'?13:14);
+     const modelCell=all(x,'c').find(c=>c.getAttribute('r')===address);
+     if(!modelCell)throw Error('Missing Model export cell '+address);
+     const stylesPath='xl/styles.xml',part=zip.file(stylesPath);
+     if(!part)throw Error('Missing XLSX styles for Model emphasis');
+     const sd=parse(await part.async('string'));
+     const fonts=all(sd,'fonts')[0],xfs=all(sd,'cellXfs')[0];
+     if(!fonts||!xfs)throw Error('Missing fonts/cellXfs');
+     const originalXfs=Array.from(xfs.children).filter(c=>c.localName==='xf');
+     const oldStyle=Number(modelCell.getAttribute('s')||0);
+     const oldXf=originalXfs[oldStyle]||originalXfs[0];
+     const fontList=Array.from(fonts.children).filter(c=>c.localName==='font');
+     const oldFont=fontList[Number(oldXf.getAttribute('fontId')||0)]||fontList[0];
+     const boldFont=oldFont.cloneNode(true);
+     let b=Array.from(boldFont.children).find(c=>c.localName==='b');
+     if(!b){b=sd.createElementNS(n,'b');boldFont.appendChild(b);}
+     b.setAttribute('val','1');
+     const fontId=fontList.length;fonts.appendChild(boldFont);
+     fonts.setAttribute('count',String(fontId+1));
+     const newXf=oldXf.cloneNode(true);
+     newXf.setAttribute('fontId',String(fontId));
+     newXf.setAttribute('applyFont','1');
+     const styleId=originalXfs.length;
+     xfs.appendChild(newXf);xfs.setAttribute('count',String(styleId+1));
+     modelCell.setAttribute('s',String(styleId));
+     zip.file(stylesPath,serial(sd));
    }
    // v3.8: highlight only Roman-numbered specification section headings (I., II., III., IV., etc.).
    // Style the frozen export worksheet itself, so both XLSX and its PDF print share
@@ -680,7 +727,7 @@
      let rowClass=section?'section':sub?'subsection':feature?'feature':'';
      rows.push('<tr class="'+rowClass+'"><td>'+escape(a)+'</td><td>'+escape(b)+'</td><td>'+escape(c)+'</td></tr>');
    }
-   let title=model==='MR'?'NEXIEZ-MR ALPHA':'NEXIEZ-MRL Version02 ALPHA';
+   let title=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
    return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>SPEC ${title} - A4 PDF</title><style>
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,"Times New Roman",sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
