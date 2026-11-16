@@ -680,6 +680,12 @@ function renderFeatures(){
    line.title=itvEnabled?'':'Yêu cầu bật tính năng ITV / ITV must be selected first';
   }
   if($('model').value==='MRL'&&fCode==='AIL'&&!window.SPEC_HALL_LANTERN?.any(changes))disabled=true;
+  if($('model').value==='MRL'&&fCode==='SETS-L'&&disabled&&chk.checked){
+    // Source Q472 disallows SETS-L at 60 m/min. Clear a stale selection
+    // inherited from an earlier speed so D520 cannot remain FALSE with a
+    // disabled checkbox that the user cannot untick.
+    changes[f.cell]='0';featureTouched.delete(f.cell);chk.checked=false;
+  }
   chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{
    const code=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
    if($('model').value==='MRL'&&code==='FHL'&&!chk.checked&&window.SPEC_HALL_LANTERN?.any(changes)){
@@ -796,6 +802,21 @@ function landingDoorChoices(field,workbook){
  return result.length?result:null;
 }
 function workbookChoices(field,engine=null){
+ // Source XLSX already validates this Table 4.3 exception in R14, but its
+ // legacy data-validation ranges for D14/D16 don't expose the valid choice.
+ // These two fields must use the manual-specific UI choices, independent of the
+ // old INDIRECT dropdown; Check Spec still evaluates R13/R14/D525.
+ if($('model').value==='MRL'&&['D14','D16'].includes(field.cell))return technicalOptions(field);
+ // NEXIEZ-MR hospital bed handrail Rev.AM: YH-56S, not YH-55S.
+ if($('model').value==='MRL'&&field.name==='K32_Handrail'){
+  return [...new Set([...(field.options||[]),'YH-100SL (SUS304)'])];
+ }
+ if($('model').value==='MR'&&field.cell==='D67'&&/^B(?:750|1000)-2S\b/.test(String(currentValue('D13')))){
+  const model=workbookEngineData(),dbTable=model?.tables?.TblK32_Handrail;
+  const choices=(field.options||[]).slice();
+  const allowed='YH-56S (SUS304)';if(!choices.includes(allowed))choices.push(allowed);
+  return choices;
+ }
  // NEXIEZ-MRL Version02 — G11L1P Sales Manual Rev.M, Table 2.1-C.
  // Speed 60 m/min: 22 stops; 96/105/120/150 m/min: 30 stops.
  // Preserve an old incompatible selection as invalid so Check Spec reports it.
@@ -839,8 +860,10 @@ function workbookChoices(field,engine=null){
  // v5.8.65: MRL Version02 only. Limit visible choices but NEVER overwrite an
  // existing selection; Check Spec flags incompatible saved/imported values.
  if($('model').value==='MRL'&&field.cell==='D62'&&String(currentValue('D60')).trim()==='Side')list=['No'];
- if($('model').value==='MRL'&&field.cell==='D65'&&
-    !/^not supplied$/i.test(String(currentValue('D64')).trim())&&String(currentValue('D64')).trim())list=['1 pc on rear wall'];
+ // v5.8.76: Default Handrail Type (D64) never presets or narrows
+ // Handrail Quantity / Location (D65). Use its independent workbook choices.
+ // Observation-car location choices remain governed by NY-40A..E above;
+ // invalid combinations are reported by Check Spec, not silently replaced.
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
@@ -1118,9 +1141,18 @@ function row(field,displayName='',compact=false){
    changes[field.cell]=input.value;input.classList.add('dirty');
    if(['MR','MRL'].includes($('model').value))refreshTwoStopTravelWarning();
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
+   if($('model').value==='MRL'&&['D13','D16'].includes(field.cell)){
+    const opts=allowedObservationCodes();
+    if(!opts.includes(String(currentValue('D14')))&&String(currentValue('D14'))!=='No')applyValue('D14','No');
+   }
+   // SETS-L status uses a dynamic source formula (DataTable!Q472 / K472).
+   // Rebuild the feature controls when rated speed changes; prior UI kept
+   // a stale disabled X state from the previous 60 m/min selection.
+   if($('model').value==='MRL'&&field.name==='K8_Speed')renderFeatures();
    if(field.name==='K28_FlooringWeight')flooringManual=true;
    else flooringDependencyChanged(field.cell);
    if(field.name==='K5_Capacity' || field.name==='K17_CarW')refreshMirrorWeightHint();
+   if($('model').value==='MR'&&['D13','D34','D35'].includes(field.cell))refreshMRBedShaftNotes();
    // A new ceiling model immediately changes its finish choices, instead of
    // falsely flagging the old paint color when switching to SUS-HL.
    if(field.name==='K22_CeilingModel'&&window.SPEC_CEILING_FINISH){
@@ -1153,6 +1185,13 @@ function row(field,displayName='',compact=false){
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
+ if($('model').value==='MR'&&['D34','D35'].includes(field.cell)){
+  const note=document.createElement('small');note.className='mr-bed-shaft-note';note.hidden=true;
+  note.id='mr-bed-shaft-note-'+field.cell;
+  note.setAttribute('role','note');note.setAttribute('aria-live','polite');
+  box.append(note);
+  input.addEventListener('input',refreshMRBedShaftNotes);
+ }
  if(($('model').value==='MR'&&field.cell==='D39')||($('model').value==='MRL'&&field.cell==='D35')){
   const hint=document.createElement('small');
   hint.className='travel-limit-hint';hint.hidden=true;
@@ -1187,6 +1226,22 @@ function row(field,displayName='',compact=false){
   box.append(hint);
  }
  return box;
+}
+// BED750/BED1000 only: offer a structural narrowing note alongside AH/BH
+// when an entered dimension exceeds the published maximum. This is an
+// engineering suggestion, NOT approval of an out-of-range factory configuration.
+function refreshMRBedShaftNotes(){
+ const bed=$('model').value==='MR'&&window.SPEC_MR_BED_5871?.cases?.find(
+   x=>String(currentValue('D13')).startsWith(x.code+'-2S'));
+ for(const [cell,key,maxKey,label] of [['D34','ah','ahmax','AH'],['D35','bh','bhmax','BH']]){
+  const input=activeInput(cell),note=document.getElementById('mr-bed-shaft-note-'+cell);
+  if(!note||!input)continue;
+  const val=Number(input.value),max=bed?.[maxKey];
+  const excessive=!!bed&&input.value.trim()!==''&&Number.isFinite(val)&&val>max;
+  note.hidden=!excessive;
+  note.textContent=excessive?`${label} vượt Maximum ${max.toLocaleString('vi-VN')} mm. Vui lòng bổ sung dầm thu hố (dầm thép hình, dầm bê tông...) để giảm kích thước hữu dụng về giới hạn cho phép; cần xác nhận phương án kết cấu và kích thước với bộ phận kỹ thuật.`:'';
+  input.classList.toggle('mr-bed-over-max',excessive);
+ }
 }
 // Additional MRL shaft minima from the user's 156-row, four-CWT V02 source.
 // These are displayed without overwriting a manually entered shaft size.
@@ -1233,6 +1288,32 @@ function refreshMRLOverheadMinimum(adjustIfBelow=false){
   if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<minimum){el.value=String(minimum);changes[cell]=String(minimum);el.classList.add('dirty');}}
  }
 }
+// v5.8.75: factory-requested defaults for NEXIEZ-MR hospital-bed models.
+const BED_DEFAULT_FEATURES=new Set(['DKO-TB','HE-B','EXCL','EXCLC']);
+function isMRBedCapacity(value=String(currentValue('D13'))){
+ return $('model').value==='MR'&&/^B(?:750|1000)-2S(?:\s|\(|$)/i.test(String(value));
+}
+function applyMRBedDefaults(capacity){
+ if(!isMRBedCapacity(capacity))return;
+ // These are defaults on switching capacity; subsequent user edits are respected.
+ for(const [cell,value] of [['D64','Side'],['D65','710'],['D67','YH-56S (SUS304)'],['D68','3 pcs on 3 walls']])applyValue(cell,value);
+ const features=sourceFeatureRows();
+ for(const feat of features){
+  const code=window.SPEC_V52_FEATURES?.canonical(feat.code)||feat.code;
+  if(BED_DEFAULT_FEATURES.has(code)){
+   changes[feat.cell]='1';featureTouched.delete(feat.cell);
+  }
+ }
+}
+function setMRLHandrailDefault(){
+ if($('model').value!=='MRL')return;
+ const field=current.fields.find(x=>x.name==='K32_Handrail');
+ if(!field)return;
+ // Set only Handrail Type (D64): D65 quantity/location remains untouched.
+ // The source SpecForm may initially show "1 pc on rear wall"; that is its own
+ // source value, not a quantity default tied to YH-100SL.
+ applyValue(field.cell,'YH-100SL (SUS304)');
+}
 function capacityUpdate(capacity){
  let row=current.capacity.find(c=>String(c.EleCapacityName)===capacity);if(!row)return;
  // Mirrors mapped parameters from the base prototype, not yet a complete C# rule port.
@@ -1246,18 +1327,22 @@ function capacityUpdate(capacity){
   const v=String(row[tableCol]);if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v)){let op=document.createElement('option');op.value=v;op.textContent=v;el.append(op)}
   el.value=v;changes[f.cell]=v;el.classList.add('dirty');
  }
+ applyMRBedDefaults(capacity);
 }
 function allowedObservationCodes(){
  if($('model').value!=='MRL')return [];
+ const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
+ // Table 4.3 Version02: 1D-2G is exclusively NY-40C on P11-CO/P13W-CO.
+ // Do not hide NY-40C before the salesman switches COP to Front: that
+ // creates a circular selection blocker. R13/R14 remain checked by Check Spec.
+ if(entrance==='1D-2G')return /^(?:P11-CO|P13W-CO)(?:\s|\(|$)/i.test(cap)?['NY-40C']:[];
  const db=workbookEngineData();
  if(db&&window.SpecExcelSourceEngine?.SourceEngine){
   const e=new window.SpecExcelSourceEngine.SourceEngine(db,changes);
   const gate=e.safe('SpecForm','R13');
-  if(!gate.ok||gate.value!==true)return [];
+  if(gate.ok&&gate.value===false)return [];
  }
- const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
  if(entrance==='1D-1G')return Object.keys(NY40_POPUP_DATA);
- if(entrance==='1D-2G' && (/^P11-CO/.test(cap)||/^P13W-CO/.test(cap)) && String(currentValue('D60'))==='Front')return ['NY-40C'];
  return [];
 }
 function ny40PositionChoices(){
@@ -1665,7 +1750,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();refreshTwoStopTravelWarning();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1860,7 +1945,7 @@ function renderSourceCheck(result){
   const cell=String(err.cell||'').trim();if(!cell)continue;
   const f=current.fields.find(x=>x.cell===cell),feature=features.find(x=>x.cell===cell);
   let name=vietnameseFieldName(xrules().labels?.[cell]||f?.label||feature?.vi||feature?.code||'Thông số kỹ thuật');
-  if(isDimension(cell))name=sizeLabel[cell]||name;
+  if(isDimension(cell))name=($('model').value==='MR'&&cell==='D34'?'Chiều rộng hố thang (AH)':sizeLabel[cell])||name;
   if(String(err.id)==='ITP!Required')name='Vui lòng chọn loại ITP';
   if(String(err.id).startsWith('ITP!')&&String(err.id)!=='ITP!Required')name=String(err.message||'Loại ITP không hợp lệ');
   if(!name||name===cell)name='Thông số kỹ thuật';

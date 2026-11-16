@@ -129,8 +129,14 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    if(model==='MRL'&&sheet==='DataTable'&&addr==='D520'){
      const speed=value('SpecForm','D17'),tr=value('SpecForm','D35');
      const v=Number(speed.value),travel=Number(tr.value);
-     msg=v<96?'SETS-L không áp dụng cho tốc độ 60 m/min / SETS-L is not applicable at 60 m/min.':
-       'Với cấu hình tốc độ/hành trình này cần chọn SETS-L theo điều kiện Technical Study / SETS-L is required for this speed/travel combination.';
+     const selected=value('SpecForm','A157');
+     const on=selected.ok&&[1,true,'1','TRUE','V','✓'].includes(String(selected.value).toUpperCase());
+     const capName=value('SpecForm','D13');
+     const capKg=window.SPEC_ALPHA_5865?.mrlV02CapacityKg(capName.value);
+     const mandatory=v===150&&travel>60000&&capKg>=1275&&capKg<=1600;
+     msg=v<96&&on?'SETS-L không áp dụng cho tốc độ 60 m/min. Hãy tắt SETS-L / Feature not allowed at 60 m/min.':
+       mandatory&&!on?'Travel > 60 m ở 150 m/min, tải trọng 1275–1600 kg bắt buộc bật SETS-L (G11L1P Note 6 / DataTable D520).':
+       'SETS-L: điều kiện nguồn D520 chưa đạt; kiểm tra Speed, Travel, Capacity và trạng thái A157 / Review the source eligibility.';
    }
    if(model==='MRL'&&sheet==='DataTable'&&row===522){
     // D522 combines AH and BH. Show the exact failing field and dynamic F33/F34 minimum.
@@ -362,7 +368,8 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   for(let r=Number(ref[2])+1;r<=Number(ref[3]);r++){
    const name=String(db.sheets.DataTable[ref[1]+r]??'').trim();if(name)names.push(name);
   }
-  if(!names.includes(String(selected.value??'').trim()))issue('Source!'+tab,field,
+  const isBEDHandrail=model==='MR'&&tab==='TblK32_Handrail'&&/^B(?:750|1000)-2S\b/.test(String(value('SpecForm','D13').value||''))&&String(selected.value).trim()==='YH-56S (SUS304)';
+  if(!names.includes(String(selected.value??'').trim())&&!isBEDHandrail)issue('Source!'+tab,field,
    tab==='TblK32_Handrail'?'Mã tay vịn chưa được cho phép trong Excel nguồn.':'Vị trí tay vịn không hợp lệ trong Excel nguồn.');
   else verified.push('SpecForm!'+field+' — '+tab);
  }

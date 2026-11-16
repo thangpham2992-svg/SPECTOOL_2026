@@ -42,7 +42,11 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
   if(carHeight===2500&&family.includes(ceiling))mark('K22_CeilingModel',`HL=2500 không dùng được với trần ${ceiling} / Ceiling not compatible with HL=2500`);
   const mm=x=>Number(x).toLocaleString('vi-VN')+' mm';
   const shaftName={AH:'Chiều rộng hố thang (AH)',BH:'Chiều sâu hố thang (BH)'};
+  const isBedMR=model==='MR'&&/^(?:B750|B1000)-2S(?:\s|\()/i.test(capacity);
   for(const [code,dimension] of [['AH','K19_CarAH'],['BH','K19_CarBH']]){
+   // BED rows were appended as static records; their N-Min values are not formula states.
+   // BED envelopes are validated dynamically by mr-bed-capacity.js, preventing permanent false alarms.
+   if(isBedMR)continue;
    const state=str(row[code+'-Valid']),limit=num(row[code+'-Valid-Value']),actual=num(n(dimension));
    // These state codes are workbook-calculated against model/door/fire/CWT-specific ranges.
    if(state==='N-Max'&&Number.isFinite(limit))mark(dimension,`${shaftName[code]} ${mm(actual)} vượt quá giới hạn tối đa ${mm(limit)}.`);

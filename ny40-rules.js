@@ -32,7 +32,12 @@ window.SPEC_NY40_RULES=Object.freeze({
     // Source R14 is the authority for special two-gate COP Front; we do not
     // invent a side restriction for one-gate or an unrecorded COP left/right side.
     const entrance=String(get('D16')||''),cop=String(get('D60')||'');
-    if(entrance==='1D-2G'&&cop==='Side')errors.push({cell:'D60',id:'NY40!COPLocation',message:obs+' với 1D-2G yêu cầu kiểm tra COP Front; COP Side không thỏa điều kiện NY-40 / Review COP location.'});
+    const cap=String(get('D13')||'');
+    if(entrance==='1D-2G'){
+      if(obs!=='NY-40C'||! /^(?:P11-CO|P13W-CO)(?:\s|\(|$)/i.test(cap))
+        errors.push({cell:'D14',id:'NY40!TwoGateApplication',message:'1D-2G với kính NY-40 chỉ áp dụng NY-40C cho P11-CO/P13W-CO (Table 4.3).'});
+      if(cop!=='Front')errors.push({cell:'D60',id:'NY40!COPLocation',message:'1D-2G + NY-40C yêu cầu COP đặt tại Front return panel (Table 4.3).'});
+    }
     return errors;
   }
 });
