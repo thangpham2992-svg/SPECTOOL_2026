@@ -1,0 +1,3 @@
+SpecWebTool v5.8.85 Mobile Compact
+Source: v5.8.84 classic UI
+Mobile-only CSS: condensed header, model, project, ETD, action panel and navigation so section I first rows appear on initial mobile screen. No changes to calculation JS, database, PDF/Excel, or spec validation.

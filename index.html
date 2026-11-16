@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.84-classic-ui-selective">
+<meta name="specweb-build" content="5.8.85-mobile-compact">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <!-- Browser icon / Home screen icon -->
@@ -161,6 +161,74 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
 input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important;box-shadow:none!important}
 #leadtime-days.leadtime-standard{color:#24824a!important}
 #leadtime-days.leadtime-extended{color:#b72832!important}
+</style>
+
+<style id="mobile-first-three-rows-v5885">
+/* Mobile-only compact first viewport. Does not alter field DOM, values, or validation. */
+@media (max-width:740px){
+  .site-header{height:43px!important;padding:0 12px!important}
+  .brand{gap:8px!important}.brand-bar{height:23px!important;width:3px!important}
+  .brand-text{font-size:11.1px!important;letter-spacing:0!important;line-height:1.15}
+  .brand-sub{font-size:8px!important;letter-spacing:.1px!important;margin-top:1px!important}
+  .workspace{padding:7px 9px 85px!important}
+  .workspace>.intro{display:grid!important;grid-template-columns:minmax(0,.84fr) minmax(0,1.16fr)!important;
+    gap:6px!important;align-items:center!important;padding:9px 10px!important;margin:0 0 6px!important;
+    min-height:0!important;border-radius:7px!important}
+  .intro>div:first-child{min-width:0!important}
+  .intro-title{font-size:15px!important;line-height:1.2!important;letter-spacing:-.2px!important}
+  .intro-title span{display:block;font-size:10px!important;line-height:1.2!important}
+  .intro-caption{font-size:9px!important;margin:2px 0 0!important}
+  .model-control{width:100%!important;min-width:0!important}
+  .model-control .label-top{font-size:9px!important;line-height:1.2!important;margin:0 0 3px!important;
+    white-space:normal!important}
+  .model-control select{height:37px!important;min-height:37px!important;font-size:11px!important;
+    font-weight:680!important;padding:5px 20px 5px 8px!important}
+  .workspace>.project-box{padding:6px 9px 7px!important;margin:0 0 6px!important;border-radius:7px!important}
+  .workspace>.project-box .project-heading{font-size:11px!important;line-height:1.15!important;
+    margin:0 0 5px!important;padding:0!important}
+  .workspace .project-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    column-gap:9px!important;row-gap:0!important}
+  .workspace .project-grid .field{display:flex!important;flex-direction:column!important;
+    align-items:stretch!important;gap:2px!important;padding:0!important;min-height:0!important;
+    border:0!important}
+  .workspace .project-grid .field .nm{font-size:9px!important;line-height:1.2!important;min-height:0!important}
+  .workspace .project-grid .field input{height:34px!important;min-height:34px!important;
+    font-size:11px!important;padding:5px 8px!important}
+  .workspace>.leadtime-check{display:flex!important;align-items:center!important;justify-content:space-between!important;
+    gap:7px!important;min-height:39px!important;padding:6px 10px!important;margin:0 0 6px!important}
+  .workspace>.leadtime-check .leadtime-label{font-size:11px!important;font-weight:700!important}
+  .workspace>.leadtime-check .leadtime-main{display:flex!important;gap:6px!important;
+    margin:0!important;align-items:center!important;justify-content:flex-end!important;min-width:0!important}
+  .workspace>.leadtime-check .leadtime-main strong{font-size:16px!important;line-height:1.1!important}
+  .workspace>.leadtime-check .leadtime-reasons{font-size:9px!important;max-width:110px!important;
+    overflow-wrap:anywhere!important}
+  .workspace>.action-panel{padding:5px 8px!important;margin:0 0 6px!important}
+  .workspace>.action-panel .tech-export-choice{padding:4px 6px!important;min-height:30px!important;
+    margin:0 0 4px!important;border:0!important;background:transparent!important;gap:7px!important}
+  .workspace>.action-panel .tech-export-choice input{width:16px!important;height:16px!important}
+  .workspace>.action-panel .tech-export-choice strong{font-size:10.5px!important;line-height:1.2!important}
+  .workspace>.action-panel .check-top{padding:5px 7px!important;font-size:10.5px!important;
+    line-height:1.2!important;min-height:24px!important;margin:0!important}
+  .workspace>.action-panel #check-issues:not(:empty){margin-top:7px!important}
+  .workspace .spec-nav{padding:0 0 6px!important;gap:5px!important}
+  .workspace .spec-nav a{min-height:28px!important;padding:5px 7px!important;font-size:10px!important;
+    border-radius:5px!important}
+  .workspace .spec-section{margin-bottom:9px!important;padding:0 9px 9px!important}
+  .workspace .spec-section .section-heading{margin:0 -9px 3px!important;padding:8px 9px!important;
+    font-size:13px!important;line-height:1.2!important}
+  .workspace .spec-section .section-heading:before{height:16px!important;width:3px!important}
+  .workspace #fields .spec-section[data-section="I"] .spec-row{min-height:39px!important;
+    padding:4px 6px!important;gap:5px!important}
+  .workspace #fields .spec-section[data-section="I"] .spec-row-title{font-size:11px!important;
+    line-height:1.2!important}
+  .workspace #fields .spec-section[data-section="I"] .field input,
+  .workspace #fields .spec-section[data-section="I"] .field select,
+  .workspace #fields .spec-section[data-section="I"] .readonly-value{
+    min-height:32px!important;height:32px!important;font-size:11px!important;padding:5px 7px!important}
+  .mobile-actions{padding:6px 9px calc(6px + env(safe-area-inset-bottom,0px))!important;
+    gap:6px!important}
+  .mobile-actions button{min-height:40px!important;padding:8px 5px!important}
+}
 </style>
 </head>
 <body>
