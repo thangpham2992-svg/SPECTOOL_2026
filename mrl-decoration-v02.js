@@ -4,6 +4,10 @@
  * input/dropdown/dimension/other model. Excel Rev.C is intentionally not used.
  */
 (()=>{
+ // Customer-requested engineering reserve: allow at most 95% of the verified
+ // Technical Study Decoration Weight AFTER flooring is removed.
+ const SAFETY_FACTOR=0.95;
+ const safeMax=raw=>Math.max(0,Math.floor(raw*SAFETY_FACTOR+1e-9));
  const CODES=new Set(['P06-2S','P08-CO','P08-2S','P11-CO','P11-2S','P13W-CO','P13W-2S','P13D-CO','P13D-2S','P17W-CO','P17D-CO','P17D-2S','P18-CO','P21W-CO','P21D-CO','P21D-2S','P24-CO']);
  const KNOWN_OBS=new Set(['No','NY-40A','NY-40B','NY-40C','NY-40D','NY-40E']);
  const txt=v=>String(v??'').trim();
@@ -104,15 +108,21 @@
   for(const [cell,k] of [['D28','aa'],['D29','bb'],['D30','hl'],['D31','jj'],['D32','hh'],['D35','travel'],['D36','pd'],['D17','speed']])if(i[k]===null)err(cell,'Thiếu số liệu đầu vào từ Spectool.');
   if(errors.length)return {state:'invalid',max:null,errors,reason:'Input ngoài phạm vi Technical Study Alpha',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i}};
   const calc=window.G11L1_SOURCE_DECOR?.evaluate(i)||{state:'unverified',reason:'Technical Study engine not loaded'};
-  if(calc.state==='ready')return {state:'ready',max:calc.max,rawMaximum:calc.rawMax,errors:[],reason:'Technical Study G11L1 v2.5.0.0 (including flooring - Flooring Weight once)',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
+  if(calc.state==='ready'){
+   // calc.max is already an integer, floored from (MaxDecorationMass - FlooringMass).
+   // Apply the 5% margin exactly once to this EXCLUDING-flooring value; never to
+   // flooring mass or the mechanical source limits. Floor kg to stay conservative.
+   const max=safeMax(calc.max);
+   return {state:'ready',max,sourceMaximum:calc.max,rawMaximum:calc.rawMax,safetyFactor:SAFETY_FACTOR,errors:[],reason:'Technical Study G11L1 v2.5.0.0; Maximum excluding flooring with 5% safety margin',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
+  }
   return {state:'unavailable',max:null,errors:[],reason:calc.reason||'Cannot verify Technical Study source logic',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
  }
  function validate(get,has){
   const result=evaluate(get,has),errors=[...result.errors];const v=get('D57');
   const entered=txt(v),n=num(v);
   if(entered!==''&&(n===null||n<0))errors.push({id:'MRL_V02_DECOR!Input',cell:'D57',message:'Decoration Weight phải là số không âm (kg).'});
-  if(result.state==='ready'&&n!==null&&n>result.max){errors.push({id:'MRL_V02_DECOR!Maximum',cell:'D57',message:`Decoration Weight ${n.toLocaleString('en-US')} kg vượt Maximum: ${result.max.toLocaleString('en-US')} kg (Excluding Flooring).`});}
+  if(result.state==='ready'&&n!==null&&n>result.max){errors.push({id:'MRL_V02_DECOR!Maximum',cell:'D57',message:`Decoration Weight ${n.toLocaleString('en-US')} kg vượt Maximum: ${result.max.toLocaleString('en-US')} kg (đã giảm 5% dự phòng, không gồm sàn).`});}
   return {...result,errors};
  }
- window.SPEC_MRL_V02_DECOR={evaluate,validate,ALL_V02:[...CODES]};
+ window.SPEC_MRL_V02_DECOR={evaluate,validate,SAFETY_FACTOR,ALL_V02:[...CODES]};
 })();

@@ -809,6 +809,11 @@ function workbookChoices(field,engine=null){
  if(!field.validation&& !supplementalListSources[field.name])list=technicalOptions(field);
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
  if(field.cell==='D65'&&$('model').value==='MRL'&&ny40PositionChoices())list=ny40PositionChoices();
+ // v5.8.65: MRL Version02 only. Limit visible choices but NEVER overwrite an
+ // existing selection; Check Spec flags incompatible saved/imported values.
+ if($('model').value==='MRL'&&field.cell==='D62'&&String(currentValue('D60')).trim()==='Side')list=['No'];
+ if($('model').value==='MRL'&&field.cell==='D65'&&
+    !/^not supplied$/i.test(String(currentValue('D64')).trim())&&String(currentValue('D64')).trim())list=['1 pc on rear wall'];
  if(field.name==='K18_CarJJ'&&$('model').value==='MRL')list=eligibleJJ();
  if(field.name==='K33_Mirror'&&window.SPEC_MIRROR_RULES){
    const model=$('model').value;
@@ -1111,6 +1116,7 @@ function row(field,displayName='',compact=false){
    }
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
+   if($('model').value==='MRL'&&['D36','D37'].includes(field.cell))refreshMRLOverheadMinimum(false);
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
  });
  if($('model').value==='MRL'&&field.cell==='D14'){
@@ -1174,6 +1180,7 @@ function refreshMRLOverheadMinimum(adjustIfBelow=false){
  const db=workbookEngineData();const Engine=window.SpecExcelSourceEngine?.SourceEngine;
  if(!db||!Engine)return;
  const calc=new Engine(db,changes);
+ const setsAlternative=window.SPEC_MRL_SETSL_SUGGESTION?.compare(db,changes);
  for(const [cell,source,label] of [['D36','F36','PD'],['D37','F37','OH']]){
   const el=activeInput(cell);if(!el)continue;
   const r=calc.safe('SpecForm',source),numeric=r.ok?Number(r.value):NaN;
@@ -1181,7 +1188,10 @@ function refreshMRLOverheadMinimum(adjustIfBelow=false){
   let hint=el.closest('.field')?.querySelector('.oh-minimum-hint');
   if(!hint){hint=document.createElement('div');hint.className='oh-minimum-hint';hint.style.cssText='font-size:11px;color:#526a82;line-height:1.4;margin-top:2px';el.closest('.field')?.append(hint);}
   if(minimum===null){hint.textContent=`${label}: CHECK LAYOUT — không có giá trị cho tổ hợp Capacity / Speed / TR hiện tại.`;hint.style.color='#a32832';continue;}
-  hint.textContent=`${label} tối thiểu theo DataTable: ${minimum} mm (có thể nhập lớn hơn)`;hint.style.color='#526a82';
+  const actual=Number(currentValue(cell));
+  const advice=window.SPEC_MRL_SETSL_SUGGESTION?.advise(label,actual,setsAlternative)||'';
+  hint.textContent=`${label} tối thiểu theo DataTable: ${minimum} mm (có thể nhập lớn hơn)`+(advice?' · '+advice:'');
+  hint.style.color=advice?'#8b521e':'#526a82';
   if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<minimum){el.value=String(minimum);changes[cell]=String(minimum);el.classList.add('dirty');}}
  }
 }

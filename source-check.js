@@ -35,7 +35,7 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   if(model==='MRL'){
    if(row===522)return 'D33';if(row===523)return 'D37';if(row===524)return 'D14';
    if(row===525)return 'D14';if(row===526)return 'D62';if(row===528)return 'D66';
-   if(row===520)return 'D17';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
+   if(row===520)return featureByCode['sets-l']||'A157';if(row===519)return 'D15';if(row===521)return 'D16';if(row===513)return 'D17';
    if(row===514)return 'D35';if(row===515)return 'D18';if(row===516||row===517||row===518)return 'D41';
    // COP failures are NOT rated-load errors: map them to the user-editable COP inputs.
    if(row===502||row===503||row===505)return 'D59';
@@ -61,6 +61,11 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   return model==='MR'?'D21':'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
+ // Alpha-specific additions, with MR legacy logic unchanged except the 2-stop Travel cap.
+ if(window.SPEC_ALPHA_5865){
+  const get=addr=>{const x=value('SpecForm',addr);return x.ok?x.value:null;};
+  for(const item of window.SPEC_ALPHA_5865.validate(model,get))issue(item.id,item.cell,item.message);
+ }
  // Supplemental AC power traveling cable is possible only with ITV selected.
  if(['1','TRUE','V','✓'].includes(String(changes.AC_TRAVEL_CABLE??'0').toUpperCase())){
   const itvCell=featureByCode['itv']||featureByCode['itv cable'];
@@ -121,6 +126,12 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
     }else msg='Điều kiện NSCR-C theo DataTable!D494 chưa đạt. Kiểm tra COP C760 và EVRC-C/EVRC-S.';
    }
    if(model==='MR'&&sheet==='DataTable'&&addr==='D509')msg='Vật liệu trần không phù hợp: L200S, L210S, N300S chỉ được chọn SUS-HL (không dùng màu sơn Y033/Y055/Y073).';
+   if(model==='MRL'&&sheet==='DataTable'&&addr==='D520'){
+     const speed=value('SpecForm','D17'),tr=value('SpecForm','D35');
+     const v=Number(speed.value),travel=Number(tr.value);
+     msg=v<96?'SETS-L không áp dụng cho tốc độ 60 m/min / SETS-L is not applicable at 60 m/min.':
+       'Với cấu hình tốc độ/hành trình này cần chọn SETS-L theo điều kiện Technical Study / SETS-L is required for this speed/travel combination.';
+   }
    if(model==='MRL'&&sheet==='DataTable'&&row===522){
     // D522 combines AH and BH. Show the exact failing field and dynamic F33/F34 minimum.
     let found=false;
@@ -135,11 +146,15 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    }else if(model==='MRL'&&sheet==='DataTable'&&row===523){
     // Report OH and PD independently; use minimum calculated by F36/F37.
     let found=false;
+    // Calculate a read-only SETS-L alternative from F36/F37 for this exact
+    // configuration. This is a suggestion, never a replacement for the error.
+    const setsAlternative=window.SPEC_MRL_SETSL_SUGGESTION?.compare(db,changes);
     for(const [kind,addr,lookup] of [['PD','D36','F36'],['OH','D37','F37']]){
      const actual=value('SpecForm',addr),expected=value('SpecForm',lookup);
      const n=expected.ok?Number(expected.value):NaN,got=actual.ok?Number(actual.value):NaN;
      if(!Number.isFinite(n)||n<=0||!Number.isFinite(got)||got<n){
-      issue(reference+'/'+kind,addr,dimensionMessage(kind,actual,expected));found=true;
+      const tip=window.SPEC_MRL_SETSL_SUGGESTION?.advise(kind,got,setsAlternative)||'';
+      issue(reference+'/'+kind,addr,dimensionMessage(kind,actual,expected)+(tip?' '+tip:''));found=true;
      }
     }
     if(!found)issue(reference,'D37',msg);

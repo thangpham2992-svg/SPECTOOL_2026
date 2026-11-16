@@ -12,7 +12,14 @@
   const aa=+i.aa,bb=+i.bb,cap=+i.capacity,typ=i.ceiling,ent=i.entrance,dt=i.doorType;
   let mass=null;
   const exact=(T.CageMassCeiling||[]).find(r=>+r.AA===aa&&+r.BB===bb);
-  if(cap<=1000&&exact&&good(+exact[typ]))mass=+exact[typ];
+  // IL MethodDef 66 first looks up the exact AA x BB row in CageMassCeiling,
+  // regardless of rated capacity. Only when no exact row exists does it
+  // branch to <=1000 kg slope/intercept or >1000 kg Extended_* tables.
+  // The previous cap<=1000 guard added about 8 kg to P24-CO (2350 x 1600).
+  if(exact){
+   if(!good(+exact[typ]))throw Error(`CageMassCeiling unsupported: ${typ} ${aa}x${bb}`);
+   mass=+exact[typ];
+  }
   if(mass==null&&cap<=1000){
    const slo=(T[`CageMass_SLOPE_${typ}`]||[]).find(r=>aa>=+r['AA min.']&&aa<+r['AA Max.']&&bb>=+r['BB min.']&&bb<+r['BB Max.']);
    const int=(T[`CageMass_INTERCEPT_${typ}`]||[]).find(r=>aa>=+r['AA min.']&&aa<+r['AA Max.']&&bb>=+r['BB min.']&&bb<+r['BB Max.']);
