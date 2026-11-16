@@ -2160,7 +2160,7 @@ async function loadRepositoryDatabase(model,quiet=false){
  await applyWorkbook(model,path,bytes,quiet);remoteLoaded.add(model);
  return true;
 }
-$('model').onchange=()=>{load();if(!remoteLoaded.has($('model').value)&&/^https?:$/.test(window.location.protocol))loadRepositoryDatabase($('model').value,true).catch(e=>status('Không thể nạp từ GitHub; đang dùng bản dữ liệu tích hợp: '+e.message,'error'))};
+$('model').onchange=()=>{load();/* v5.8.77: same embedded source for offline and GitHub Pages; workbook loading is manual only. */};
 $('reload-db').onclick=()=>{const model=$('model').value;if(Object.keys(changes).length&&!confirm('Nạp Database sẽ thay các giá trị đang chỉnh sửa. Tiếp tục? / Reload discards unsaved edits. Continue?'))return;
  loadRepositoryDatabase(model,false).catch(e=>status('Lỗi Reload Database / Reload failed: '+e.message,'error'));
 };
@@ -2187,4 +2187,6 @@ $('ny40-apply')?.addEventListener('click',()=>{
 $('ny40-popup')?.addEventListener('click',e=>{if(e.target.id==='ny40-popup')closeNy40Popup()});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')closeNy40Popup()});
 load();
-if(/^https?:$/.test(window.location.protocol))loadRepositoryDatabase($('model').value,true).catch(e=>status('Đã dùng Database tích hợp / Embedded fallback: '+e.message));
+// v5.8.77: Avoid silent database replacement on GitHub Pages.
+// Use the embedded workbook in both file:// and https:// contexts.
+// Reload Database remains available only through an explicit user action.
