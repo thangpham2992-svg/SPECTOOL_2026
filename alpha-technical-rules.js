@@ -1,22 +1,31 @@
 'use strict';
-/* v5.8.65: additive Check Spec conditions. No change to inputs or dimension formulas.
+/* v5.8.68: common two-stop rule for inline Travel warning and Check Spec.
+ * v5.8.65: additive Check Spec conditions. No change to inputs or dimension formulas.
  * MR: only the two-stop travel limit is added.
  * MRL Version02: same travel limit, wheelchair COP and handrail location.
  * SETS-L remains governed by the native G11L1P DataTable!D520 and F36/F37.
  */
 window.SPEC_ALPHA_5865 = Object.freeze({
+  // Pure, read-only predicate shared by the Travel UI and Check Spec.
+  // When the number of stops is not exactly two, this extra 11 m rule does not apply.
+  twoStopTravel(model,get){
+    if(!['MR','MRL'].includes(model))return null;
+    const stopsCell=model==='MR'?'D16':'D18';
+    const travelCell=model==='MR'?'D39':'D35';
+    const stopsRaw=String(get(stopsCell)??'').trim();
+    const travelRaw=String(get(travelCell)??'').trim();
+    if(!stopsRaw||!travelRaw)return null;
+    const stops=Number(stopsRaw),travel=Number(travelRaw);
+    if(stops!==2||!Number.isFinite(travel)||travel<=11000)return null;
+    return {stopsCell,travelCell,travel,limit:11000};
+  },
   validate(model,get){
     const errors=[];
     const value=addr=>String(get(addr)??'').trim();
-    const stopsCell=model==='MR'?'D16':'D18';
-    const travelCell=model==='MR'?'D39':'D35';
-    if(model==='MR'||model==='MRL'){
-      const stops=Number(value(stopsCell));
-      const travel=Number(value(travelCell));
-      if(value(stopsCell)!=='' && stops===2 && value(travelCell)!=='' && Number.isFinite(travel) && travel>11000){
-        errors.push({id:'ALPHA!TwoStopsTravel',cell:travelCell,
-          message:`Thang chỉ có 2 điểm dừng: Travel ${travel.toLocaleString('vi-VN')} mm vượt giới hạn 11.000 mm / Maximum travel for exactly 2 stops is 11,000 mm.`});
-      }
+    const exceeded=this.twoStopTravel(model,get);
+    if(exceeded){
+      errors.push({id:'ALPHA!TwoStopsTravel',cell:exceeded.travelCell,
+        message:`Thang chỉ có 2 điểm dừng: Travel ${exceeded.travel.toLocaleString('vi-VN')} mm vượt giới hạn 11.000 mm / Maximum travel for exactly 2 stops is 11,000 mm.`});
     }
     if(model==='MRL'){
       const copLocation=value('D60'),wheelchair=value('D62');

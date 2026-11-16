@@ -249,6 +249,24 @@ const paintedMaterial=v=>/^Painted(?:\b|\s|\-)/i.test(String(v||'').trim());
 const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS|Laminated steel sheet)(?:\b|\s|\-)/i.test(String(v||'').trim());
 function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell===addr)?.value??''}
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
+// v5.8.68: Inline 11,000 mm warning for exactly two stops on BOTH models.
+// Read live DOM values for immediate feedback; never change SpecForm inputs or constraints.
+function refreshTwoStopTravelWarning(){
+ const model=$('model')?.value;
+ const travelCell=model==='MR'?'D39':'D35';
+ const input=activeInput(travelCell);
+ const hint=input?.closest('.field')?.querySelector('.travel-limit-hint');
+ if(!input||!hint)return;
+ const rule=window.SPEC_ALPHA_5865?.twoStopTravel(model,addr=>activeInput(addr)?.value??currentValue(addr));
+ const invalid=Boolean(rule);
+ hint.hidden=!invalid;
+ hint.textContent=invalid
+  ?`⚠ Hai điểm dừng: Travel ${rule.travel.toLocaleString('vi-VN')} mm vượt tối đa 11.000 mm. Vui lòng điều chỉnh Travel xuống ≤ 11.000 mm.`
+  :'';
+ input.classList.toggle('travel-over-limit',invalid);
+ if(invalid)input.setAttribute('aria-invalid','true');
+ else input.removeAttribute('aria-invalid');
+}
 function selectedCapacity(){return current.capacity.find(c=>String(c.EleCapacityName)===String(currentValue('D13')))||{}}
 // FlooringWeight: evaluate the original SpecForm Excel expression in the browser.
 // AA, BB and JJ are in mm. Thickness 0.02 m; density 2700 kg/m3.
@@ -1089,6 +1107,7 @@ function row(field,displayName='',compact=false){
  input.value=value;
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
+   if(['MR','MRL'].includes($('model').value))refreshTwoStopTravelWarning();
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
    if(field.name==='K28_FlooringWeight')flooringManual=true;
    else flooringDependencyChanged(field.cell);
@@ -1125,6 +1144,16 @@ function row(field,displayName='',compact=false){
   btn.onclick=()=>openNy40Popup(input.value);
   wrap.append(input,btn);box.append(name,wrap);syncObservationButton(input);
  }else box.append(name,input);
+ if(($('model').value==='MR'&&field.cell==='D39')||($('model').value==='MRL'&&field.cell==='D35')){
+  const hint=document.createElement('small');
+  hint.className='travel-limit-hint';hint.hidden=true;
+  hint.id='travel-limit-warning-'+$('model').value;
+  hint.setAttribute('role','alert');hint.setAttribute('aria-live','polite');
+  input.setAttribute('aria-describedby',hint.id);
+  box.append(hint);
+  // Travel is a free-text input: warn while typing, not only when leaving the cell.
+  input.addEventListener('input',refreshTwoStopTravelWarning);
+ }
  if(field.name==='K28_FlooringWeight'){
   const btn=document.createElement('button');btn.type='button';btn.className='btn btn-small';
   btn.textContent='Tính lại / Recalculate';
@@ -1627,7 +1656,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();refreshTwoStopTravelWarning();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1828,7 +1857,7 @@ function renderSourceCheck(result){
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(isDimension(cell)||String(err.id).startsWith('MRL_V02_DECOR!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=isDimension(cell)?dimensionPriority(err):0;
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{name,message,priority});
