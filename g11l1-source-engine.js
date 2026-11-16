@@ -82,11 +82,13 @@ function single(i,side,opening){
   ME.run(43,[d]);
   assert(Number.isFinite(d.MaxDecorationMass)&&Math.abs(d.MaxDecorationMass)<9999,'Technical Study: invalid MaxDecorationMass');
   const maxInclFloor=d.MaxDecorationMass,maxExclFloor=maxInclFloor-floor;
-  if(maxExclFloor<0)throw Error('Technical Study: flooring already exceeds allowance');
+  // A negative remaining allowance is a genuine overweight-flooring result,
+  // NOT an unverified Technical Study calculation. Keep the source maximum.
+  const flooringExceedsMaximum=maxExclFloor<0;
   const cwtConstraint=ME.round(d.MaxCwtMass-.5*cap-.5*d.CableMass-4);
   const controlling={car:ME.round(d.MaxCarMass),cwt:cwtConstraint,carBuffer:ME.round(d.MaxCarBufferLoad-cap),cwtBuffer:ME.round(d.MaxCwtBufferLoad-.5*cap-.5*d.CableMass),carSafety:ME.round(d.MaxCarSafetyLoad-cap-d.CompMass-d.CableMass)};
   if(d.CapacityRange.includes('A'))controlling.frame=ME.round(d.MaxSafetyFrameMoment/d.BGxx*1e6-cap);
-  return {state:'ready',max:Math.floor(maxExclFloor+1e-8),rawMax:maxExclFloor,includingFloor:maxInclFloor,
+  return {state:'ready',max:Math.floor(maxExclFloor+1e-8),rawMax:maxExclFloor,includingFloor:maxInclFloor,flooringExceedsMaximum,
    controls:controlling,limiting:Object.keys(controlling).sort((a,b)=>controlling[a]-controlling[b])[0],
    masses:Object.fromEntries([...range,'BGxx','MaxSafetyFrameMoment'].map(k=>[k,d[k]])),
    selected:{machine:d.TractionMachine,rope:d.HoistingRope,carSafety:d.CarSafety,cwt:d.Counterweight,buffer:d.CarBuffer},

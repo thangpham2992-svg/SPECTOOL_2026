@@ -1858,8 +1858,13 @@ function refreshMRLDecorationMaximum(){
  try{r=evaluateMRLDecoration()}
  catch(e){r={state:'unavailable',reason:String(e?.message||e)}}
  hint.textContent=r?.state==='ready'?'Maximum: '+r.max.toLocaleString('en-US')+' kg':'Maximum: —';
+ if(r?.overweightFlooring){
+  const note=document.createElement('span');note.className='mrl-flooring-overlimit-note';
+  note.textContent=' — Flooring vượt Maximum. Vui lòng giảm trọng lượng sàn đá.';
+  hint.append(note);
+ }
  hint.classList.toggle('unavailable',r?.state!=='ready');
- hint.classList.toggle('overlimit',!!r?.errors?.some(x=>x.id==='MRL_V02_DECOR!Maximum'));
+ hint.classList.toggle('overlimit',!!r?.overweightFlooring||!!r?.errors?.some(x=>x.id==='MRL_V02_DECOR!Maximum'));
  hint.title=r?.reason||'Chưa xác định được kết quả theo Technical Study G11L1';
 }
 function check(){

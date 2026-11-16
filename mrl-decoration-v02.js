@@ -112,8 +112,12 @@
    // calc.max is already an integer, floored from (MaxDecorationMass - FlooringMass).
    // Apply the 5% margin exactly once to this EXCLUDING-flooring value; never to
    // flooring mass or the mechanical source limits. Floor kg to stay conservative.
-   const max=safeMax(calc.max);
-   return {state:'ready',max,sourceMaximum:calc.max,rawMaximum:calc.rawMax,safetyFactor:SAFETY_FACTOR,errors:[],reason:'Technical Study G11L1 v2.5.0.0; Maximum excluding flooring with 5% safety margin',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
+   const floorOverLimit=calc.flooringExceedsMaximum === true || i.flooringMass > calc.includingFloor;
+   // When flooring alone exceeds the Technical Study limit, display the actual
+   // combined allowance (flooring + additional decoration), never a dash or 0.
+   // Otherwise preserve the existing 5% reserve on decoration excluding flooring.
+   const max=floorOverLimit?calc.includingFloor:safeMax(calc.max);
+   return {state:'ready',max,sourceMaximum:calc.max,rawMaximum:calc.rawMax,technicalStudyMaximum:calc.includingFloor,overweightFlooring:floorOverLimit,safetyFactor:SAFETY_FACTOR,errors:[],reason:floorOverLimit?'Technical Study: flooring exceeds the maximum combined allowance':'Technical Study G11L1 v2.5.0.0; Maximum excluding flooring with 5% safety margin',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
   }
   return {state:'unavailable',max:null,errors:[],reason:calc.reason||'Cannot verify Technical Study source logic',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
  }
@@ -121,7 +125,10 @@
   const result=evaluate(get,has),errors=[...result.errors];const v=get('D57');
   const entered=txt(v),n=num(v);
   if(entered!==''&&(n===null||n<0))errors.push({id:'MRL_V02_DECOR!Input',cell:'D57',message:'Decoration Weight phải là số không âm (kg).'});
-  if(result.state==='ready'&&n!==null&&n>result.max){errors.push({id:'MRL_V02_DECOR!Maximum',cell:'D57',message:`Decoration Weight ${n.toLocaleString('en-US')} kg vượt Maximum: ${result.max.toLocaleString('en-US')} kg (đã giảm 5% dự phòng, không gồm sàn).`});}
+  if(result.state==='ready'&&result.overweightFlooring){
+   const excess=result.info.inputs.flooringMass-result.technicalStudyMaximum;
+   errors.push({id:'MRL_V02_DECOR!FlooringOverMaximum',cell:'D56',message:`Flooring Weight ${result.info.inputs.flooringMass.toLocaleString('en-US')} kg vượt Maximum ${result.technicalStudyMaximum.toLocaleString('en-US')} kg của Technical Study (${excess.toLocaleString('en-US')} kg). Vui lòng giảm trọng lượng sàn đá.`});
+  } else if(result.state==='ready'&&n!==null&&n>result.max){errors.push({id:'MRL_V02_DECOR!Maximum',cell:'D57',message:`Decoration Weight ${n.toLocaleString('en-US')} kg vượt Maximum: ${result.max.toLocaleString('en-US')} kg (đã giảm 5% dự phòng, không gồm sàn).`});}
   return {...result,errors};
  }
  window.SPEC_MRL_V02_DECOR={evaluate,validate,SAFETY_FACTOR,ALL_V02:[...CODES]};
