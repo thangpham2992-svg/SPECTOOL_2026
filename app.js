@@ -652,7 +652,7 @@ function renderFeatures(){
  const features=sourceFeatureRows();ensureFreeFeatureDefaults(features);const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();ensureITPDefault(features);
  if(!tables.length){main.textContent='Chưa trích xuất được bảng Features / Features unavailable';return}
  if(!tables.includes(activeFeatureTable))activeFeatureTable=tables[0];
- tables.forEach(t=>{let b=document.createElement('button');b.className='btn'+(t===activeFeatureTable?' red':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
+ tables.forEach(t=>{let b=document.createElement('button');const selected=features.some(f=>f.table===t&&featureIsSelected(f));b.className='btn feature-tab'+(selected?' feature-tab-selected':'')+(t===activeFeatureTable?' feature-tab-current':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
@@ -686,12 +686,12 @@ function renderFeatures(){
     // disabled checkbox that the user cannot untick.
     changes[f.cell]='0';featureTouched.delete(f.cell);chk.checked=false;
   }
-  chk.disabled=disabled;if(disabled)line.classList.add('x');chk.onchange=()=>{
+  chk.disabled=disabled;if(chk.checked&&!disabled)line.classList.add('feature-line-selected');if(disabled)line.classList.add('x');chk.onchange=()=>{
    const code=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
    if($('model').value==='MRL'&&code==='FHL'&&!chk.checked&&window.SPEC_HALL_LANTERN?.any(changes)){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
-   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';
+   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';line.classList.toggle('feature-line-selected',chk.checked);tabs.querySelectorAll('.feature-tab').forEach(b=>{const group=tables.find(t=>b.textContent===(({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t));if(group)b.classList.toggle('feature-tab-selected',features.some(x=>x.table===group&&featureIsSelected(x)))});
    // v5.8.41: EVRC-C (not EVRC-S) is mandatory with NSCR-C/AS/SCS-B/NS-CB
    // for MR C760/C770/C780 and MRL V02 M*/P* COP codes.
    if(chk.checked&&['NSCR-C','AS','SCS-B','NS-CB'].includes(code)){
@@ -1188,7 +1188,8 @@ function row(field,displayName='',compact=false){
  if($('model').value==='MR'&&['D34','D35'].includes(field.cell)){
   const note=document.createElement('small');note.className='mr-bed-shaft-note';note.hidden=true;
   note.id='mr-bed-shaft-note-'+field.cell;
-  note.setAttribute('role','note');note.setAttribute('aria-live','polite');
+  note.setAttribute('role','alert');note.setAttribute('aria-live','polite');
+  input.setAttribute('aria-describedby',note.id);
   box.append(note);
   input.addEventListener('input',refreshMRBedShaftNotes);
  }
@@ -1241,6 +1242,7 @@ function refreshMRBedShaftNotes(){
   note.hidden=!excessive;
   note.textContent=excessive?`${label} vượt Maximum ${max.toLocaleString('vi-VN')} mm. Vui lòng bổ sung dầm thu hố (dầm thép hình, dầm bê tông...) để giảm kích thước hữu dụng về giới hạn cho phép; cần xác nhận phương án kết cấu và kích thước với bộ phận kỹ thuật.`:'';
   input.classList.toggle('mr-bed-over-max',excessive);
+  input.setAttribute('aria-invalid',excessive?'true':'false');
  }
 }
 // Additional MRL shaft minima from the user's 156-row, four-CWT V02 source.
@@ -1742,7 +1744,7 @@ function calculateMRLLeadTime(){
 }
 function refreshLeadTime(){
  const days=document.getElementById('leadtime-days'),reason=document.getElementById('leadtime-reasons');if(!days||!reason||!current)return;
- const r=$('model').value==='MRL'?calculateMRLLeadTime():calculateMRLeadTime();days.textContent=r.days+' days';reason.replaceChildren();
+ const r=$('model').value==='MRL'?calculateMRLLeadTime():calculateMRLeadTime();days.textContent=r.days+' days';days.classList.toggle('leadtime-standard',Number(r.days)<=35);days.classList.toggle('leadtime-extended',Number(r.days)>35);reason.replaceChildren();
  const lines=r.reasons.length?r.reasons:[];
  for(const line of lines){const div=document.createElement('div');div.textContent=line;reason.append(div)}
 }

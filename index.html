@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.78-bed-shaft-dynamic-checks">
+<meta name="specweb-build" content="5.8.84-classic-ui-selective">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <!-- Browser icon / Home screen icon -->
@@ -123,16 +123,45 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
 .dimension-hoistway .dimension-entry:has(.travel-limit-hint) input{grid-column:2}
 @media(max-width:580px){.dimension-hoistway .dimension-entry .travel-limit-hint{grid-column:2;grid-row:auto;margin-top:-2px!important}}
 
-/* v5.8.78: Structural narrowing guidance appears to the right of MR BED AH/BH. */
+/* v5.8.79: Structural narrowing guidance appears to the right of MR BED AH/BH. */
 .mr-bed-shaft-note{color:#a35a13;font-size:11px;line-height:1.4;overflow-wrap:anywhere;min-width:0}
 .mr-bed-shaft-note[hidden]{display:none!important}
 .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) .mr-bed-shaft-note{grid-column:3}
 .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) input{grid-column:2}
 .dimension-entry input.mr-bed-over-max{border-color:#d38a35;background:#fff9ed}
-@media(max-width:580px){.dimension-hoistway .dimension-entry .mr-bed-shaft-note:not([hidden]){grid-column:2;grid-row:auto}}
+/* Mobile: full-width structural note below AH/BH rather than squeezed into the input column. */
+@media(max-width:740px){
+ .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])){align-items:start;row-gap:6px}
+ .dimension-hoistway .dimension-entry .mr-bed-shaft-note:not([hidden]){
+  display:block!important;grid-column:1 / -1!important;grid-row:auto!important;
+  width:100%;box-sizing:border-box;padding:9px 11px;margin:2px 0 3px;
+  border:1px solid #e3bb77;border-left:3px solid #c17c21;border-radius:5px;
+  background:#fff7e8;color:#8e4a0e;font-size:12px;line-height:1.55;
+  white-space:normal;overflow-wrap:anywhere;word-break:normal;
+ }
+ .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) input{grid-column:2;min-width:0}
+ #check-issues .check-error-row{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+ #check-issues .check-error-explanation{display:block;white-space:normal;overflow-wrap:anywhere}
+}
 </style>
 <link rel="stylesheet" href="responsive-ui.css?v=5.8.45">
 <link rel="stylesheet" href="design-guide.css?v=5.8.28">
+
+<style id="classic-selective-ui-v5884">
+/* Restore classic colors; emphasize editable inputs and selected feature only. */
+.feature-tabs .btn.feature-tab{background:#fff;border:1px solid #dfe5ec;color:#506377;box-shadow:none}
+.feature-tabs .btn.feature-tab-current:not(.feature-tab-selected){background:#f6f8fa;border-color:#b4c5d4;color:#274862}
+.feature-tabs .btn.feature-tab-selected{background:#e1f0fc;border-color:#83b7da;color:#164f78;box-shadow:inset 3px 0 0 #3c88b8}
+.feature-tabs .btn.feature-tab-selected.feature-tab-current{background:#d4eafa;border-color:#569acc}
+.feature-line.feature-line-selected{background:#eef7ff;box-shadow:inset 3px 0 0 #4e9ccc}
+.feature-line:not(.feature-line-selected){background:#fff;box-shadow:none}
+.feature-line.x{opacity:.5}
+/* Input options retain original cool blue; read-only and disabled remain neutral. */
+.field.locked input,.field.locked select,.field.cf-locked input,.field.cf-locked select,
+input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important;box-shadow:none!important}
+#leadtime-days.leadtime-standard{color:#24824a!important}
+#leadtime-days.leadtime-extended{color:#b72832!important}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.68</span></header>
@@ -171,8 +200,8 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
   </div>
 </div>
 
-<script src="vendor/jszip.min.js?v=5.8.78"></script>
-<script src="spec-core.bundle.js?v=5.8.78"></script>
+<script src="vendor/jszip.min.js?v=5.8.79"></script>
+<script src="spec-core.bundle.js?v=5.8.79"></script>
 
 
 
@@ -185,34 +214,34 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
 
 
 
-<script src="spec-conditional.js?v=5.8.78"></script>
-<script src="source-engine.js?v=5.8.78"></script>
-<script src="legacy-step1.js?v=5.8.78"></script>
-<script src="conditional-check.js?v=5.8.78"></script>
-<script src="hall-lantern.js?v=5.8.78"></script>
-<script src="ny40-rules.js?v=5.8.78"></script>
-<script src="evrc-c-rule.js?v=5.8.78"></script>
-<script src="mr-bed-capacity.js?v=5.8.78"></script>
-<script src="alpha-technical-rules.js?v=5.8.78"></script>
-<script src="source-check.js?v=5.8.78"></script>
-<script src="g11l1-ts-alpha-tables.js?v=5.8.78"></script>
-<script src="g11l1-ts-il-data.js?v=5.8.78"></script>
-<script src="g11l1-ts-il-runtime.js?v=5.8.78"></script>
-<script src="g11l1-source-machine-il.js?v=5.8.78"></script>
-<script src="g11l1-source-machine.js?v=5.8.78"></script>
-<script src="g11l1-source-cage.js?v=5.8.78"></script>
-<script src="g11l1-source-traction.js?v=5.8.78"></script>
-<script src="g11l1-source-duty.js?v=5.8.78"></script>
-<script src="g11l1-source-engine.js?v=5.8.78"></script>
-<script src="mrl-decoration-v02.js?v=5.8.78"></script>
-<script src="feature-v02.js?v=5.8.78"></script>
-<script src="mirror-rules.js?v=5.8.78"></script>
-<script src="export-engine.js?v=5.8.78"></script>
-<script src="print-layout.js?v=5.8.78"></script>
-<script src="design-guide.js?v=5.8.78"></script>
-<script src="panel-images.js?v=5.8.78"></script>
-<script src="material-finish.js?v=5.8.78"></script>
-<script src="app.js?v=5.8.78"></script>
+<script src="spec-conditional.js?v=5.8.79"></script>
+<script src="source-engine.js?v=5.8.79"></script>
+<script src="legacy-step1.js?v=5.8.79"></script>
+<script src="conditional-check.js?v=5.8.79"></script>
+<script src="hall-lantern.js?v=5.8.79"></script>
+<script src="ny40-rules.js?v=5.8.79"></script>
+<script src="evrc-c-rule.js?v=5.8.79"></script>
+<script src="mr-bed-capacity.js?v=5.8.79"></script>
+<script src="alpha-technical-rules.js?v=5.8.79"></script>
+<script src="source-check.js?v=5.8.79"></script>
+<script src="g11l1-ts-alpha-tables.js?v=5.8.79"></script>
+<script src="g11l1-ts-il-data.js?v=5.8.79"></script>
+<script src="g11l1-ts-il-runtime.js?v=5.8.79"></script>
+<script src="g11l1-source-machine-il.js?v=5.8.79"></script>
+<script src="g11l1-source-machine.js?v=5.8.79"></script>
+<script src="g11l1-source-cage.js?v=5.8.79"></script>
+<script src="g11l1-source-traction.js?v=5.8.79"></script>
+<script src="g11l1-source-duty.js?v=5.8.79"></script>
+<script src="g11l1-source-engine.js?v=5.8.79"></script>
+<script src="mrl-decoration-v02.js?v=5.8.79"></script>
+<script src="feature-v02.js?v=5.8.79"></script>
+<script src="mirror-rules.js?v=5.8.79"></script>
+<script src="export-engine.js?v=5.8.79"></script>
+<script src="print-layout.js?v=5.8.79"></script>
+<script src="design-guide.js?v=5.8.79"></script>
+<script src="panel-images.js?v=5.8.79"></script>
+<script src="material-finish.js?v=5.8.79"></script>
+<script src="app.js?v=5.8.84"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

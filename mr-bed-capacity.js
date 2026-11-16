@@ -83,8 +83,8 @@
   const geometry=[['D29',bed.aa,'AA'],['D30',bed.bb,'BB'],['D32',bed.jj,'JJ']];
   for(const [cell,expected,label] of geometry){const actual=Number(get(cell));if(actual>0&&actual!==expected)add(label,cell,`${bed.code}: ${label} phải là ${expected} mm theo Table 7.`)}
   const ah=Number(get('D34')),bh=Number(get('D35'));
-  if(ah>0&&(ah<bed.ah||ah>bed.ahmax))add('AH','D34',`${bed.code}: AH nằm trong ${bed.ah}–${bed.ahmax} mm (Table 7).`);
-  if(bh>0&&(bh<bed.bh||bh>bed.bhmax))add('BH','D35',`${bed.code}: BH nằm trong ${bed.bh}–${bed.bhmax} mm (Table 7).`);
+  if(ah>0&&(ah<bed.ah||ah>bed.ahmax))add('AH','D34',ah>bed.ahmax?`${bed.code}: AH ${ah.toLocaleString('vi-VN')} mm vượt Maximum ${bed.ahmax.toLocaleString('vi-VN')} mm. Vui lòng bổ sung dầm thu hố (dầm thép hình, dầm bê tông...) để giảm kích thước hữu dụng về giới hạn cho phép; cần bộ phận kỹ thuật xác nhận phương án kết cấu.`:`${bed.code}: AH ${ah.toLocaleString('vi-VN')} mm nhỏ hơn Minimum ${bed.ah.toLocaleString('vi-VN')} mm (Table 7).`);
+  if(bh>0&&(bh<bed.bh||bh>bed.bhmax))add('BH','D35',bh>bed.bhmax?`${bed.code}: BH ${bh.toLocaleString('vi-VN')} mm vượt Maximum ${bed.bhmax.toLocaleString('vi-VN')} mm. Vui lòng bổ sung dầm thu hố (dầm thép hình, dầm bê tông...) để giảm kích thước hữu dụng về giới hạn cho phép; cần bộ phận kỹ thuật xác nhận phương án kết cấu.`:`${bed.code}: BH ${bh.toLocaleString('vi-VN')} mm nhỏ hơn Minimum ${bed.bh.toLocaleString('vi-VN')} mm (Table 7).`);
   const flooring=Number(get('D60'))||0,decor=Number(get('D61'))||0;
   // Table 11 Note 1: total allowable decoration includes flooring weight.
   // B1000, 220 kg only under the complete Table 11-A exact specification.
