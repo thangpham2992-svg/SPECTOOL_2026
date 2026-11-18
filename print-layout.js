@@ -26,13 +26,13 @@
    s.borders=Array.from(borders?.children||[]).map(b=>{const sides={};for(const n of ['left','right','top','bottom']){const side=q(b,n);const st=attr(side,'style');if(st&&st!=='none')sides[n]=(st==='medium'?1.2:0.45)+'px solid '+color(q(side,'color'),'#a9b4c0');}return sides});
    s.xfs=Array.from(cellxfs?.children||[]).map(x=>({font:s.fonts[Number(attr(x,'fontId',0))]||{},fill:s.fills[Number(attr(x,'fillId',0))],border:s.borders[Number(attr(x,'borderId',0))]||{},align:q(x,'alignment')}));return s;
  }
- function formatStyle(index,book){const x=book.xfs[index]||{};const f=x.font||{};const rules=[];
+ function formatStyle(index,book,uniformBorders=false){const x=book.xfs[index]||{};const f=x.font||{};const rules=[];
    if(f.bold)rules.push('font-weight:700');if(f.italic)rules.push('font-style:italic');
    rules.push('font-size:'+Math.max(7.2,Math.min(13,Number(f.size||9)))+'pt');
    if(f.color)rules.push('color:'+f.color);if(x.fill&&x.fill!=='transparent'&&x.fill!=='#000000')rules.push('background:'+x.fill);
    if(x.align){const a=attr(x.align,'horizontal');const v=attr(x.align,'vertical');if(['center','right','left','justify'].includes(a))rules.push('text-align:'+a);if(v==='center')rules.push('vertical-align:middle');if(attr(x.align,'wrapText')==='1')rules.push('overflow-wrap:break-word');}
    if(x.fill&&/^#[0-9a-f]{6}$/i.test(x.fill)){const v=x.fill.slice(1);const rr=parseInt(v.slice(0,2),16),gg=parseInt(v.slice(2,4),16),bb=parseInt(v.slice(4,6),16);if((rr*299+gg*587+bb*114)/1000<125)rules.push('color:#ffffff');}
-   const b=x.border||{};for(const key of ['left','right','top','bottom'])if(b[key])rules.push('border-'+key+':'+b[key]);
+   if(!uniformBorders){const b=x.border||{};for(const key of ['left','right','top','bottom'])if(b[key])rules.push('border-'+key+':'+b[key]);}
    return rules.join(';');
  }
  function readText(c,strings){if(!c)return '';const type=attr(c,'t');if(type==='inlineStr')return qa(q(c,'is'),'t').map(t=>t.textContent).join('');let v=q(c,'v')?.textContent||'';if(type==='s')return strings[Number(v)]||'';if(type==='b')return v==='1'?'TRUE':'FALSE';return v}
@@ -111,7 +111,25 @@
    for(const entry of Array.from(cols?.children||[])){const min=Number(attr(entry,'min')),max=Number(attr(entry,'max')),width=Number(attr(entry,'width'));for(let i=1;i<=3;i++)if(i>=min&&i<=max&&width>0)widths[i-1]=width}
    const sum=widths.reduce((a,b)=>a+b,0);const colgroup=widths.map(w=>'<col style="width:'+(w/sum*100).toFixed(5)+'%">').join('');
    const first=Array.from(cells.entries()).find(([a])=>a==='B8')?.[1]?.value||'';
-   const project=esc(first);const modelName=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
+   const project=esc(first);const modelName=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2';
+   // Detect a bilingual pair from the real exported XLSX border styles across
+   // ALL sections. Section III may have a vertically merged label on the left,
+   // unlike Section V features where both lines carry their own labels.
+   // Section I/II/IV rows that already contain both languages in the SAME cell
+   // have no internal border; they retain a very light item separator.
+   const bilingualEnglish=new Set(),bilingualVietnamese=new Set();
+   for(let rn=1;rn<end;rn++){
+     if(model!=='MRL'||!visibleRows.has(rn)||!visibleRows.has(rn+1))continue;
+     const upper=cells.get('C'+rn),lower=cells.get('C'+(rn+1));
+     if(!upper?.value?.trim()||!lower?.value?.trim())continue;
+     const upperStyle=styles.xfs[upper.style],lowerStyle=styles.xfs[lower.style];
+     // Actual XLSX cell styles mark only the two lines of a single bilingual
+     // item (no lower edge on upper C; no upper edge on lower C).
+     if(!upperStyle?.border?.bottom&&!lowerStyle?.border?.top&&
+        upperStyle?.border?.top&&lowerStyle?.border?.bottom){
+       bilingualEnglish.add(rn);bilingualVietnamese.add(rn+1);
+     }
+   }
    const printRows=[];
    for(let rowNum=1;rowNum<=end;rowNum++){
      const row=visibleRows.get(rowNum);if(!row)continue;
@@ -121,7 +139,7 @@
        const key=colAddr(col)+rowNum;if(covered.has(key))continue;
        const val=cells.get(key)||{value:'',style:0};const merge=merges.get(key)||{colspan:1,rowspan:1};
        const extra=merge.colspan>1?' colspan="'+merge.colspan+'"':'';const vextra=merge.rowspan>1?' rowspan="'+merge.rowspan+'"':'';
-       let style=formatStyle(val.style,styles);
+       let style=formatStyle(val.style,styles,model==='MRL');
        if(isIOS)style=style.replace(/(border-(?:left|right|top|bottom):)0\.45px solid /g,'$1'+'0.8px solid ');
        // Explicit inline background prevents theme tint and browser print defaults
        // from suppressing the original pale-blue I/II/III/IV section headers.
@@ -132,8 +150,9 @@
      const customHeight=attr(row,'ht')!=='';
      const minHeight=Math.max(isBlank?2:0,Math.min(72,rowHeight*1.07));
      const rowValue=[1,2,3].map(i=>String(cells.get(colAddr(i)+rowNum)?.value||'')).join(' ');
-     const cl=(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
-     printRows.push('<tr class="excel-row'+cl+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
+     const cl=(rowNum<13?' excel-prelude':'')+(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
+     const pairClass=bilingualEnglish.has(rowNum)?' excel-bilingual-en':bilingualVietnamese.has(rowNum)?' excel-bilingual-vi':'';
+     printRows.push('<tr class="excel-row'+cl+pairClass+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
    }
    const iosPrintCSS=isIOS?`
    /* iOS-only: make native XLSX borders visible without inventing borders on unbordered cells. */
@@ -149,14 +168,27 @@
    .print-toolbar button{border:none;border-radius:6px;background:#b9232c;color:#fff;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer}
    .paper{margin:14px auto;max-width:920px;padding:5mm 4mm;box-shadow:0 5px 22px #14233718;background:white}
    table.excel{border-collapse:collapse;border-spacing:0;table-layout:fixed;width:100%;font-size:8.2pt;line-height:1.18}
-   table.excel td{padding:2px 3px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;line-height:1.2;min-width:0}
+   table.excel td{padding:3px 4px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;line-height:1.23;min-width:0}
+   main.mrl-export table.excel tr[data-source-row] td{border:0}
+   main.mrl-export table.excel tr[data-source-row]:not(.excel-prelude):not(.excel-space) td{border:0.45px solid #d1dbe5}
+   main.mrl-export table.excel tr.excel-heading td{border-color:#a7b9c8}
+   /* One bilingual item = one visual group across all specification sections.
+      Preserve the outer bottom border of a rowspan cell spanning both lines. */
+   main.mrl-export table.excel tr.excel-bilingual-en td:not([rowspan]){border-bottom:0!important}
+   main.mrl-export table.excel tr.excel-bilingual-vi td{border-top:0!important}
+   table.excel tr.excel-bilingual-en{break-after:avoid;page-break-after:avoid}
+   table.excel tr.excel-bilingual-vi{break-before:avoid;page-break-before:avoid}
+   main.mrl-export table.excel tr[data-source-row] td[data-cell^="A1"],main.mrl-export table.excel tr[data-source-row] td[data-cell^="A2"]{border:0}
+   /* MRL entrance is a single logical device/floor section: start it on a new
+      page to prevent a top-floor row being orphaned from main/other floors. */
+   main.mrl-export tr[data-source-row="69"]{break-before:page;page-break-before:always}
    tr.excel-row{break-inside:avoid;page-break-inside:avoid}
    tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
    @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;padding:0;margin:0;width:100%;max-width:100%}table.excel{width:100%;} .paper{zoom:.96;width:104.17%;} }
    `;
    return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+'</style></head><body>'+
    '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc / A4 Portrait · Dựa trên SpecFormExport</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+
-   '<main class="paper"><table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
+   '<main class="paper '+(model==='MRL'?'mrl-export':'')+'"><table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
  }
  window.SPEC_PRINT_LAYOUT={fromXlsx};
 })();

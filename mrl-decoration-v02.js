@@ -65,11 +65,12 @@
   const mHandrail=handrail(v('D64'));
   const rawCop=txt(v('D61'));
   const rawAux=txt(v('D62'));
-  // Spectool D62 lists F650E/F660E/F670E: wheelchair COP (PCNV),
-  // not the technical-study auxiliary COP table ACO1. PCNV is read only
-  // by rail-clearance/drawing methods, not CageMass/Maximum methods.
+  // Every installed COP, including wheelchair/auxiliary units F650E/F660E/F670E,
+  // contributes one identical reference COP mass. PCNV remains independent for
+  // the original geometry/clearance rules; a missing unit contributes no mass.
   const pcnv=/^F6(?:50|60|70)E$/i.test(rawAux)?'Yes':'No';
-  const aux=/^(?:no|not supplied|none)$/i.test(rawAux)||pcnv==='Yes'?'No':cop(rawAux);
+  const auxiliaryAbsent=!rawAux||/^(?:no|not supplied|none)$/i.test(rawAux);
+  const aux=auxiliaryAbsent?'No':pcnv==='Yes'?'CB**-N10**E (Full height)':cop(rawAux);
   return {code:cap,capacity,doorType:txt(v('D15')).toUpperCase(),entrance:txt(v('D16')).toUpperCase(),
    speed:num(v('D17')),stops:num(v('D18')),
    cwt:nameCwt(v('D23')),regulation:mreg,
@@ -107,6 +108,11 @@
   if(i.flooringMass===null||i.flooringMass<0)err('D56','Flooring Weight phải là số không âm.');
   for(const [cell,k] of [['D28','aa'],['D29','bb'],['D30','hl'],['D31','jj'],['D32','hh'],['D35','travel'],['D36','pd'],['D17','speed']])if(i[k]===null)err(cell,'Thiếu số liệu đầu vào từ Spectool.');
   if(errors.length)return {state:'invalid',max:null,errors,reason:'Input ngoài phạm vi Technical Study Alpha',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i}};
+  // User-provided engineering rule: all COP types have identical reference
+  // mass, including additional COP. Original IL 69 has no M/P+NY-40 branch;
+  // the cage calculator normalizes ONLY mass lookup to reference N-series and
+  // adds one reference unit for an installed auxiliary COP. Selected COP type
+  // and PCNV are preserved for other Webtool validations and geometry rules.
   const calc=window.G11L1_SOURCE_DECOR?.evaluate(i)||{state:'unverified',reason:'Technical Study engine not loaded'};
   if(calc.state==='ready'){
    // calc.max is already an integer, floored from (MaxDecorationMass - FlooringMass).
@@ -117,7 +123,7 @@
    // combined allowance (flooring + additional decoration), never a dash or 0.
    // Otherwise preserve the existing 5% reserve on decoration excluding flooring.
    const max=floorOverLimit?calc.includingFloor:safeMax(calc.max);
-   return {state:'ready',max,sourceMaximum:calc.max,rawMaximum:calc.rawMax,technicalStudyMaximum:calc.includingFloor,overweightFlooring:floorOverLimit,safetyFactor:SAFETY_FACTOR,errors:[],reason:floorOverLimit?'Technical Study: flooring exceeds the maximum combined allowance':'Technical Study G11L1 v2.5.0.0; Maximum excluding flooring with 5% safety margin',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
+   return {state:'ready',max,sourceMaximum:calc.max,rawMaximum:calc.rawMax,technicalStudyMaximum:calc.includingFloor,overweightFlooring:floorOverLimit,safetyFactor:SAFETY_FACTOR,errors:[],reason:floorOverLimit?'Technical Study: flooring exceeds the maximum combined allowance':'Technical Study G11L1 v2.5.0.0; COP mass normalized to N-series for all types; Maximum excluding flooring with 5% safety margin',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
   }
   return {state:'unavailable',max:null,errors:[],reason:calc.reason||'Cannot verify Technical Study source logic',info:{source:'Technical Study G11L1 2.5.0.0',inputs:i,detail:calc}};
  }

@@ -48,16 +48,48 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
    // BED envelopes are validated dynamically by mr-bed-capacity.js, preventing permanent false alarms.
    if(isBedMR)continue;
    const state=str(row[code+'-Valid']),limit=num(row[code+'-Valid-Value']),actual=num(n(dimension));
+   // MRL V02 BH special limits are checked against the selected CWT DataTable below.
+   // Avoid stale workbook N-Max when 1D-1G Mitsubishi Standard permits +440 mm,
+   // or when 1D-2G requires equality with its CWT-specific source dimension.
+   const ent=str(raw('SpecForm','D16')),reg=str(raw('SpecForm','D26'));
+   if(model==='MRL'&&code==='BH'&&(ent==='1D-2G'||(ent==='1D-1G'&&/Mitsubishi\s*Standard|MELCO\s*std\.?/i.test(reg))))continue;
    // These state codes are workbook-calculated against model/door/fire/CWT-specific ranges.
    if(state==='N-Max'&&Number.isFinite(limit))mark(dimension,`${shaftName[code]} ${mm(actual)} vượt quá giới hạn tối đa ${mm(limit)}.`);
    if(state==='N-Min'&&Number.isFinite(limit))mark(dimension,`${shaftName[code]} ${mm(actual)} nhỏ hơn tiêu chuẩn tối thiểu ${mm(limit)}.`);
   }
   if(model==='MRL'){
+   // V02 Mitsubishi Standard: 1D-1G BH max is source CWT-specific BH min + 440 mm.
+   // 1D-2G is an exact-source-dimension layout, regardless of regulation.
+   // The CWT dataset gives the correct BH for model/speed/JJ/entrance/fire/CWT.
+   const entrance=f('K7_EntranceType')||str(raw('SpecForm','D16'));
+   const regulation=f('K16_Regulation')||str(raw('SpecForm','D26'));
+   const isMitsubishiStandard=/Mitsubishi\s*Standard|MELCO\s*std\.?/i.test(regulation);
+   const strictTwoGate=entrance==='1D-2G';
+   const standardSingleGate=entrance==='1D-1G'&&isMitsubishiStandard;
+   if(strictTwoGate||standardSingleGate){
+    const lookup=window.SPEC_CWT_ENGINE?.lookupEngine?.(calc);
+    const minimumBH=lookup?.ok?Number(lookup.BH):NaN;
+    const actualBH=num(n('K19_CarBH'));
+    if(Number.isFinite(minimumBH)&&minimumBH>0&&Number.isFinite(actualBH)){
+     const maxBH=strictTwoGate?minimumBH:minimumBH+440;
+     if(strictTwoGate&&actualBH!==minimumBH){
+      errors.push({id:'MRL!2G_BH_Exact',cell:namedAddr('K19_CarBH')||'D34',
+       message:`1D-2G: BH ${mm(actualBH)} phải bằng đúng DataTable ${mm(minimumBH)} (không áp dụng +440 mm).`,
+       detail:'MRL Version02: 1D-2G exact BH from the selected CWT layout'});
+     }else if(standardSingleGate&&actualBH>maxBH){
+      errors.push({id:'MRL!Standard1G_BHMax',cell:namedAddr('K19_CarBH')||'D34',
+       message:`BH ${mm(actualBH)} vượt BH Max ${mm(maxBH)} (BH Min DataTable ${mm(minimumBH)} + 440 mm). Khuyến nghị bổ sung lưới/vách phía sau để giảm BH khai báo đặt hàng, đảm bảo điều kiện an toàn theo mục 5.4.7.4 TCVN 6396-20. Phương án kết cấu và kích thước BH hữu dụng phải được xác nhận trước khi đặt hàng.`,
+       detail:'MRL Version02 / Mitsubishi Standard / 1D-1G: BH Max = CWT DataTable BH Min + 440 mm; safety illustration attached'});
+     }
+     verified.push('MRL Version02 '+entrance+': BH Min '+minimumBH+' mm, BH Max '+maxBH+' mm (source CWT dataset)');
+    }else unverified.push('MRL '+entrance+': cannot determine CWT-specific BH minimum for BH maximum/exact validation');
+   }
    // DataTable has AH-Max / BH-Max (and fire-door-specific maxima) even when
    // AH-Valid/BH-Valid returns MANUAL GQ LAYOUT. Enforce the explicitly declared
    // table envelope; exceeding it requires a different factory layout.
    const isFire=!/^Not suppl(?:ied|y)$/i.test(str(n('K36_FireproofDoor')));
    for(const [code,dimension] of [['AH','K19_CarAH'],['BH','K19_CarBH']]){
+    if(code==='BH'&&(strictTwoGate||standardSingleGate))continue;
     const column=code+'-Max'+(isFire?'-FIRE':'');
     const max=num(row[column]),actual=num(n(dimension));
     if(Number.isFinite(max)&&max>0&&Number.isFinite(actual)&&actual>max){
@@ -70,6 +102,27 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
    }
   }
   if(model==='MR'){
+   // NEXIEZ-MR only: side counterweight + BH above the source maximum.
+   // Keep the existing hard BH maximum failure, and attach one safety recommendation
+   // to that same failure. Never infer a maximum from blank workbook cells.
+   const sideDrop=/CWT\s*Side|Side\s*Drop/i.test(capacity)||/Side/i.test(str(row['CWT-Position']));
+   const bhActual=num(n('K19_CarBH'));
+   const fireSelection=str(n('K36_FireproofDoor'));
+   const hasFire=fireSelection!==''&&!/^(?:Not supplied|Not supply|No|Without|-)$/i.test(fireSelection);
+   const maxColumn=hasFire?'BH-Max-FIRE':'BH-Max';
+   const sourceMax=num(row[maxColumn]);
+   const alternateMax=num(row['BH-Max']);
+   const declaredMax=Number.isFinite(sourceMax)&&sourceMax>0?sourceMax:
+    (!hasFire&&Number.isFinite(alternateMax)&&alternateMax>0?alternateMax:NaN);
+   const state=str(row['BH-Valid']);
+   const stateLimit=num(row['BH-Valid-Value']);
+   const bhMax=Number.isFinite(declaredMax)?declaredMax:
+    (state==='N-Max'&&Number.isFinite(stateLimit)&&stateLimit>0?stateLimit:NaN);
+   if(sideDrop&&Number.isFinite(bhActual)&&Number.isFinite(bhMax)&&bhActual>bhMax){
+    errors.push({id:'MR!SideDropBHMax',cell:namedAddr('K19_CarBH')||'D35',
+     message:`BH ${mm(bhActual)} vượt BH Max ${mm(bhMax)}. Khuyến nghị bổ sung lưới/vách phía sau để giảm BH khai báo đặt hàng, đảm bảo điều kiện an toàn theo mục 5.4.7.4 TCVN 6396-20. Phương án kết cấu và kích thước BH hữu dụng phải được xác nhận trước khi đặt hàng.`,
+     detail:'MR Side Drop + BH > BH Max | reference image: balustrade 700 mm min; toe-board 100 mm min; engineering verification required'});
+   }
    if(capKg===450&&speed>60)mark('K8_Speed','450 kg không áp dụng tốc độ 90/105 m/min / Restricted speed for 450 kg');
    const minTR=speed===60?3400:speed===90?5700:speed===105?7300:null,maxTR=speed===60?60000:80000;
    if(minTR!==null&&travel<minTR)mark('K21_CarTR',`Hành trình nâng ${travel} thấp hơn ${minTR} mm / Travel below minimum`);
@@ -160,7 +213,12 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
   const P='K36_PIV'+key,H='K36_HBV'+key,I='K36_PIH_PID'+key;
   const piv=f(P),hbv=f(H),pih=f(I);
   if(requireSingle&&!notSup(piv)&&!['71','73','766','1010','1030'].some(c=>piv.includes(c)))mark(P,`PIV ${piv} không áp dụng điều khiển nhóm ${group} / Invalid hall fixture for control group`);
-  if(!notSup(piv)&&!notSup(hbv))mark(P,`Không được đồng thời sử dụng PIV và HBV tại ${key} / PIV and HBV cannot coexist`);
+  // Exception confirmed by Sales Engineering: PIV may share a landing with
+  // HBV1-F716N / HBV2-F716N / HBV3-F716N / HBV4-F716N only.
+  // Attribute any other simultaneous PIV/HBV failure to HBV, the conflicting fixture.
+  const pivWithHBVException=/^HBV[1-4]-F716N$/i.test(hbv);
+  if(!notSup(piv)&&!notSup(hbv)&&!pivWithHBVException)
+   mark(H,`Tầng ${key}: PIV không dùng đồng thời với HBV ${hbv}. Chỉ cho phép HBV1/2/3/4-F716N. / PIV cannot share this floor with HBV except HBV1/2/3/4-F716N.`);
   if(!notSup(piv)&&!notSup(pih)&&(model==='MRL'||key==='MainFloor'))mark(P,`Không được đồng thời sử dụng PIV và PIH/PID tại ${key} / Incompatible hall fixtures`);
   if(notSup(piv)&&notSup(hbv))mark(P,`Phải chọn PIV hoặc HBV tại ${key} / At least one hall fixture is required`);
  }

@@ -71,6 +71,16 @@
    if(!db?.sheets?.SpecFormExport||!db?.tables)throw Error('Thiếu SpecFormExport hoặc DataTable / Workbook source missing');
    currentResult(model,changes,db);
    const eng=new window.SpecExcelSourceEngine.SourceEngine(db,changes);
+   // JD is a Webtool-only supplemental field, not an Excel DataTable formula.
+   // Validate it before any export is built, even when exportModel is invoked directly.
+   if(['MR','MRL'].includes(model)&&window.SPEC_JAMB_DEPTH){
+     const jdErrors=window.SPEC_JAMB_DEPTH.validate(model,key=>{
+       if(key==='JD_MAIN'||key==='JD_OTHER')return changes[key];
+       return eng.safe('SpecForm',key).value;
+     });
+     if(jdErrors.length)throw Error(jdErrors.map(e=>e.message).join(' | '));
+   }
+
    const cells={},hiddenRows=new Set(),overrides={},sections={},unresolved=[];
    const output=db.sheets.SpecFormExport;
    for(const [addr,entry] of Object.entries(output)){
@@ -79,6 +89,19 @@
        if(result.ok)cells[addr]=result.value;
        else {cells[addr]='';unresolved.push({addr,formula:entry.f,error:result.error})}
      }else cells[addr]=entry?.v??entry??'';
+   }
+   // Explicit rated duration requested for the EN81-58(II) option in both
+   // NEXIEZ-MR and NEXIEZ-MRL Version2. The source SpecFormExport omits
+   // the duration; keep the remaining options (No, GHCL E30) unchanged.
+   const fireInputAddr=nameAddr(db,'SpecForm','K36_FireproofDoor');
+   const fireExportAddr=nameAddr(db,'SpecFormExport','K36_FireproofDoor');
+   if(fireInputAddr&&fireExportAddr){
+     const fireSelected=text(eng.safe('SpecForm',fireInputAddr).value).trim();
+     if(/^EN81[-\s]*58\s*\(II\)$/i.test(fireSelected)){
+       cells[fireExportAddr]=
+        'Cửa chống cháy EN81-58(II), khả năng chịu lửa 120 phút.\n'+
+        '(Fire-rated landing door EN81-58(II), 120-minute fire resistance.)';
+     }
    }
    const featureGroups=['Emergency','Door','Operation','Signal','Traffic'];
    const removedFeatures=[],includedFeatures=[];
@@ -246,7 +269,26 @@
    // Export presentation only (5.8.87): model name is a product name, not the
    // workbook's detailed configuration code. Both XLSX and PDF use doc.cells.
    const exportModelRow=model==='MR'?13:14;
-   cells['C'+exportModelRow]=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
+   cells['C'+exportModelRow]=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2';
+   // v5.8.91 — The MRL SpecFormExport speed lookup is occasionally evaluated
+   // as a bare number by the browser Excel interpreter. Preserve the complete
+   // bilingual wording defined by G11L1P DataTable TblK8_Speed[SpeedVN].
+   // For non-listed future speeds use mpm/60 (m/s) without changing Spec inputs.
+   if(model==='MRL'){
+     const raw=eng.safe('SpecForm','D17');
+     const mpm=Number(raw?.value);
+     const sourceSpeed={
+       60:'60 m/phút - 1 m/giây (60 mpm - 1 m/s)',
+       96:'96 m/phút - 1.6 m/giây (96 mpm - 1.6 m/s)',
+       105:'105 m/phút - 1.75 m/giây (105 mpm - 1.75 m/s)',
+       120:'120 m/phút - 2 m/giây (120 mpm - 2 m/s)',
+       150:'150 m/phút - 2.5 m/giây (150 mpm - 2.5 m/s)'
+     };
+     if(raw?.ok&&Number.isFinite(mpm)&&mpm>0){
+       const rate=Number((mpm/60).toFixed(4)).toString();
+       cells.C20=sourceSpeed[mpm]||`${mpm} m/phút - ${rate} m/giây (${mpm} mpm - ${rate} m/s)`;
+     }
+   }
    // Obsolete MBSS: hide the bilingual pair even if the historic MR workbook
    // contains it in SpecFormExport but no longer lists it as an active feature.
    // Do not remove unrelated door-sensor features.
@@ -262,8 +304,114 @@
    // v4.2: Remove the legacy decorative-weight exclusion note from any export.
    for(const addr of Object.keys(cells))if(typeof cells[addr]==='string')cells[addr]=cells[addr]
      .replace(/\s*[-–]?\s*Trừ\s*:\s*Handrail\s*&\s*mirror\s*nhập khẩu\s*;\s*sàn\s*\(By local\)/gi,'');
+   // MRL entrance design: use the same simple device/floor hierarchy as MR,
+   // instead of multi-row vertical merges that spill unpredictably across A4 pages.
+   // All values still come from the selected SpecFormExport workbook (not guesses).
+   if(model==='MRL'){
+     const read=a=>text(eng.safe('SpecForm',a).value).trim();
+     const obs=read('D14');
+     // Observation NY-40A: stainless-steel hairline car wall with aluminum
+     // framed glazing. Do not describe the observation-glass frame as SUS-HL.
+     // Other NY-40 types retain their own source-workbook description.
+     if(obs==='NY-40A'){
+       cells.C47='Vách phòng thang kiểu NY-40A bằng inox sọc nhuyễn (SUS-HL), kính quan sát với khung/nẹp nhôm.';
+       cells.C48='(NY-40A observation car wall in hairline-finish stainless steel (SUS-HL), with aluminum-framed observation glass.)';
+     }
+     // v5.8.91 — Human-readable bilingual handrail specification. Build one
+     // description per source K32_Handrail and K32_HandrailLocation; do not
+     // duplicate the code in parentheses or strip the Vietnamese description.
+     const handrail=read('D64'),position=read('D65');
+     const positionVi={
+       '1 pc on rear wall':'1 tay vịn trên vách sau',
+       '1 pc on right side wall':'1 tay vịn trên vách phải',
+       '1 pc on left side wall':'1 tay vịn trên vách trái',
+       '2 pcs on both side walls':'2 tay vịn trên 2 vách bên',
+       '2 pcs on rear & right side wall':'2 tay vịn trên vách sau và bên phải',
+       '2 pcs on rear & left side wall':'2 tay vịn trên vách sau và bên trái',
+       '3 pcs on 3 walls':'3 tay vịn trên 3 vách'
+     };
+     const kind=/^YH-100SL(?:\s|\(|$)/i.test(handrail)?'round':
+       /^YH-57S(?:\s|\(|$)/i.test(handrail)?'flat':null;
+     if(kind){
+       const code=kind==='round'?'YH-100SL':'YH-57S';
+       const viType=kind==='round'?'Tay vịn tròn':'Tay vịn dẹt';
+       const enType=kind==='round'?'Round':'Flat';
+       const viPlace=positionVi[position]||position;
+       const vi=viType+' inox sọc nhuyễn SUS304 mã hiệu '+code+(viPlace?', '+viPlace:'');
+       const en=enType+' hairline-finish stainless steel SUS304 handrail type '+code+(position?', '+position:'');
+       cells.C62=vi+' ('+en+').';
+     }else if(/^(?:Not supplied|No)$/i.test(handrail)){
+       cells.C62='Không cung cấp (Not supplied).';
+     }else if(handrail){
+       // Keep any other option's source-workbook bilingual description;
+       // never assume other models have the same material or cross-section.
+       const prior=text(cells.C62).trim();
+       if(!prior||prior===handrail)cells.C62=handrail+(position?', '+position:'')+'.';
+     }
+     const mirror=read('D66');
+     if(mirror&&!/^(?:Not supplied|No)$/i.test(mirror)&&
+        /^\s*([^\n]+?)\s*\(\s*\1\s*\)\.?\s*$/.test(text(cells.C63)))cells.C63=mirror+'.';
+     if(/^(?:Not supplied|No)$/i.test(mirror)&&/Not supplied\s*\(Not supplied\)/i.test(text(cells.C63)))
+       cells.C63='Không cung cấp (Not supplied).';
+
+     // Each jamb/landing entry occupies one bilingual row, without a merged
+     // cell that spans subsequent rows or page boundaries.
+     const body=(vi,en)=>[text(vi).trim(),text(en).trim()].filter(Boolean).join('\n');
+     for(const [rn,following,heading,floor] of [
+       [68,69,'Khung cửa tầng (Jamb Model)','Tầng chính (Main floor)'],
+       [70,71,'Khung cửa tầng (Jamb Model)','Tầng khác (Other floors)'],
+       [72,73,'Cửa tầng (Landing door)','Tầng chính (Main floor)'],
+       [74,75,'Cửa tầng (Landing door)','Tầng khác (Other floors)']]){
+       cells['C'+rn]=body(cells['C'+rn],cells['C'+following]);
+       cells['A'+rn]=heading;cells['B'+rn]=floor;
+       hiddenRows.add(following);
+     }
+     // Append JD in both languages to the selected wide jamb, independently by floor.
+     // E-102 must not show a JD value or a JD text line.
+     if(window.SPEC_JAMB_DEPTH){
+       for(const floor of window.SPEC_JAMB_DEPTH.floorsForModel(model)){
+         const jamb=window.SPEC_JAMB_DEPTH.jambType(eng.safe('SpecForm',floor.cell).value);
+         if(!window.SPEC_JAMB_DEPTH.limits(jamb))continue;
+         const jd=String(changes[floor.key]);
+         cells['C'+floor.exportRow]=text(cells['C'+floor.exportRow]).trimEnd()+'\n'+window.SPEC_JAMB_DEPTH.description(jd);
+       }
+     }
+     // Three independent floor groups. Combine PIV, HBV, PIH and optional
+     // Hall Lantern per floor only once; keep every selected device description.
+     const hallGroups=[
+       [76,[76,77,78],'Tầng trên cùng (Top floor)'],
+       [79,[79,80,81],'Tầng chính (Main floor)'],
+       [82,[82,83,84],'Tầng khác (Other floors)']];
+     for(const [main,members,floor] of hallGroups){
+       const description=members.filter(rn=>!hiddenRows.has(rn))
+         .map(rn=>text(cells['C'+rn]).trim())
+         .filter(v=>v&&!/^(?:Not supplied|Không cung cấp(?: \(Not supplied\))?)\.?$/i.test(v))
+         .filter((v,i,array)=>array.indexOf(v)===i).join('\n');
+       for(const rn of members.slice(1))hiddenRows.add(rn);
+       cells['A'+main]='Hiển thị và nút bấm (Hall indicators & buttons)';
+       cells['B'+main]=floor;
+       cells['C'+main]=description;
+       if(description)hiddenRows.delete(main);else hiddenRows.add(main);
+     }
+     cells.A87='V. Các tính năng (Features) :';
+   }
+   // NEXIEZ-MR uses the same Jamb output rows C68/C70 but does not enter the
+   // MRL-specific combined Entrance Design layout above. Append JD here for MR.
+   if(model==='MR'&&window.SPEC_JAMB_DEPTH){
+     for(const floor of window.SPEC_JAMB_DEPTH.floorsForModel(model)){
+       const jamb=window.SPEC_JAMB_DEPTH.jambType(eng.safe('SpecForm',floor.cell).value);
+       if(!window.SPEC_JAMB_DEPTH.limits(jamb))continue;
+       const jd=text(changes[floor.key]).trim();
+       cells['C'+floor.exportRow]=text(cells['C'+floor.exportRow]).trimEnd()+'\n'+window.SPEC_JAMB_DEPTH.description(jd);
+     }
+   }
    // MR source has two historical MBSS #N/A lookups on feature rows that are removed
    // when MBSS does not apply; only unresolved visible output cells block export.
+   // Correct spelling in every customer-facing output cell, including formula results.
+   // This must run after all layout transformations; source workbook data stays intact.
+   if(window.SPEC_PROOFREAD){
+     for(const addr of Object.keys(cells)){if(typeof cells[addr]==='string')cells[addr]=window.SPEC_PROOFREAD(cells[addr]);}
+   }
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
@@ -696,6 +844,148 @@
      zip.file(stylePath,serial(sd));
    }
 
+   // v5.8.88: consistent fine, neutral borders throughout the customer spec.
+   // Always normalize the actual XLSX (source of PDF print), not PDF CSS alone.
+   // Keep fonts/fills/content and all MR behavior unchanged.
+   if(model==='MRL'){
+     const firstEntrance=70,lastEntrance=87; // +2 after insertion of rail rows
+     const merges=all(x,'mergeCells')[0];
+     if(merges){
+       for(const m of Array.from(merges.children).filter(c=>c.localName==='mergeCell')){
+         const match=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');
+         if(!match)continue;
+         const r1=+match[2],r2=+match[4];
+         if(r1<=lastEntrance&&r2>=firstEntrance)m.remove();
+       }
+       merges.setAttribute('count',String(all(merges,'mergeCell').length));
+     }
+     const stylePath='xl/styles.xml',styleFile=zip.file(stylePath);
+     if(!styleFile)throw Error('Missing XLSX styles for uniform borders');
+     const styles=parse(await styleFile.async('string'));
+     const borders=all(styles,'borders')[0],xfs=all(styles,'cellXfs')[0];
+     if(!borders||!xfs)throw Error('Missing XLSX borders / cellXfs');
+     const uniform=styles.createElementNS(n,'border');
+     for(const side of ['left','right','top','bottom']){
+       const s=styles.createElementNS(n,side);s.setAttribute('style','thin');
+       const clr=styles.createElementNS(n,'color');clr.setAttribute('rgb','FFD1DBE5');
+       s.appendChild(clr);uniform.appendChild(s);
+     }
+     for(const side of ['diagonal'])uniform.appendChild(styles.createElementNS(n,side));
+     const borderId=all(borders,'border').length;
+     borders.appendChild(uniform);borders.setAttribute('count',String(borderId+1));
+     const originalXfs=Array.from(xfs.children).filter(c=>c.localName==='xf'),cache=new Map();
+     function balancedStyle(oldId){
+       const id=Number.isFinite(oldId)&&oldId>=0&&oldId<originalXfs.length?oldId:0;
+       if(cache.has(id))return cache.get(id);
+       const xf=originalXfs[id].cloneNode(true);
+       xf.setAttribute('borderId',String(borderId));xf.setAttribute('applyBorder','1');
+       let align=Array.from(xf.children).find(c=>c.localName==='alignment');
+       if(!align){align=styles.createElementNS(n,'alignment');xf.appendChild(align);}
+       align.setAttribute('wrapText','1');align.setAttribute('vertical','center');
+       xf.setAttribute('applyAlignment','1');
+       const nextId=originalXfs.length+cache.size;
+       xfs.appendChild(xf);cache.set(id,nextId);return nextId;
+     }
+     for(const row of all(x,'row')){
+       const rn=Number(row.getAttribute('r')||0);
+       if(rn<13||row.getAttribute('hidden')==='1')continue;
+       for(const c of Array.from(row.children).filter(c=>c.localName==='c')){
+         if(!/^[ABC]\d+$/.test(c.getAttribute('r')||''))continue;
+         c.setAttribute('s',String(balancedStyle(Number(c.getAttribute('s')||0))));
+       }
+       // New MRL compact entrance rows: enough height for bilingual text;
+       // the PDF layout expands longer paragraphs automatically.
+       if(rn>=firstEntrance&&rn<=lastEntrance){
+         const cc=Array.from(row.children).find(c=>c.localName==='c'&&c.getAttribute('r')==='C'+rn);
+         const v=cc?String(doc.cells['C'+(rn-2)]||''):'';
+         const lineCount=v.split(/\n/).reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/68)),0);
+         row.setAttribute('ht',String(Math.max(26,Math.min(175,lineCount*15+8))));
+         row.setAttribute('customHeight','1');
+       }
+     }
+     // v5.8.90 — Group bilingual texts from ALL specification sections, not
+     // merely V. Features. A single item may occupy two rows:
+     //  - Section III: Vietnamese specification + English translation (C only,
+     //    while the A/B label is merged across the pair).
+     //  - Section V: English feature + Vietnamese translation (A and C).
+     //  - Sections I, II and IV predominantly place the two languages INSIDE
+     //    ONE Excel cell. Such rows have no internal boundary to remove; their
+     //    outer boundary is retained in light gray to distinguish items.
+     const shiftToExportRow=(rn)=>rn+(rn>29?2:0)+(doc.includeTechDetails===true&&rn>29?1:0);
+     const rowByNumber=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')||0),row]));
+     const sharedFile=zip.file('xl/sharedStrings.xml');
+     const sharedList=sharedFile?all(parse(await sharedFile.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     function textFromRow(row,rn,col){
+       const cell=Array.from(row?.children||[]).find(node=>node.localName==='c'&&node.getAttribute('r')===col+rn);
+       if(!cell)return '';
+       const type=cell.getAttribute('t');
+       if(type==='inlineStr')return all(cell,'t').map(t=>t.textContent||'').join('');
+       const v=all(cell,'v')[0]?.textContent||'';
+       return type==='s'?(sharedList[Number(v)]||''):v;
+     }
+     const groups=new Map();
+     // Add feature groups from the actual selection, including appended options.
+     for(const feat of doc.includedFeatures||[]){
+       const source=feat.exportRows||[];
+       if(source.length!==2||source[1]!==source[0]+1)continue;
+       const top=shiftToExportRow(source[0]),bottom=shiftToExportRow(source[1]);
+       if(bottom!==top+1)continue;
+       groups.set(top,{bottom,kind:'feature'});
+     }
+     // Discover bilingual descriptions using the workbook structure, not an
+     // English/Vietnamese dictionary. This also supports optional technical
+     // rows inserted above section III (which shift all following row numbers).
+     const active=rn=>rowByNumber.has(rn)&&rowByNumber.get(rn).getAttribute('hidden')!=='1';
+     const sectionEnd=shiftToExportRow(87); // last section-IV detail row
+     for(const rn of [...rowByNumber.keys()].sort((a,b)=>a-b)){
+       if(rn<13||rn>=sectionEnd||!active(rn)||!active(rn+1)||groups.has(rn))continue;
+       const first=rowByNumber.get(rn),second=rowByNumber.get(rn+1);
+       const a=textFromRow(first,rn,'A').trim(),c=textFromRow(first,rn,'C').trim();
+       const a2=textFromRow(second,rn+1,'A').trim(),b2=textFromRow(second,rn+1,'B').trim(),c2=textFromRow(second,rn+1,'C').trim();
+       if(a&&c&&!a2&&!b2&&/^\s*\(/.test(c2))groups.set(rn,{bottom:rn+1,kind:'detail'});
+     }
+     const noInnerBorderIds=new Map();
+     function bilingualBorderStyle(currentId,role){
+       const key=currentId+'|'+role;
+       if(noInnerBorderIds.has(key))return noInnerBorderIds.get(key);
+       const currentXfs=Array.from(xfs.children).filter(node=>node.localName==='xf');
+       const base=currentXfs[currentId]||currentXfs[0];
+       const variant=base.cloneNode(true);
+       const originalBorder=all(borders,'border')[Number(base.getAttribute('borderId')||0)];
+       if(!originalBorder)throw Error('Missing bilingual border source');
+       const b=originalBorder.cloneNode(true);
+       const edge=Array.from(b.children).find(node=>node.localName===(role==='upper'?'bottom':'top'));
+       if(edge){edge.removeAttribute('style');for(const child of Array.from(edge.children))edge.removeChild(child);}
+       const newBorderId=all(borders,'border').length;
+       borders.appendChild(b);borders.setAttribute('count',String(newBorderId+1));
+       variant.setAttribute('borderId',String(newBorderId));variant.setAttribute('applyBorder','1');
+       const newStyleId=Array.from(xfs.children).filter(node=>node.localName==='xf').length;
+       xfs.appendChild(variant);noInnerBorderIds.set(key,newStyleId);
+       return newStyleId;
+     }
+     const stats={feature:0,detail:0};
+     for(const [top,{bottom,kind}] of groups){
+       const upper=rowByNumber.get(top),lower=rowByNumber.get(bottom);
+       if(!upper||!lower||!active(top)||!active(bottom))continue;
+       if(!textFromRow(upper,top,'C').trim()||!textFromRow(lower,bottom,'C').trim())continue;
+       if(kind==='feature'&&(!textFromRow(upper,top,'A').trim()||!textFromRow(lower,bottom,'A').trim()))continue;
+       for(const [row,role] of [[upper,'upper'],[lower,'lower']]){
+         for(const cell of Array.from(row.children).filter(node=>node.localName==='c')){
+           if(!/^[ABC]\d+$/.test(cell.getAttribute('r')||''))continue;
+           // In section III, columns A:B are merged vertically over both
+           // translations. Keep their full outer border; only C has an
+           // actual English/Vietnamese internal boundary to remove.
+           if(kind==='detail'&&!/^C\d+$/.test(cell.getAttribute('r')||''))continue;
+           const id=Number(cell.getAttribute('s')||0);
+           cell.setAttribute('s',String(bilingualBorderStyle(id,role)));
+         }
+       }
+       stats[kind]++;
+     }
+     console.debug('[Export] Bilingual rows, all sections:',stats);
+     xfs.setAttribute('count',String(Array.from(xfs.children).filter(node=>node.localName==='xf').length));
+     zip.file(stylePath,serial(styles));
+   }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
@@ -727,7 +1017,7 @@
      let rowClass=section?'section':sub?'subsection':feature?'feature':'';
      rows.push('<tr class="'+rowClass+'"><td>'+escape(a)+'</td><td>'+escape(b)+'</td><td>'+escape(c)+'</td></tr>');
    }
-   let title=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02';
+   let title=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2';
    return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>SPEC ${title} - A4 PDF</title><style>
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,"Times New Roman",sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;

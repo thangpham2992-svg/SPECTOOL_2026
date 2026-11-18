@@ -11,7 +11,7 @@ let models={MR:structuredClone(window.SPEC_EMBEDDED.MR),MRL:structuredClone(wind
 let layouts=structuredClone(window.SPEC_LAYOUT);
 for(const k of ['MR','MRL']) models[k].fields.push(...structuredClone(window.SPEC_EXTRAS[k]));
 let sourceFiles={},current=null,changes={};
-function status(message,cls=''){$('status').className=cls;$('status').textContent=message}
+function status(message,cls=''){$('status').className=cls;$('status').textContent=window.SPEC_PROOFREAD?.(message)??message}
 function bytesFromB64(b64){const raw=atob(b64),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes}
 const colnum=col=>Array.from(col).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
 function colname(n){let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}
@@ -655,7 +655,7 @@ function renderFeatures(){
  tables.forEach(t=>{let b=document.createElement('button');const selected=features.some(f=>f.table===t&&featureIsSelected(f));b.className='btn feature-tab'+(selected?' feature-tab-selected':'')+(t===activeFeatureTable?' feature-tab-current':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
-  const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=f.vi||f.code;let en=document.createElement('small');en.textContent=f.en||'';desc.append(en);
+  const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('span');desc.className='fdesc';desc.textContent=window.SPEC_PROOFREAD?.(f.vi||f.code)??(f.vi||f.code);let en=document.createElement('small');en.textContent=window.SPEC_PROOFREAD?.(f.en||'')??(f.en||'');desc.append(en);
   let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';
   const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
   // NSCR-C and NSCR-H are independent options; the card-reader variant
@@ -668,6 +668,14 @@ function renderFeatures(){
     // Technical requirements (e.g. EVRC-C/S for COP C760) remain Check Spec rules.
     if(sourceStatus==='A'||sourceStatus==='S')disabled=false;
     line.title='NSCR-C: hạn chế cuộc gọi trong cabin (CAR CALL). Khác NSCR-H: cuộc gọi tại tầng (HALL CALL).';
+  }
+  if(fCode==='HE-B'){
+   const selected=name=>features.some(z=>(window.SPEC_V52_FEATURES?.canonical(z.code)||z.code)===name&&featureIsSelected(z));
+   const missing=['DKO-TB','EXCL'].filter(name=>!selected(name));
+   line.title='HE-B chỉ hợp lệ khi chọn cả DKO-TB và EXCL / Requires both DKO-TB and EXCL.';
+   if(missing.length){const requirement=document.createElement('small');requirement.className='feature-dependency-note';
+    requirement.textContent='Yêu cầu / Requires: DKO-TB + EXCL'+(chk.checked?' (còn thiếu / missing: '+missing.join(', ')+')':'');
+    desc.append(requirement);}
   }
   if(fCode==='NSCR-H'){
     line.title='NSCR-H: hạn chế cuộc gọi tại tầng (HALL CALL). Không thay thế NSCR-C (CAR CALL).';
@@ -691,7 +699,12 @@ function renderFeatures(){
    if($('model').value==='MRL'&&code==='FHL'&&!chk.checked&&window.SPEC_HALL_LANTERN?.any(changes)){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
-   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';line.classList.toggle('feature-line-selected',chk.checked);tabs.querySelectorAll('.feature-tab').forEach(b=>{const group=tables.find(t=>b.textContent===(({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t));if(group)b.classList.toggle('feature-tab-selected',features.some(x=>x.table===group&&featureIsSelected(x)))});
+   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';line.classList.toggle('feature-line-selected',chk.checked);
+   if(code==='HE-B'&&chk.checked){
+     const active=c=>sourceFeatureRows().some(f=> (window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)===c&&featureIsSelected(f));
+     const missing=['DKO-TB','EXCL'].filter(c=>!active(c));
+     if(missing.length)status('HE-B yêu cầu chọn đồng thời DKO-TB và EXCL. Còn thiếu: '+missing.join(', '));
+   }tabs.querySelectorAll('.feature-tab').forEach(b=>{const group=tables.find(t=>b.textContent===(({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t));if(group)b.classList.toggle('feature-tab-selected',features.some(x=>x.table===group&&featureIsSelected(x)))});
    // v5.8.41: EVRC-C (not EVRC-S) is mandatory with NSCR-C/AS/SCS-B/NS-CB
    // for MR C760/C770/C780 and MRL V02 M*/P* COP codes.
    if(chk.checked&&['NSCR-C','AS','SCS-B','NS-CB'].includes(code)){
@@ -879,6 +892,14 @@ function workbookChoices(field,engine=null){
  // are reported by SPEC_NY40_RULES.validate, rather than silently overwritten.
  if($('model').value==='MRL'&&window.SPEC_NY40_RULES?.allowedLocations(String(currentValue('D14')))
     &&['K26_CarFrontFinish','K25_CarTransomFinish','K27_Kickplate'].includes(field.name))list=['SUS-HL'];
+ // Car wall is the master material for the transom panel in both MR and MRL.
+ // Preserve factory restrictions (e.g. NY-40 SUS-HL): if the wall material is
+ // not in the allowed Transom list, keep the actual allowed list and let
+ // Check Spec flag the incompatible wall/transom combination.
+ if(field.name==='K25_CarTransomFinish'){
+  const wall=String(currentValue($('model').value==='MR'?'D47':'D43')||'').trim();
+  if(wall&&list.some(x=>String(x).trim()===wall))list=[wall];
+ }
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
 function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
@@ -988,7 +1009,7 @@ function guideSelectableValue(kind,code){
 function openDesignGuide(kind){
  const modal=$('design-popup'),items=guideEntries(kind);if(!modal||!items.length)return;
  const label={ceiling:'Trần phòng thang / Car ceiling',ceilingColor:'Màu sắc & vật liệu trần / Ceiling finishes',handrail:'Tay vịn / Handrail',mirror:'Gương / Mirror'};
- $('design-title').textContent=label[kind]+' · '+($('model').value==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version02');
+ $('design-title').textContent=label[kind]+' · '+($('model').value==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2');
  $('design-subtitle').textContent=kind==='mirror'?'':kind==='ceilingColor'?'Vật liệu theo hình catalogue. Các màu bổ sung chỉ áp dụng khi có dữ liệu SpecTool tương ứng.':'Chọn mẫu bằng ảnh. Các mẫu chưa có trong Excel source được hiển thị để tham khảo.';
  const generalFootnote=modal.querySelector('.design-footnote');if(generalFootnote)generalFootnote.hidden=kind==='mirror';
  const root=$('design-cards');root.replaceChildren();
@@ -1127,14 +1148,14 @@ function row(field,displayName='',compact=false){
  const box=document.createElement('div');box.className='field';
  box.dataset.sourceCell=field.cell;
  // Source identifiers remain as data-cell attributes for Check Spec, focus and Export.
- const name=document.createElement('label');name.className='nm';name.textContent=displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' ');
+ const name=document.createElement('label');name.className='nm';name.textContent=window.SPEC_PROOFREAD?.(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '))??(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '));
  const choices=workbookChoices(field);const input=hasDropdown(field)?document.createElement('select'):document.createElement('input');input.dataset.cell=field.cell;input.id='spec-'+field.cell;
  name.htmlFor=input.id;
  let value=String(field.value??'');
  if(input.tagName==='SELECT'){
   const options=[...choices.map(String)];if(value&&!choices.includes(value)&&!field.validation&&!supplementalListSources[field.name])options.unshift(value);
   if(!options.length)options.push('');
-  for(const option of [...new Set(options)]){const opt=document.createElement('option');opt.value=option;opt.textContent=option||'— Chọn / Select —';input.append(opt)}
+  for(const option of [...new Set(options)]){const opt=document.createElement('option');opt.value=option;opt.textContent=window.SPEC_PROOFREAD?.(option||'— Chọn / Select —')??(option||'— Chọn / Select —');input.append(opt)}
  }else input.placeholder='';
  input.value=value;
  input.addEventListener('change',()=>{
@@ -1160,13 +1181,26 @@ function row(field,displayName='',compact=false){
     if(fin){const chosen=window.SPEC_CEILING_FINISH.next(model,input.value,currentValue(fin.cell));
      if(String(currentValue(fin.cell))!==chosen)applyValue(fin.cell,chosen);}
    }
+   // Material-only sync: changing Car wall also sets Transom material, if that
+   // value is available under the current factory / observation restrictions.
+   // Paint color and PPS pattern remain independent selections.
+   if(field.name==='K23_WallFinish'){
+    const transom=current.fields.find(x=>x.name==='K25_CarTransomFinish');
+    if(transom){
+     const allowed=workbookChoices(transom);
+     if(allowed.includes(String(input.value).trim())&&String(currentValue(transom.cell))!==String(input.value).trim())
+      applyValue(transom.cell,String(input.value).trim());
+    }
+   }
    if($('model').value==='MRL'&&field.cell==='D14'&&window.SPEC_NY40_RULES){
      const allowed=window.SPEC_NY40_RULES.allowedLocations(input.value);
      if(allowed&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
    }
    syncDropdownOptions();
+   refreshNY40CopChoices();
    refreshSideDrop();
    refreshLocks();
+   refreshJambDepthFields();
    refreshDesignHints();
    updateFinishPreviews();
    refreshMirrorWeightHint();
@@ -1175,6 +1209,7 @@ function row(field,displayName='',compact=false){
     if(['D13','D17','D31','D16','D84','D23'].includes(field.cell))refreshMRLShaftMinimum();
    }
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
+   if(field.name==='K13_Operation')refreshGroupControlPreview();
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    if($('model').value==='MRL'&&['D36','D37'].includes(field.cell))refreshMRLOverheadMinimum(false);
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
@@ -1307,6 +1342,22 @@ function applyMRBedDefaults(capacity){
   }
  }
 }
+// v5.8.95: Sales consultation defaults for NEXIEZ-MR only.
+// Apply once on MR load. Subsequent user selections and FER toggles remain editable.
+// Store overrides in `changes` so source Check Spec and Excel/PDF Export agree with the UI.
+function setMRDefaultGroupAndFER(){
+ if($('model').value!=='MR')return;
+ const groupField=current.fields.find(f=>f.name==='K13_Operation');
+ if(groupField)applyValue(groupField.cell,'1C-2BC');
+ const fer=sourceFeatureRows().find(f=>(window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)==='FER');
+ if(fer){
+  const option=window.SPEC_V52_FEATURES?.status('MR','FER','1C-2BC',workbookEngineData());
+  if(String(option||fer.option).trim().toUpperCase()!=='X'){
+   changes[fer.cell]='1';
+   featureTouched.delete(fer.cell);
+  }
+ }
+}
 function setMRLHandrailDefault(){
  if($('model').value!=='MRL')return;
  const field=current.fields.find(x=>x.name==='K32_Handrail');
@@ -1410,7 +1461,7 @@ function openHallLanternGallery(fieldKey,select){
  const overlay=document.createElement('div');overlay.className='hall-lantern-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Hall Lanterns gallery');
  const modal=document.createElement('div');modal.className='hall-lantern-modal';
  const bar=document.createElement('div');bar.className='hall-lantern-header';
- const title=document.createElement('h3');title.textContent='Đèn báo tầng / Hall Lanterns — NEXIEZ-MRL Version02';
+ const title=document.createElement('h3');title.textContent='Đèn báo tầng / Hall Lanterns — NEXIEZ-MRL Version2';
  const close=document.createElement('button');close.className='btn';close.type='button';close.textContent='Đóng / Close';close.onclick=()=>overlay.remove();bar.append(title,close);
  const grid=document.createElement('div');grid.className='hall-lantern-gallery';
  for(const rec of source.catalog){
@@ -1493,6 +1544,101 @@ function refreshCarDesignStates(){
   }
  }
 }
+// v5.8.92 — conditional JD (Jamb depth) for G11L1P, independent for main/other floors.
+function mountJambDepthFields(){
+ if(!['MR','MRL'].includes($('model').value)||!window.SPEC_JAMB_DEPTH)return;
+ for(const config of window.SPEC_JAMB_DEPTH.floorsForModel($('model').value)){
+  const jamb=activeInput(config.cell),host=jamb?.closest('.field');
+  if(!host||host.querySelector('.jamb-jd-field'))continue;
+  const block=document.createElement('div');block.className='jamb-jd-field';block.dataset.jdKey=config.key;
+  const label=document.createElement('label');label.className='nm jamb-jd-label';label.textContent='JD (mm) – Chiều rộng khung bao bản rộng / Jamb depth';
+  const select=document.createElement('select');select.id='spec-'+config.key;
+  select.dataset.cell=config.key;select.className='jamb-jd-input';label.htmlFor=select.id;
+  select.addEventListener('change',()=>{
+   changes[config.key]=select.value;select.classList.add('dirty');
+   invalidateCheck();status('Đã thay đổi chiều rộng khung bao (JD). Cần kiểm tra lại Check Spec.');
+  });
+  const help=document.createElement('small');help.className='jamb-jd-range';
+  block.append(label,select,help);host.append(block);
+ }
+ refreshJambDepthFields();
+}
+function refreshJambDepthFields(){
+ if(!['MR','MRL'].includes($('model').value)||!window.SPEC_JAMB_DEPTH)return;
+ for(const config of window.SPEC_JAMB_DEPTH.floorsForModel($('model').value)){
+  const block=document.querySelector('.jamb-jd-field[data-jd-key="'+config.key+'"]');
+  if(!block)continue;
+  const selectedType=window.SPEC_JAMB_DEPTH.jambType(currentValue(config.cell));
+  const range=window.SPEC_JAMB_DEPTH.limits(selectedType);
+  block.hidden=!range;
+  if(!range)continue;
+  const select=block.querySelector('select');
+  const prev=String(changes[config.key]??'');
+  // The customer-approved JD selector uses exactly 5-mm increments within each published range.
+  if(select.dataset.min!==String(range.min)){
+   select.replaceChildren();
+   const blank=document.createElement('option');blank.value='';blank.textContent='— Chọn JD (mm) / Select —';select.append(blank);
+   for(let value=range.min;value<=range.max;value+=range.step){
+    const option=document.createElement('option');option.value=String(value);option.textContent=value+' mm';select.append(option);
+   }
+   select.dataset.min=String(range.min);
+  }
+  select.value=(/^\d+$/.test(prev)&&Number(prev)>=range.min&&Number(prev)<=range.max&&(Number(prev)-range.min)%range.step===0)?prev:'';
+  block.querySelector('.jamb-jd-range').textContent=selectedType+': '+range.min+' ≤ JD ≤ '+range.max+' mm · Bước / Step '+range.step+' mm';
+ }
+}
+
+// Preview is presentation-only and is anchored to the K13_Operation field for
+// EACH model (MR=D21, MRL=D22). It disappears five seconds after a selection.
+let groupControlPreviewTimer=null;
+function clearGroupControlPreview(){
+ if(groupControlPreviewTimer!==null){clearTimeout(groupControlPreviewTimer);groupControlPreviewTimer=null;}
+ document.querySelectorAll('.group-control-preview').forEach(panel=>panel.remove());
+ document.querySelectorAll('.group-preview-inline').forEach(host=>host.classList.remove('group-preview-inline'));
+}
+function refreshGroupControlPreview(){
+ // Cancel the previous model/selection preview even when a new one is hidden.
+ clearGroupControlPreview();
+ const model=$('model')?.value;
+ if(!['MR','MRL'].includes(model))return;
+ const field=current?.fields?.find(f=>f.name==='K13_Operation');
+ if(!field)return;
+ const input=activeInput(field.cell),host=input?.closest('.field');
+ if(!host)return;
+ const value=String(currentValue(field.cell)||'').trim();
+ if(!value||value==='1C-2BC')return;
+ const panel=document.createElement('div');panel.className='group-control-preview';
+ const img=document.createElement('img');img.className='group-control-preview-thumb';
+ img.loading='eager';img.decoding='async';img.alt='At bottom floor — group control arrangement';
+ img.src='assets/group-control-non-1c-2bc.png';
+ const note=document.createElement('small');note.className='group-control-preview-note';
+ note.textContent='Hình minh họa bố trí thang nhóm / Group control arrangement preview';
+ panel.append(img,note);host.append(panel);host.classList.add('group-preview-inline');
+ // Auto-dismiss without changing the selected group control or Check Spec state.
+ groupControlPreviewTimer=setTimeout(()=>{
+  panel.remove();host.classList.remove('group-preview-inline');
+  groupControlPreviewTimer=null;
+ },5000);
+}
+function refreshNY40CopChoices(){
+ if($('model').value!=='MRL')return;
+ const obs=String(currentValue('D14')||'').trim();
+ const isNY40=/^NY-40[A-E]$/.test(obs);
+ for(const [cell,disallow] of [
+  ['D61',v=>/^[MP]\d/i.test(v)],
+  ['D62',v=>v!==''&&!/^(?:NO|NONE|NOT SUPPLIED|KHÔNG CUNG CẤP)$/i.test(v)]
+ ]){
+   const input=activeInput(cell);if(!input||input.tagName!=='SELECT')continue;
+   for(const option of input.options){
+     option.disabled=isNY40&&disallow(String(option.value).trim());
+   }
+   let help=input.closest('.field')?.querySelector('.ny40-cop-hint');
+   if(isNY40){
+     if(!help){help=document.createElement('small');help.className='ny40-cop-hint';input.closest('.field')?.append(help);}
+     if(help){help.textContent=cell==='D61'?'NY-40: không chọn COP M/P / M and P COP not permitted.':'NY-40: không sử dụng Auxiliary/Wheelchair COP / Not permitted.';help.hidden=false;}
+   }else if(help)help.hidden=true;
+ }
+}
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
@@ -1507,7 +1653,7 @@ function renderAllSpecRows(){
   const major=String(info.B||'').trim();const sub=String(info.C||'').trim();
   if(/^([IVX]+)\.\s*/.test(major)){
    section=document.createElement('section');section.className='spec-section';section.dataset.section=major.match(/^([IVX]+)/)[1];
-   const heading=document.createElement('h2');heading.className='section-heading';heading.textContent=headingText(major);
+   const heading=document.createElement('h2');heading.className='section-heading';heading.textContent=window.SPEC_PROOFREAD?.(headingText(major))??headingText(major);
    sectionRows=document.createElement('div');sectionRows.className='section-fields';
    section.append(heading,sectionRows);root.append(section);lastMajor='';continue;
   }
@@ -1518,7 +1664,7 @@ function renderAllSpecRows(){
   const label=major&&sub&&!isInfoNote?major+' · '+subLabel(sub):currentLabel||lastMajor;
   if(!fields.length && !String(info.D||'').trim())continue;
   const sectionRow=document.createElement('div');sectionRow.className='spec-row';sectionRow.dataset.row=info.row;
-  const text=document.createElement('div');text.className='spec-row-title';text.textContent=headingText(label||lastMajor);
+  const text=document.createElement('div');text.className='spec-row-title';text.textContent=window.SPEC_PROOFREAD?.(headingText(label||lastMajor))??headingText(label||lastMajor);
   const area=document.createElement('div');area.className='spec-row-inputs';
   if(fields.length>1){
    sectionRow.classList.add('span-full','multi');
@@ -1559,6 +1705,14 @@ function renderAllSpecRows(){
      original.classList.add('dimension-entry');
      const label=original.querySelector('.spec-row-title');
      if(label)label.textContent=group.labels[i];
+     // MR only: fixed maintenance headroom note beside MH (source row 38).
+     // Informational display; do not bind it to SpecForm, Check Spec, or Export.
+     if(model==='MR'&&sourceRow===38){
+      const note=document.createElement('small');
+      note.className='mr-mh-maintenance-note';
+      note.textContent='Chiều cao bảo trì tối thiểu 1770 mm – Sử dụng thép tấm thay thế Underbeam H125';
+      original.append(note);
+     }
      card.append(original);
     });
     grouped.append(card);
@@ -1632,6 +1786,7 @@ function renderAllSpecRows(){
    landingRows.insertBefore(panel,fireRow||null);
   }
  }
+ mountJambDepthFields();
  // Build a compact section navigator without changing any workbook inputs or source-cell bindings.
  const nav=$('spec-nav');if(nav){nav.replaceChildren();
   const headings=[...root.querySelectorAll('.spec-section')];
@@ -1752,7 +1907,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){clearGroupControlPreview();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -1792,9 +1947,35 @@ function focusIssue(cell){
  if(!input.disabled)try{input.focus({preventScroll:true})}catch(e){input.focus()}
 }
 
+// v5.8.105: Floor Name errors must start from COP No. 1, then hall panels.
+// Ranking is independent of worksheet row numbers (MRL report otherwise sorts bottom-up).
+function floorDisplayErrorRank(err){
+ const id=String(err?.id||''),cell=String(err?.cell||'').toUpperCase();
+ if(!id.startsWith('FloorName!Display!'))return null;
+ const model=$('model').value;
+ const cop=model==='MR'?'D65':'D61';
+ if(cell===cop)return 0; // COP No. 1 (main COP)
+ const order=model==='MRL'
+  ? ['E75','E78','E81','E76','E79','E82','E77','E80','E83']
+  : ['E78','E81','E79','E82','E80','E83'];
+ const ix=order.indexOf(cell);
+ return ix>=0?10+ix:90;
+}
+function orderedCheckErrors(errors){
+ return [...errors].sort((a,b)=>{
+  const aRank=floorDisplayErrorRank(a),bRank=floorDisplayErrorRank(b);
+  if(aRank!==null||bRank!==null){
+   if(aRank===null)return 1;
+   if(bRank===null)return -1;
+   return aRank-bRank;
+  }
+  const num=e=>{const m=/\d+/.exec(String(e.cell||''));return m?Number(m[0]):9999;};
+  return $('model').value==='MRL'?num(b)-num(a):num(a)-num(b);
+ });
+}
 function renderCheckIssues(result){
  const wrap=$('check-issues');if(!wrap)return;wrap.replaceChildren();
- const all=[...result.errors.map(x=>({raw:x,type:'error'})),...result.warnings.filter(x=>/^[A-Z]{1,3}\d+:/.test(x)).map(x=>({raw:x,type:'warning'}))];
+ const all=[...orderedCheckErrors(result.errors).map(x=>({raw:x,type:'error'})),...result.warnings.filter(x=>/^[A-Z]{1,3}\d+:/.test(x)).map(x=>({raw:x,type:'warning'}))];
  const head=document.createElement('div');head.className='check-summary';
  head.textContent=result.errors.length?`FAIL — ${result.errors.length} lỗi cần sửa / ${result.errors.length} errors to fix`:'PASS PARTIAL — Đạt quy tắc đã triển khai; vẫn còn điều kiện chưa xác minh / Implemented rules passed; some conditions unverified';
  head.classList.add(result.errors.length?'check-fail':'check-pass');wrap.append(head);
@@ -1878,7 +2059,7 @@ function check(){
   const decor=evaluateMRLDecoration();
   if(decor){
    result.errors.push(...decor.errors);
-   if(decor.state==='unavailable')result.unverified.push('Decoration Weight Maximum Version02: '+decor.reason);
+   if(decor.state==='unavailable')result.unverified.push('Decoration Weight Maximum NEXIEZ-MRL Version2: '+decor.reason);
    if(decor.errors.length)result.status='FAIL';
    else if(decor.state==='unavailable'&&result.status==='PASS')result.status='INCOMPLETE';
    if(decor.state==='ready')result.verified.push('Technical Study G11L1 v2.5.0.0: '+decor.max+' kg excluding flooring');
@@ -1890,6 +2071,10 @@ function check(){
    const v=String(currentValue(f.cell)||'').trim();if(v&&!r.check(model,f,v))result.errors.push({id:'Material!'+f.name,cell:f.cell,message:'Mã vật liệu / màu không hợp lệ với MRL V02: '+v});
   }
   if(result.errors.length)result.status='FAIL';
+ }
+ if(['MR','MRL'].includes(model)&&window.SPEC_JAMB_DEPTH){
+  const jdErrors=window.SPEC_JAMB_DEPTH.validate(model,currentValue);
+  if(jdErrors.length){result.errors.push(...jdErrors);result.status='FAIL';}
  }
  if(window.SPEC_MIRROR_RULES && model==='MR'){
   const mr=true,val=currentValue('D69'),check=window.SPEC_MIRROR_RULES.validate(model,currentValue('D13'),currentValue('D29'),val,currentValue('D31'));
@@ -1912,22 +2097,19 @@ function renderSourceCheck(result){
   top.className='check-top '+(failed?'fail':incomplete?'partial':'source-pass')}
  if(!wrap)return;
  wrap.replaceChildren();
- const addFloorLedWarning=()=>{
-  if(!Array.isArray(result.dotLedFloorNames)||result.dotLedFloorNames.length===0)return;
-  const notice=document.createElement('div');notice.className='check-led-warning';notice.setAttribute('role','note');
-  notice.textContent='Tồn tại tên tầng cần phải sử dụng bảng gọi Dotled';
-  notice.title='Tên tầng theo DataTable: '+result.dotLedFloorNames.join(', ');
-  wrap.append(notice);
- };
+
  if(!failed){
   // When the Version02 mass table is incomplete, show a direct link at D57
   // without pretending this is an incorrect user input.
-  if(incomplete && $('model').value==='MRL' && (result.unverified||[]).some(x=>/Decoration Weight Maximum Version02/.test(String(x)))){
+  if(incomplete && $('model').value==='MRL' && (result.unverified||[]).some(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2/.test(String(x)))){
    const notice=document.createElement('button');notice.type='button';notice.className='check-error-row';
-   notice.textContent='Chưa xác minh Maximum Decoration Weight (D57) — '+(result.unverified||[]).filter(x=>/Decoration Weight Maximum Version02/.test(String(x))).map(x=>String(x).replace(/^Decoration Weight Maximum Version02:\s*/, '')).join('; ');
-   notice.onclick=()=>focusIssue('D57');wrap.append(notice);
+   notice.textContent='Chưa xác minh Maximum Decoration Weight (D57) — '+(result.unverified||[]).filter(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2/.test(String(x))).map(x=>String(x).replace(/^Decoration Weight Maximum NEXIEZ-MRL Version2:\s*/, '')).join('; ');
+   // Observation wall MethodDef 69 can be unsupported for the selected COP.
+   // Link to the actual incompatible COP selection instead of only to D57.
+   const relatedToCop=(result.unverified||[]).some(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2:.*không có nhánh tính khối lượng vách.*COP/i.test(String(x)));
+   notice.onclick=()=>focusIssue(relatedToCop?'D61':'D57');wrap.append(notice);
   }
-  addFloorLedWarning();return;
+  return;
  }
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
  const primaries=result.errors.filter(x=>!aggregates.test(x.id));
@@ -1940,10 +2122,7 @@ function renderSourceCheck(result){
  });
  // Display errors of MRL Version02 from the bottom of SpecForm upwards.
  // This is UI ordering only: no input, shaft-size or validation formula changes.
- const issues=[...(filtered.length?filtered:result.errors)].sort((a,b)=>{
-  const num=error=>{const cell=String(error.cell||'');const m=/\d+/.exec(cell);return m?Number(m[0]):9999;};
-  return $('model').value==='MRL' ? num(b)-num(a) : num(a)-num(b);
- });
+ const issues=orderedCheckErrors(filtered.length?filtered:result.errors);
  const fields=new Map(),features=sourceFeatureRows();
  const sizeLabel={D33:'Chiều rộng hố thang (AH)',D34:'Chiều sâu hố thang (BH)',D36:'Chiều sâu hố PIT (PD)',D37:'Đỉnh hố thang (OH)',D40:'Chiều sâu hố PIT (PD)',D41:'Đỉnh hố thang (OH)',D35:'Chiều sâu hố thang (BH)'};
  const isDimension=cell=>$('model').value==='MRL'?['D33','D34','D36','D37'].includes(cell):['D34','D35','D40','D41'].includes(cell);
@@ -1953,18 +2132,19 @@ function renderSourceCheck(result){
   const f=current.fields.find(x=>x.cell===cell),feature=features.find(x=>x.cell===cell);
   let name=vietnameseFieldName(xrules().labels?.[cell]||f?.label||feature?.vi||feature?.code||'Thông số kỹ thuật');
   if(isDimension(cell))name=($('model').value==='MR'&&cell==='D34'?'Chiều rộng hố thang (AH)':sizeLabel[cell])||name;
+  if(String(err.id).startsWith('JD!'))name='Chiều rộng khung bao bản rộng (JD) — '+(cell==='JD_MAIN'?'Tầng chính':'Tầng khác');
   if(String(err.id)==='ITP!Required')name='Vui lòng chọn loại ITP';
   if(String(err.id).startsWith('ITP!')&&String(err.id)!=='ITP!Required')name=String(err.message||'Loại ITP không hợp lệ');
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
-  const priority=isDimension(cell)?dimensionPriority(err):0;
+  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const priority=(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')?10:(isDimension(cell)?dimensionPriority(err):0);
   const old=fields.get(cell);
-  if(!old||priority>old.priority)fields.set(cell,{name,message,priority});
+  if(!old||priority>old.priority)fields.set(cell,{id:String(err.id),name,message,priority});
  }
  if(top&&failed)top.textContent=`Không đạt — ${fields.size||1} lỗi`;
- if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);addFloorLedWarning();return}
+ if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);return}
  let index=0;
  for(const [cell,item] of fields){
   const link=document.createElement('button');link.type='button';link.className='check-error-row';
@@ -1975,11 +2155,15 @@ function renderSourceCheck(result){
    detail=detail.replace(/^(?:Đỉnh hố thang \(OH\)|Chiều sâu hố PIT \(PD\)|Chiều rộng hố thang \(AH\)|Chiều sâu hố thang \(BH\))\s*/,'');
    explanation.textContent=detail;link.append(explanation);
   }
+  if((($('model').value==='MR'&&cell==='D35')||($('model').value==='MRL'&&cell==='D34'))&&item.priority===10&&item.id!=='MRL!2G_BH_Exact'){
+   const img=document.createElement('img');img.src='assets/mr_side_drop_bh_safety_5474.png';
+   img.alt='Minh họa lưới/vách bảo vệ phía sau, lan can tối thiểu 700 mm và gờ chắn chân tối thiểu 100 mm';
+   img.className='bh-safety-illustration';img.loading='lazy';link.append(img);
+  }
   link.setAttribute('aria-label','Đến thông số lỗi: '+item.name+(item.message?' — '+item.message:''));
   link.onclick=()=>focusIssue(cell);
   wrap.append(link);
  }
- addFloorLedWarning();
 }
 
 function download(bytes,name,type){

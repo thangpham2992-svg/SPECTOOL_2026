@@ -4,6 +4,10 @@
 (function(root){
  const T=root.G11L1_TS_ALPHA_TABLES||{};
  const IL=root.G11L1_IL_PURE;
+ // Customer-approved mass equivalence for all main COP models and auxiliary COPs.
+ // Reuse N-series as a single consistent reference in the legacy IL tables,
+ // which otherwise return sentinel 9999 for M/P and observation + aux COP.
+ const COP_MASS_REFERENCE='CB**-N10**E (Full height)';
  const nd=(v)=>Number.isFinite(+v)&&v!=null&&String(v)!==''?+v:null;
  const good=(n)=>Number.isFinite(n)&&n>=0&&n<9999;
  const round=(x,d=0)=>{const p=10**d,y=x*p,q=Math.floor(y),f=y-q;return (f===0.5?(q%2===0?q:q+1):Math.round(y))/p;};
@@ -56,13 +60,20 @@
  function calculate(i){
    if(!IL)throw Error('missing original IL');
    const aa=+i.aa,bb=+i.bb,jj=+i.jj,hh=+i.hh,hl=+i.hl,kk=+i.kk,
-      ent=i.entrance,dt=i.doorType,cap=+i.capacity,cop=i.mainCop,aux=i.auxCop,stop=+i.stops;
+      ent=i.entrance,dt=i.doorType,cap=+i.capacity,stop=+i.stops;
+   const hasAux=!!i.auxCop&&i.auxCop!=='No';
+   // The selected model is retained in the user interface and source inputs.
+   // Mass/assembly terms are evaluated with one fixed COP reference only.
+   const cop=COP_MASS_REFERENCE,aux='No';
    const al=dt==='CO'?(aa-jj)/2:aa-jj-10;
    let bonus=i.ceiling==='DL5'?100:i.ceiling==='DL6'?90:50;
    const wallHeight=hl-75+bonus-0.5,transomHeight=hl+bonus-0.5-hh;
    let twoG=ent==='1D-1G'?1:2;
    const comp={};
    comp.ceiling=round(ceiling(i),1);
+   // IL 69 does not provide a wall geometry branch for observation + extra COP.
+   // Keep the reference wall geometry (aux = No) and account for an extra COP
+   // as a distinct unit in the auxiliary COP mass component below.
    if(i.observation==='No'){
     comp.wall=calcOne(ent==='1D-1G'?67:68,ent==='1D-1G'
      ?[aa,bb,wallHeight,i.rearWall,i.sideWall,cop,aux,stop,dt,i.mirror,i.regulation]
@@ -79,13 +90,13 @@
    comp.column=dt==='CO'?0:round(calcOne(72,[wallHeight,i.frontPanel,dt,kk])*twoG,1);
    comp.kickplate=calcOne(73,[aa,bb,ent,cap]);
    comp.mainCop=calcOne(74,[al,cop,aux,stop,wallHeight,hh,ent,dt,bb,kk]);
-   comp.auxCop=calcOne(75,[al,cop,aux,stop,wallHeight,ent]);
+   comp.auxCop=hasAux?calcOne(75,[al,cop,COP_MASS_REFERENCE,stop,wallHeight,ent]):0;
    comp.mirror=calcOne(76,[aa,wallHeight,i.mirror,i.rearWall,i.sideWall]);
    const parts=['ceiling','wall','handrail','front','transom','column','kickplate','mainCop','auxCop','mirror'];
    const sum=parts.reduce((s,k)=>s+comp[k],0);
    const cage=round(sum*1.1);
    const door=round(round(carDoor(i),1)*twoG*1.1);
-   return {cage,door,components:comp,sum,wallHeight,al};
+   return {cage,door,components:comp,sum,wallHeight,al,massCopReference:COP_MASS_REFERENCE,additionalCopUnits:hasAux?1:0};
  }
  root.G11L1_CAGE_SOURCE={calculate,ceiling,carDoor};
 })(typeof window!=='undefined'?window:globalThis);
