@@ -648,6 +648,14 @@ function ensureFreeFeatureDefaults(features){
   }else if(f.virtual&&status==='X'){changes[f.cell]='0';featureTouched.delete(f.cell)}
  }
 }
+// v5.8.108 — Natural-light advisory: selected MBS + glass car door or NY-40 observation.
+function shouldShowMBSNaturalLightNote(){
+ const doorField=current?.fields?.find(f=>f.name==='K24_CarDoorFinish');
+ const door=String(doorField?currentValue(doorField.cell):'');
+ const observation=String(currentValue('D14')||'').trim();
+ const glassDoor=/(?:Large\s*window|DSJ1|\bDS1\b)/i.test(door);
+ return glassDoor || ($('model').value==='MRL' && /^NY-?40[A-E]?\b/i.test(observation));
+}
 function renderFeatures(){
  const features=sourceFeatureRows();ensureFreeFeatureDefaults(features);const tables=[...new Set(features.map(f=>f.table))];const tabs=$('feature-tabs'),main=$('features');if(!tabs||!main)return;tabs.replaceChildren();main.replaceChildren();ensureITPDefault(features);
  if(!tables.length){main.textContent='Chưa trích xuất được bảng Features / Features unavailable';return}
@@ -728,12 +736,18 @@ function renderFeatures(){
    if(f.code==='FE-C30'&&chk.checked)changes.A93='0';
    if(f.code==='FE'&&chk.checked)changes.FE_C30='0';
    if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);
-   if(['FE','FE-C30','ITP','ITV','AECC','AECH','AIL'].includes(code)){
+   if(code==='MBS')renderFeatures();
+  if(['FE','FE-C30','ITP','ITV','AECC','AECH','AIL'].includes(code)){
      if(code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();
    }
    invalidateCheck();status('Đã cập nhật Feature / Feature updated. Vui lòng chạy lại Check Spec.');
   };
-  let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line)
+  let op=document.createElement('span');op.className='option';op.textContent=dynamicOption;let suggest=document.createElement('span');suggest.className='suggest';suggest.textContent=f.suggestion;line.append(addr,code,desc,chk,op,suggest);if(f.code==='ITP'&&chk.checked&&!chk.disabled)renderITPOptions(line);main.append(line);
+  if(fCode==='MBS' && chk.checked && !chk.disabled && shouldShowMBSNaturalLightNote()){
+   const advisory=document.createElement('div');advisory.className='mbs-natural-light-note';advisory.setAttribute('role','note');
+   advisory.textContent='Lưu ý: Chùm quang phổ ánh sáng tự nhiên có thể ảnh hưởng đến hiệu quả của mành tia MBS.';
+   main.append(advisory);
+  }
  }
 }
 
@@ -1200,6 +1214,8 @@ function row(field,displayName='',compact=false){
    refreshNY40CopChoices();
    refreshSideDrop();
    refreshLocks();
+   if(field.cell==='D14'){refreshCarDesignStates();renderFeatures();}
+   if(field.name==='K24_CarDoorFinish')renderFeatures();
    refreshJambDepthFields();
    refreshDesignHints();
    updateFinishPreviews();
@@ -1504,6 +1520,17 @@ function buildCarDesignLines(){
    const nm=fieldNode.querySelector('.nm');if(nm)nm.textContent=kind==='paint'?'Màu sơn / Paint color':'Hoa văn / Pattern';
    variants.append(fieldNode);
   }
+  // v5.8.107: advisory only for MRL Version02 NY-40 observation cars.
+  if(parentName==='K22_SUSType'){
+   const note=document.createElement('small');
+   note.className='ny40-sus304-note';
+   note.id='ny40-sus304-advisory';
+   note.setAttribute('role','note');
+   note.hidden=true;
+   note.innerHTML='Thang máy quan sát, khuyến nghị nên chọn <strong>SUS304</strong> do yếu tố ánh sáng, môi trường, tăng khả năng chống ăn mòn.';
+   // Keep advisory in the material cell: variants is hidden for single-value Full SUS-HL rows.
+   material.append(note);
+  }
   line.append(label,material,variants);wrapper.append(line);
  }
  // Move just the car-design block, retaining all SpecForm cell IDs for Export & Check.
@@ -1517,6 +1544,9 @@ function buildCarDesignLines(){
 function refreshCarDesignStates(){
  const panel=document.querySelector('.car-design-lines');if(!panel)return;
  const model=$('model').value;
+ // Do not enforce SUS304: the designer retains full control of the material selection.
+ const sus304Note=panel.querySelector('#ny40-sus304-advisory');
+ if(sus304Note)sus304Note.hidden=!(model==='MRL'&&/^NY-40(?:[A-E])?\b/i.test(String(currentValue('D14')||'').trim()));
  for(const line of panel.querySelectorAll('.car-design-line')){
   const parent=current.fields.find(f=>f.name===line.dataset.device);if(!parent)continue;
   const value=String(currentValue(parent.cell)||'');

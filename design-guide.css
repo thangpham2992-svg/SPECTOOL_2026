@@ -256,3 +256,22 @@
   .spec-section{margin-bottom:12px!important;padding-bottom:12px!important}
   .section-heading{padding-top:12px!important;padding-bottom:12px!important;margin-bottom:10px!important;font-size:17px!important}
 }
+
+/* v5.8.107 – contextual NY-40 material recommendation (non-blocking note) */
+#fields .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note:not([hidden]){
+ display:block!important;color:#805400;background:#fff7e5;border-left:3px solid #d59a28;
+ border-radius:4px;padding:9px 11px;font-size:12px;line-height:1.5;
+}
+#fields .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note strong{font-weight:800;color:#583700}
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-variants:has(.ny40-sus304-note:not([hidden]))::after{content:none!important}
+
+/* v5.8.108 — Keep SUS304 recommendation visible even when the third column is hidden. */
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note:not([hidden]){
+ display:block!important;margin-top:8px;color:#805400;background:#fff7e5;
+ border-left:3px solid #d59a28;border-radius:4px;padding:9px 11px;font-size:12px;line-height:1.5;
+}
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note strong{font-weight:800;color:#583700}
+#features .mbs-natural-light-note,.mbs-natural-light-note{
+ display:block;margin:0 0 9px 0;padding:9px 12px;color:#805400;background:#fff7e5;
+ border-left:3px solid #d59a28;border-radius:4px;font-size:12px;line-height:1.5;
+}
