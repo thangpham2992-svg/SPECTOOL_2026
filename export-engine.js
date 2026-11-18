@@ -266,6 +266,17 @@
      cells.C300='Các cuộc gọi ở tầng bị hạn chế chỉ được chấp nhận khi sử dụng thẻ từ. Chức năng tự động vô hiệu hóa trong chế độ khẩn cấp. Chỉ cung cấp tiếp điểm khô, không bao gồm đầu đọc thẻ và thẻ từ.';
      includedFeatures.push({group:'Operation',code:'NSCR-H',row:null,option:'A',exportRows:[299,300]});
    }
+   // v5.8.106 — MRL Version02 Observation: the source workbook maps
+   // SpecFormExport!C16 to SpecForm!D12 (Use=Passenger), so an NY-40
+   // observation selection in D14 is omitted from both PDF and XLSX.
+   // Override only the export presentation; do not change underlying D12.
+   if(model==='MRL'){
+     const observation=text(eng.safe('SpecForm','D14').value).trim();
+     const matched=/^NY[\s-]*40\s*([A-E])$/i.exec(observation);
+     if(matched){
+       cells.C16=`Thang máy quan sát (Observation) kiểu NY40${matched[1].toUpperCase()}`;
+     }
+   }
    // Export presentation only (5.8.87): model name is a product name, not the
    // workbook's detailed configuration code. Both XLSX and PDF use doc.cells.
    const exportModelRow=model==='MR'?13:14;
