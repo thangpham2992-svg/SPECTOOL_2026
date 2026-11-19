@@ -58,11 +58,17 @@
    const visibleRows=new Map(),cells=new Map();let largest=0;
    // Rows above 300 are usually technical helpers. Only show the deliberate
    // additional-feature appendix (VI.) and its bilingual entries.
+   // Include the genuine source/origin and local-material notes even when
+   // they fall AFTER the 300th worksheet row. MR puts this note at A300;
+   // MRL Version02 uses A305. The previous 300-row cutoff silently lost it
+   // in PDF even though the same value was preserved in XLSX.
+   const isOriginDisclaimer=t => /Toàn bộ thiết bị thang máy được nhập khẩu|All main components are imported|Some auxiliary parts of the lifts/i.test(String(t||''));
    const isExtraRow=(rn,row)=>{
      if(rn<=300)return true;
-     if(rn<312||rn>475)return false;
      const c=Array.from(row.children).find(el=>el.localName==='c'&&attr(el,'r')==='A'+rn);
      const t=readText(c,strings).trim();
+     if(isOriginDisclaimer(t))return true;
+     if(rn<312||rn>475)return false;
      return /^VI\.\s|^\([A-Z0-9-]+\)\s|^Tính năng theo Manual|^Hạn chế|^Cáp động/i.test(t)||Boolean(c&&t&&rn>=313);
    };
    for(const row of rows){let rn=Number(attr(row,'r'));if(!rn||!isExtraRow(rn,row)||attr(row,'hidden')==='1')continue;
@@ -72,6 +78,13 @@
      }
    }
    if(!largest)throw Error('Export SpecFormExport is empty');
+   // The PDF must never silently omit source footnotes included in Excel.
+   // Validate against ALL non-hidden source notes, not a fixed row index.
+   const disclaimerRows=rows.filter(row=>attr(row,'hidden')!=='1' && Array.from(row.children).some(el=>el.localName==='c' && /^A\d+$/.test(attr(el,'r')) && isOriginDisclaimer(readText(el,strings))));
+   for(const row of disclaimerRows){
+     const rn=Number(attr(row,'r'));
+     if(!visibleRows.has(rn))throw Error('PDF export lost source footnote at Excel row '+rn);
+   }
    const end=largest;
    // Merge map comes from original Excel print sheet; supports vertical and horizontal merges.
    const merges=new Map(),covered=new Set();
@@ -163,13 +176,14 @@
    // Prelude ends at the first real specification section (different row in
    // MR and MRL). Do not strip borders from Manufacturer or Basic Spec rows.
    const firstSectionRow=blueRomanRows.size?Math.min(...blueRomanRows):11;
-   const printRows=[];
+   const printRows=[],printedCells=new Set();
    for(let rowNum=1;rowNum<=end;rowNum++){
      const row=visibleRows.get(rowNum);if(!row||rowNum<=titleRow)continue;
      const rowCells=[];const isBlank=[1,2,3].every(i=>!String(cells.get(colAddr(i)+rowNum)?.value||'').trim());
      const rowHeight=Number(attr(row,'ht',attr(q(data.documentElement,'sheetFormatPr'),'defaultRowHeight','13.8')))||13.8;
      for(let col=1;col<=3;col++){
        const key=colAddr(col)+rowNum;if(covered.has(key))continue;
+       printedCells.add(key);
        const val=cells.get(key)||{value:'',style:0};const merge=merges.get(key)||{colspan:1,rowspan:1};
        const extra=merge.colspan>1?' colspan="'+merge.colspan+'"':'';const vextra=merge.rowspan>1?' rowspan="'+merge.rowspan+'"':'';
        // PDF grid must never inherit irregular workbook border colors/weights.
@@ -186,7 +200,19 @@
      const rowValue=[1,2,3].map(i=>String(cells.get(colAddr(i)+rowNum)?.value||'')).join(' ');
      const cl=(rowNum<firstSectionRow?' excel-prelude':'')+(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
      const pairClass=bilingualUpper.has(rowNum)?' excel-bilingual-upper':bilingualLower.has(rowNum)?' excel-bilingual-lower':'';
-     printRows.push('<tr class="excel-row'+cl+pairClass+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
+     const originNote=isOriginDisclaimer(String(cells.get('A'+rowNum)?.value||''))?' excel-origin-note':'';
+     printRows.push('<tr class="excel-row'+cl+pairClass+originNote+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
+   }
+   // Parity guard: any visible, non-empty customer-facing source cell in
+   // columns A:C must be represented in the print table. Excel may merge away
+   // covered cells, but the PDF must never silently skip an unmerged value.
+   for(const [rowNum] of visibleRows){
+     if(rowNum<=titleRow||rowNum>end)continue;
+     for(let col=1;col<=3;col++){
+       const key=colAddr(col)+rowNum;
+       if(!String(cells.get(key)?.value||'').trim()||covered.has(key))continue;
+       if(!printedCells.has(key))throw Error('PDF Export missing Excel cell '+key);
+     }
    }
    const iosPrintCSS=isIOS?`
    /* iOS: preserve exactly the same vector grid colors as desktop PDF. */
@@ -222,6 +248,9 @@
    /* The inner rule of a true Vietnamese/English pair is lighter, not thicker.
       Apply to both adjacent cells to avoid border-collapse color conflicts.
       Rowspanned labels keep one uninterrupted outline. */
+   /* Compact the source/origin paragraph, preserving every character while
+      avoiding a lone almost-empty final A4 page (especially MRL's row 305). */
+   table.excel tr.excel-origin-note td{font-size:7.45pt!important;line-height:1.12;padding:2px 4px!important;vertical-align:top}
    table.excel tr.excel-bilingual-upper td:not([rowspan]){border-bottom:0.5pt solid #c6ced6!important}
    table.excel tr.excel-bilingual-lower td:not([rowspan]){border-top:0.5pt solid #c6ced6!important}
    table.excel tr.excel-bilingual-upper{break-after:avoid;page-break-after:avoid}
