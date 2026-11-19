@@ -130,8 +130,7 @@
        if(!featureRows.length)continue; // Code has no export row in this workbook.
        if(present){visibleCount++;includedFeatures.push({group,code,row,option:text(option.value),exportRows:featureRows});}
        else{removedFeatures.push({group,code,row});for(const er of featureRows)hiddenRows.add(er);}
-       // C# clears helper columns D/E and highlights nonstandard features.
-       for(const er of featureRows){cells['D'+er]='';cells['E'+er]='';}
+       // Retain D/E values for all features, including hidden ones, so Excel Unhide preserves the source rows.
      }
      if(!visibleCount){const heading=nameAddr(db,'SpecFormExport','K'+(37+index)+'_Title_'+group+'Features');if(heading)hiddenRows.add(cellRow(heading));}
      sections[group]={shown:visibleCount};
@@ -416,6 +415,43 @@
        cells['C'+floor.exportRow]=text(cells['C'+floor.exportRow]).trimEnd()+'\n'+window.SPEC_JAMB_DEPTH.description(jd);
      }
    }
+   // v5.8.109: Selected hall-panel quantity is exported below its corresponding
+   // panel model on both Excel and PDF. Counts are NOT written into SpecForm.
+   // Do this AFTER MRL's three-floor consolidation so the note survives it.
+   const qtyHalls=model==='MRL'?['TopFloor','MainFloor','OtherFloor']:['MainFloor','OtherFloor'];
+   const opValue=text(eng.safe('SpecForm',model==='MR'?'D21':'D22').value).toUpperCase();
+   const groupMatch=opValue.match(/(?:^|\D)([1-4])\s*C(?:\D|$)/);
+   const liftCount=groupMatch?Number(groupMatch[1]):1;
+   const qtyDetails=[];
+   for(const floor of qtyHalls){
+     const notes=[];
+     for(const kind of ['PIV','HBV']){
+       const inputAddr=nameAddr(db,'SpecForm','K36_'+kind+floor);
+       if(!inputAddr)continue;
+       const raw=text(eng.safe('SpecForm',inputAddr).value);
+       if(!raw||isNotSupplied(raw))continue;
+       const count=Number(changes['HALL_QTY_'+inputAddr]??1);
+       const family=raw.match(/PIV\d*[- ]?([A-Z]\d{3,4})/i)?.[1]?.toUpperCase()||'';
+       const two=['A1020','A1040','A1090','C720','C740','C776','C790'].includes(family)&&kind==='PIV';
+       const max=two&&liftCount>=2?liftCount-1:liftCount;
+       if(!Number.isInteger(count)||count<1||count>Math.max(1,max))throw Error('Số hộp không hợp lệ / Invalid hall panel quantity: '+raw+' = '+count+', maximum '+max);
+       notes.push(count+' hộp / '+liftCount+' thang / 1 tầng');
+       qtyDetails.push({floor,kind,code:raw,count,cars:liftCount});
+     }
+     if(!notes.length)continue;
+     const target=model==='MRL'?({TopFloor:76,MainFloor:79,OtherFloor:82}[floor]):null;
+     if(target){
+       cells['C'+target]=[text(cells['C'+target]).trim(),...notes].filter(Boolean).join('\n');
+       hiddenRows.delete(target);
+     }else{
+       // MR keeps separate PIV/HBV export lines. Append to the corresponding cell.
+       for(const item of qtyDetails.filter(x=>x.floor===floor)){
+         const outputAddr=nameAddr(db,'SpecFormExport','K36_'+item.kind+floor);
+         if(!outputAddr)continue;
+         cells[outputAddr]=text(cells[outputAddr]).trim()+'\n'+item.count+' hộp / '+liftCount+' thang / 1 tầng';
+       }
+     }
+   }
    // MR source has two historical MBSS #N/A lookups on feature rows that are removed
    // when MBSS does not apply; only unresolved visible output cells block export.
    // Correct spelling in every customer-facing output cell, including formula results.
@@ -423,6 +459,16 @@
    if(window.SPEC_PROOFREAD){
      for(const addr of Object.keys(cells)){if(typeof cells[addr]==='string')cells[addr]=window.SPEC_PROOFREAD(cells[addr]);}
    }
+   // v5.8.113: remove obsolete 1800 mm MBS beam-height claim in both languages.
+   // Keep all other sensor functions and SR/MBSS incompatibility wording unchanged.
+   for(const addr of Object.keys(cells)){
+     if(typeof cells[addr]!=='string')continue;
+     cells[addr]=cells[addr]
+       .replace(/suốt khoảng\s*1800\s*mm\s*/gi,'')
+       .replace(/cover a door height of approximately\s*1800\s*mm\s*/gi,'are arranged along the door height ')
+       .replace(/\(Overhead height\)/gi,'(Overhead)');
+   }
+   cells['C'+(model==='MR'?11:12)]='MITSUBISHI ELECTRIC';
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
@@ -467,6 +513,14 @@
    const finalpath='xl/'+sheetpath;
    const worksheet=zip.file(finalpath);if(!worksheet)throw Error('Missing export XML: '+finalpath);
    const x=parse(await worksheet.async('string'));
+   // v5.8.114: Excel exports must open without Freeze Panes for BOTH models.
+   // Remove pane configuration from the exported worksheet, leaving the source database untouched.
+   for(const sheetView of all(x,'sheetView')){
+     for(const pane of Array.from(sheetView.children).filter(node=>node.localName==='pane'))pane.remove();
+     for(const selection of Array.from(sheetView.children).filter(node=>node.localName==='selection')){
+       selection.removeAttribute('pane');
+     }
+   }
    const cellNodes=all(x,'c');let freezeCount=0;
    for(const c of cellNodes){const addr=c.getAttribute('r');if(!addr)continue;
      if(Object.hasOwn(doc.cells,addr)){updateCell(x,c,doc.cells[addr]);freezeCount++}
@@ -554,6 +608,62 @@
      }
      merges.setAttribute('count',String(all(merges,'mergeCell').length));
    }
+   // v5.8.111: merge the full width of every main/subtitle in the Features
+   // section (MR and MRL have different source row positions). The factory
+   // worksheet kept those headings only in A and left B/C blank.
+   // Do this before model-specific row shifting; the later transforms adjust
+   // the merge references consistently with their data rows.
+   {
+     const featureHeadingRows=model==='MR'
+       ? [83,84,110,146,212,254]
+       : [87,88,114,150,217,259];
+     let merges=all(x,'mergeCells')[0];
+     if(!merges){
+       merges=x.createElementNS(n,'mergeCells');
+       const after=all(x,'sheetData')[0];
+       const anchor=Array.from(x.documentElement.children).find(el=>['conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup'].includes(el.localName));
+       if(anchor)x.documentElement.insertBefore(merges,anchor);
+       else if(after?.nextSibling)x.documentElement.insertBefore(merges,after.nextSibling);
+       else x.documentElement.appendChild(merges);
+     }
+     const toIndex=str=>[...str].reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
+     const spans=(ref)=>{
+       const m=/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(ref||'');
+       return m?{a:toIndex(m[1]),b:toIndex(m[3]||m[1]),top:+m[2],bottom:+(m[4]||m[2])}:null;
+     };
+     for(const rn of featureHeadingRows){
+       if(doc.hiddenRows.has(rn))continue;
+       const blockers=all(merges,'mergeCell').filter(el=>{
+         const q=spans(el.getAttribute('ref'));
+         return q&&q.top<=rn&&q.bottom>=rn&&q.a<=3&&q.b>=1;
+       });
+       if(blockers.some(el=>{
+         const q=spans(el.getAttribute('ref'));
+         return q.top!==rn||q.bottom!==rn||q.a!==1||q.b>3;
+       }))continue; // preserve any overlapping factory vertical/other merge
+       for(const el of blockers)el.remove();
+       const el=x.createElementNS(n,'mergeCell');
+       el.setAttribute('ref',`A${rn}:C${rn}`);merges.appendChild(el);
+     }
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+   }
+   // v5.8.113: the Version02 source omitted the label-cell merges for Regulation and Fireproof Door.
+   if(model==='MRL'){
+     let merges=all(x,'mergeCells')[0];
+     if(!merges)throw Error('Missing mergeCells in MRL export worksheet');
+     for(const rn of [33,85]){
+       const wanted=`A${rn}:B${rn}`;
+       const overlaps=all(merges,'mergeCell').some(m=>{
+         const ref=m.getAttribute('ref')||'';
+         const mm=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
+         if(!mm)return false;
+         const col=k=>[...k].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+         return +mm[2]<=rn&&+mm[4]>=rn&&col(mm[1])<=2&&col(mm[3])>=1;
+       });
+       if(!overlaps){const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref',wanted);merges.appendChild(m);}
+     }
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+   }
    for(const row of all(x,'row')){
      const num=+(row.getAttribute('r')||0);
      if(doc.hiddenRows.has(num)){row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');}
@@ -596,6 +706,23 @@
      const styleId=originalXfs.length;
      xfs.appendChild(newXf);xfs.setAttribute('count',String(styleId+1));
      modelCell.setAttribute('s',String(styleId));
+     const manufacturerAddr='C'+(model==='MR'?11:12);
+     const manufacturerCell=all(x,'c').find(c=>c.getAttribute('r')===manufacturerAddr);
+     if(!manufacturerCell)throw Error('Missing Manufacturer export cell '+manufacturerAddr);
+     const oldManufacturerXf=originalXfs[Number(manufacturerCell.getAttribute('s')||0)]||originalXfs[0];
+     const oldManufacturerFont=fontList[Number(oldManufacturerXf.getAttribute('fontId')||0)]||fontList[0];
+     const manufacturerFont=oldManufacturerFont.cloneNode(true);
+     let bold=Array.from(manufacturerFont.children).find(c=>c.localName==='b');
+     if(!bold){bold=sd.createElementNS(n,'b');manufacturerFont.appendChild(bold);}
+     bold.setAttribute('val','1');
+     fonts.appendChild(manufacturerFont);
+     const manufacturerStyle=oldManufacturerXf.cloneNode(true);
+     manufacturerStyle.setAttribute('fontId',String(fontId+1));
+     manufacturerStyle.setAttribute('applyFont','1');
+     xfs.appendChild(manufacturerStyle);
+     manufacturerCell.setAttribute('s',String(styleId+1));
+     fonts.setAttribute('count',String(fontId+2));
+     xfs.setAttribute('count',String(styleId+2));
      zip.file(stylesPath,serial(sd));
    }
    // v3.8: highlight only Roman-numbered specification section headings (I., II., III., IV., etc.).
@@ -855,147 +982,386 @@
      zip.file(stylePath,serial(sd));
    }
 
-   // v5.8.88: consistent fine, neutral borders throughout the customer spec.
-   // Always normalize the actual XLSX (source of PDF print), not PDF CSS alone.
-   // Keep fonts/fills/content and all MR behavior unchanged.
+   // v5.8.115: NON-DESTRUCTIVE MRL border repair.
+   // Preserve EVERY existing merge (including multi-row Hall indicator groups,
+   // A:B label merges, and main/subheadings). Never paint a rectangle over
+   // all merged cells: that introduces visible internal lines.
    if(model==='MRL'){
-     const firstEntrance=70,lastEntrance=87; // +2 after insertion of rail rows
-     const merges=all(x,'mergeCells')[0];
-     if(merges){
-       for(const m of Array.from(merges.children).filter(c=>c.localName==='mergeCell')){
-         const match=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');
-         if(!match)continue;
-         const r1=+match[2],r2=+match[4];
-         if(r1<=lastEntrance&&r2>=firstEntrance)m.remove();
-       }
-       merges.setAttribute('count',String(all(merges,'mergeCell').length));
-     }
      const stylePath='xl/styles.xml',styleFile=zip.file(stylePath);
-     if(!styleFile)throw Error('Missing XLSX styles for uniform borders');
+     if(!styleFile)throw Error('Missing XLSX styles for MRL border correction');
      const styles=parse(await styleFile.async('string'));
      const borders=all(styles,'borders')[0],xfs=all(styles,'cellXfs')[0];
      if(!borders||!xfs)throw Error('Missing XLSX borders / cellXfs');
-     const uniform=styles.createElementNS(n,'border');
-     for(const side of ['left','right','top','bottom']){
-       const s=styles.createElementNS(n,side);s.setAttribute('style','thin');
-       const clr=styles.createElementNS(n,'color');clr.setAttribute('rgb','FFD1DBE5');
-       s.appendChild(clr);uniform.appendChild(s);
+     const borderList=Array.from(borders.children).filter(e=>e.localName==='border');
+     const originalXfs=Array.from(xfs.children).filter(e=>e.localName==='xf');
+     const blackBorderById=new Map(),blackStyleById=new Map();
+     function blackBorder(originalId){
+       if(blackBorderById.has(originalId))return blackBorderById.get(originalId);
+       const base=borderList[originalId]||borderList[0];
+       const clone=base.cloneNode(true);
+       for(const side of Array.from(clone.children)){
+         if(!['left','right','top','bottom','horizontal','vertical'].includes(side.localName))continue;
+         // Missing style = intentionally absent border; do not add a line.
+         if(!side.getAttribute('style'))continue;
+         let color=Array.from(side.children).find(x=>x.localName==='color');
+         if(!color){color=styles.createElementNS(n,'color');side.appendChild(color);}
+         for(const attr of ['theme','indexed','tint','auto'])color.removeAttribute(attr);
+         color.setAttribute('rgb','FF000000');
+       }
+       const index=all(borders,'border').length;
+       borders.appendChild(clone);borders.setAttribute('count',String(index+1));
+       blackBorderById.set(originalId,index);return index;
      }
-     for(const side of ['diagonal'])uniform.appendChild(styles.createElementNS(n,side));
-     const borderId=all(borders,'border').length;
-     borders.appendChild(uniform);borders.setAttribute('count',String(borderId+1));
-     const originalXfs=Array.from(xfs.children).filter(c=>c.localName==='xf'),cache=new Map();
-     function balancedStyle(oldId){
-       const id=Number.isFinite(oldId)&&oldId>=0&&oldId<originalXfs.length?oldId:0;
-       if(cache.has(id))return cache.get(id);
-       const xf=originalXfs[id].cloneNode(true);
-       xf.setAttribute('borderId',String(borderId));xf.setAttribute('applyBorder','1');
-       let align=Array.from(xf.children).find(c=>c.localName==='alignment');
-       if(!align){align=styles.createElementNS(n,'alignment');xf.appendChild(align);}
-       align.setAttribute('wrapText','1');align.setAttribute('vertical','center');
-       xf.setAttribute('applyAlignment','1');
-       const nextId=originalXfs.length+cache.size;
-       xfs.appendChild(xf);cache.set(id,nextId);return nextId;
+     function blackStyle(id){
+       if(blackStyleById.has(id))return blackStyleById.get(id);
+       const base=originalXfs[id]||originalXfs[0],xf=base.cloneNode(true);
+       xf.setAttribute('borderId',String(blackBorder(Number(base.getAttribute('borderId')||0))));
+       xf.setAttribute('applyBorder','1');
+       const index=all(xfs,'xf').length;
+       xfs.appendChild(xf);blackStyleById.set(id,index);return index;
      }
      for(const row of all(x,'row')){
        const rn=Number(row.getAttribute('r')||0);
-       if(rn<13||row.getAttribute('hidden')==='1')continue;
-       for(const c of Array.from(row.children).filter(c=>c.localName==='c')){
-         if(!/^[ABC]\d+$/.test(c.getAttribute('r')||''))continue;
-         c.setAttribute('s',String(balancedStyle(Number(c.getAttribute('s')||0))));
-       }
-       // New MRL compact entrance rows: enough height for bilingual text;
-       // the PDF layout expands longer paragraphs automatically.
-       if(rn>=firstEntrance&&rn<=lastEntrance){
-         const cc=Array.from(row.children).find(c=>c.localName==='c'&&c.getAttribute('r')==='C'+rn);
-         const v=cc?String(doc.cells['C'+(rn-2)]||''):'';
-         const lineCount=v.split(/\n/).reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/68)),0);
-         row.setAttribute('ht',String(Math.max(26,Math.min(175,lineCount*15+8))));
-         row.setAttribute('customHeight','1');
+       if(rn<13)continue;
+       for(const c of Array.from(row.children).filter(e=>e.localName==='c'&&/^[ABC]\d+$/.test(e.getAttribute('r')||''))){
+         c.setAttribute('s',String(blackStyle(Number(c.getAttribute('s')||0))));
        }
      }
-     // v5.8.90 — Group bilingual texts from ALL specification sections, not
-     // merely V. Features. A single item may occupy two rows:
-     //  - Section III: Vietnamese specification + English translation (C only,
-     //    while the A/B label is merged across the pair).
-     //  - Section V: English feature + Vietnamese translation (A and C).
-     //  - Sections I, II and IV predominantly place the two languages INSIDE
-     //    ONE Excel cell. Such rows have no internal boundary to remove; their
-     //    outer boundary is retained in light gray to distinguish items.
-     const shiftToExportRow=(rn)=>rn+(rn>29?2:0)+(doc.includeTechDetails===true&&rn>29?1:0);
-     const rowByNumber=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')||0),row]));
-     const sharedFile=zip.file('xl/sharedStrings.xml');
-     const sharedList=sharedFile?all(parse(await sharedFile.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
-     function textFromRow(row,rn,col){
-       const cell=Array.from(row?.children||[]).find(node=>node.localName==='c'&&node.getAttribute('r')===col+rn);
-       if(!cell)return '';
-       const type=cell.getAttribute('t');
-       if(type==='inlineStr')return all(cell,'t').map(t=>t.textContent||'').join('');
-       const v=all(cell,'v')[0]?.textContent||'';
-       return type==='s'?(sharedList[Number(v)]||''):v;
+     // Suppress only the separator between a genuine English/Vietnamese
+     // description pair in column C, not the outer borders or merged labels.
+     // Use explicit source structure to avoid crossing section/heading rows.
+     const rowMap=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')||0),row]));
+     const stringFile=zip.file('xl/sharedStrings.xml');
+     const strings=stringFile?all(parse(await stringFile.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     function cellAt(rn,col){return Array.from(rowMap.get(rn)?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+rn);}
+     function cellText(rn,col){const c=cellAt(rn,col);if(!c)return '';
+       if(c.getAttribute('t')==='inlineStr')return all(c,'t').map(t=>t.textContent||'').join('');
+       const v=all(c,'v')[0]?.textContent||'';
+       return c.getAttribute('t')==='s'?(strings[Number(v)]||''):v;
      }
-     const groups=new Map();
-     // Add feature groups from the actual selection, including appended options.
-     for(const feat of doc.includedFeatures||[]){
-       const source=feat.exportRows||[];
-       if(source.length!==2||source[1]!==source[0]+1)continue;
-       const top=shiftToExportRow(source[0]),bottom=shiftToExportRow(source[1]);
-       if(bottom!==top+1)continue;
-       groups.set(top,{bottom,kind:'feature'});
+     const pairStarts=new Set();
+     const exportShift=rn=>rn+(rn>29?2:0)+(doc.includeTechDetails===true&&rn>29?1:0);
+     for(const feature of doc.includedFeatures||[]){
+       const rr=feature.exportRows;
+       if(Array.isArray(rr)&&rr.length===2&&rr[1]===rr[0]+1)pairStarts.add(exportShift(rr[0]));
      }
-     // Discover bilingual descriptions using the workbook structure, not an
-     // English/Vietnamese dictionary. This also supports optional technical
-     // rows inserted above section III (which shift all following row numbers).
-     const active=rn=>rowByNumber.has(rn)&&rowByNumber.get(rn).getAttribute('hidden')!=='1';
-     const sectionEnd=shiftToExportRow(87); // last section-IV detail row
-     for(const rn of [...rowByNumber.keys()].sort((a,b)=>a-b)){
-       if(rn<13||rn>=sectionEnd||!active(rn)||!active(rn+1)||groups.has(rn))continue;
-       const first=rowByNumber.get(rn),second=rowByNumber.get(rn+1);
-       const a=textFromRow(first,rn,'A').trim(),c=textFromRow(first,rn,'C').trim();
-       const a2=textFromRow(second,rn+1,'A').trim(),b2=textFromRow(second,rn+1,'B').trim(),c2=textFromRow(second,rn+1,'C').trim();
-       if(a&&c&&!a2&&!b2&&/^\s*\(/.test(c2))groups.set(rn,{bottom:rn+1,kind:'detail'});
+     for(const rn of [...rowMap.keys()].sort((a,b)=>a-b)){
+       if(rn<13||rn>=exportShift(87)||!rowMap.has(rn+1))continue;
+       if(cellText(rn,'A').trim()&&cellText(rn,'C').trim()
+          &&!cellText(rn+1,'A').trim()&&!cellText(rn+1,'B').trim()
+          &&/^\s*\(/.test(cellText(rn+1,'C')))pairStarts.add(rn);
      }
-     const noInnerBorderIds=new Map();
-     function bilingualBorderStyle(currentId,role){
-       const key=currentId+'|'+role;
-       if(noInnerBorderIds.has(key))return noInnerBorderIds.get(key);
-       const currentXfs=Array.from(xfs.children).filter(node=>node.localName==='xf');
-       const base=currentXfs[currentId]||currentXfs[0];
-       const variant=base.cloneNode(true);
-       const originalBorder=all(borders,'border')[Number(base.getAttribute('borderId')||0)];
-       if(!originalBorder)throw Error('Missing bilingual border source');
+     const pairStyles=new Map();
+     function suppressBorder(styleId,edge){
+       const key=styleId+':'+edge;
+       if(pairStyles.has(key))return pairStyles.get(key);
+       const current=all(xfs,'xf'),base=current[styleId];if(!base)return styleId;
+       const xf=base.cloneNode(true);
+       const border=all(borders,'border')[Number(xf.getAttribute('borderId')||0)];if(!border)return styleId;
+       const clone=border.cloneNode(true);
+       const side=Array.from(clone.children).find(el=>el.localName===edge);
+       if(side){side.removeAttribute('style');for(const child of Array.from(side.children))side.removeChild(child);}
+       const borderId=all(borders,'border').length;borders.appendChild(clone);
+       xf.setAttribute('borderId',String(borderId));xf.setAttribute('applyBorder','1');
+       const nextId=all(xfs,'xf').length;xfs.appendChild(xf);
+       pairStyles.set(key,nextId);return nextId;
+     }
+     for(const top of pairStarts){
+       if(rowMap.get(top)?.getAttribute('hidden')==='1'||rowMap.get(top+1)?.getAttribute('hidden')==='1')continue;
+       if(!cellText(top,'C').trim()||!cellText(top+1,'C').trim())continue;
+       const upper=cellAt(top,'C'),lower=cellAt(top+1,'C');
+       if(upper)upper.setAttribute('s',String(suppressBorder(Number(upper.getAttribute('s')||0),'bottom')));
+       if(lower)lower.setAttribute('s',String(suppressBorder(Number(lower.getAttribute('s')||0),'top')));
+     }
+     borders.setAttribute('count',String(all(borders,'border').length));
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     zip.file(stylePath,serial(styles));
+     // Fail visibly if future changes produce overlapping merge ranges.
+     const ranges=all(x,'mergeCell').map(m=>m.getAttribute('ref')||'');
+     const toNum=k=>[...k].reduce((v,ch)=>v*26+ch.charCodeAt(0)-64,0);
+     const rect=ref=>{const m=/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(ref);return m?{
+       x1:toNum(m[1]),y1:+m[2],x2:toNum(m[3]||m[1]),y2:+(m[4]||m[2])}:null;};
+     for(let i=0;i<ranges.length;i++)for(let j=i+1;j<ranges.length;j++){
+       const a=rect(ranges[i]),b=rect(ranges[j]);if(!a||!b)continue;
+       if(a.x1<=b.x2&&b.x1<=a.x2&&a.y1<=b.y2&&b.y1<=a.y2)
+         throw Error('Overlapping export merges: '+ranges[i]+' / '+ranges[j]);
+     }
+   }
+   // v5.8.117: Keep multi-line hall-panel descriptions readable without
+   // over-expanding the merged floor rows. The estimate is applied to the
+   // combined height of the existing top/main/other merged blocks.
+   if(model==='MRL'){
+     const rowMap=new Map(all(x,'row').map(row=>[Number(row.getAttribute('r')||0),row]));
+     const actualRow=rn=>rn+(rn>29?2:0)+(doc.includeTechDetails===true&&rn>34?1:0);
+     for(const raw of [76,79,82]){
+       const rn=actualRow(raw),row=rowMap.get(rn);
+       if(!row||row.getAttribute('hidden')==='1')continue;
+       const value=String(doc.cells['C'+raw]||'').trim();
+       if(!value)continue;
+       const lines=bilingualRuns(value).map(run=>run.text).join('').split(/\r?\n/)
+         .reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.trim().length/74)),0);
+       // Merged floor panels are 3 source rows; set the combined height on
+       // the leading row while preserving the other rows' source dimensions.
+       const following=[rowMap.get(rn+1),rowMap.get(rn+2)].filter(Boolean);
+       const remaining=following.reduce((sum,r)=>sum+Number(r.getAttribute('ht')||15),0);
+       const desired=Math.max(66,Math.min(130,lines*15+11));
+       row.setAttribute('ht',String(Math.max(16,Math.round(desired-remaining))));
+       row.setAttribute('customHeight','1');
+     }
+   }
+   // v5.8.117: Arial for both MR/MRL. The XLSX rich text below uses the
+   // same family and preserves bold/italics from the cell's base style.
+   {
+     const stylesPath='xl/styles.xml',part=zip.file(stylesPath);
+     if(!part)throw Error('Missing Excel styles for Arial normalization');
+     const sd=parse(await part.async('string'));
+     const fonts=all(sd,'fonts')[0];
+     if(!fonts)throw Error('Missing Excel fonts');
+     for(const font of Array.from(fonts.children).filter(node=>node.localName==='font')){
+       let name=Array.from(font.children).find(node=>node.localName==='name');
+       if(!name){name=sd.createElementNS(n,'name');font.insertBefore(name,font.firstChild);}
+       name.setAttribute('val','Arial');
+     }
+     zip.file(stylesPath,serial(sd));
+   }
+   // v5.8.117: Rich-text italic on English descriptions, not just the
+   // entire cell font. Existing English on the same line is moved below the
+   // Vietnamese text; technical tokens (SUS304, kg, PIV) are untouched.
+   for(const c of all(x,'c')){
+     const addr=c.getAttribute('r')||'';
+     if(!/^C\d+$/.test(addr)||c.getAttribute('t')!=='inlineStr')continue;
+     const source=all(c,'t').map(t=>t.textContent||'').join('');
+     if(!source||!/[À-ỹ]/.test(source))continue;
+     const runs=bilingualRuns(source);
+     if(!runs.some(t=>t.english))continue;
+     const is=child(c,'is');if(!is)continue;
+     while(is.firstChild)is.removeChild(is.firstChild);
+     for(const part of runs){
+       if(!part.text)continue;
+       const rNode=x.createElementNS(n,'r');
+       const prop=x.createElementNS(n,'rPr');
+       const family=x.createElementNS(n,'rFont');family.setAttribute('val','Arial');prop.appendChild(family);
+       if(part.english)prop.appendChild(x.createElementNS(n,'i'));
+       rNode.appendChild(prop);
+       const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');
+       t.textContent=part.text;rNode.appendChild(t);is.appendChild(rNode);
+     }
+   }
+   // v5.8.119: split single-row bilingual descriptions into TWO Excel rows.
+   // Feature descriptions already encoded as two source rows remain untouched.
+   // Preserve the worksheet's original outside borders; the only new internal
+   // separator is a thin pale-grey rule above the new English row.
+   {
+     const data=all(x,'sheetData')[0];
+     const stylePart=zip.file('xl/styles.xml');
+     if(!data||!stylePart)throw Error('Missing worksheet/styles for bilingual row splitting');
+     const sd=parse(await stylePart.async('string'));
+     const fonts=all(sd,'fonts')[0],xfs=all(sd,'cellXfs')[0],borders=all(sd,'borders')[0];
+     if(!fonts||!xfs||!borders)throw Error('Missing styles for bilingual row splitting');
+     const styleCache=new Map(),vietnameseStyleCache=new Map();
+     function vietnameseStyle(baseId){
+       if(vietnameseStyleCache.has(baseId))return vietnameseStyleCache.get(baseId);
+       const original=all(xfs,'xf')[baseId]||all(xfs,'xf')[0],xf=original.cloneNode(true);
+       const originalBorder=all(borders,'border')[Number(original.getAttribute('borderId')||0)]||all(borders,'border')[0];
        const b=originalBorder.cloneNode(true);
-       const edge=Array.from(b.children).find(node=>node.localName===(role==='upper'?'bottom':'top'));
-       if(edge){edge.removeAttribute('style');for(const child of Array.from(edge.children))edge.removeChild(child);}
-       const newBorderId=all(borders,'border').length;
-       borders.appendChild(b);borders.setAttribute('count',String(newBorderId+1));
-       variant.setAttribute('borderId',String(newBorderId));variant.setAttribute('applyBorder','1');
-       const newStyleId=Array.from(xfs.children).filter(node=>node.localName==='xf').length;
-       xfs.appendChild(variant);noInnerBorderIds.set(key,newStyleId);
-       return newStyleId;
+       const bottom=Array.from(b.children).find(e=>e.localName==='bottom');
+       if(bottom){bottom.removeAttribute('style');while(bottom.firstChild)bottom.removeChild(bottom.firstChild);}
+       const id=all(borders,'border').length;borders.appendChild(b);borders.setAttribute('count',String(id+1));
+       xf.setAttribute('borderId',String(id));xf.setAttribute('applyBorder','1');
+       const sid=all(xfs,'xf').length;xfs.appendChild(xf);xfs.setAttribute('count',String(sid+1));
+       vietnameseStyleCache.set(baseId,sid);return sid;
      }
-     const stats={feature:0,detail:0};
-     for(const [top,{bottom,kind}] of groups){
-       const upper=rowByNumber.get(top),lower=rowByNumber.get(bottom);
-       if(!upper||!lower||!active(top)||!active(bottom))continue;
-       if(!textFromRow(upper,top,'C').trim()||!textFromRow(lower,bottom,'C').trim())continue;
-       if(kind==='feature'&&(!textFromRow(upper,top,'A').trim()||!textFromRow(lower,bottom,'A').trim()))continue;
-       for(const [row,role] of [[upper,'upper'],[lower,'lower']]){
-         for(const cell of Array.from(row.children).filter(node=>node.localName==='c')){
-           if(!/^[ABC]\d+$/.test(cell.getAttribute('r')||''))continue;
-           // In section III, columns A:B are merged vertically over both
-           // translations. Keep their full outer border; only C has an
-           // actual English/Vietnamese internal boundary to remove.
-           if(kind==='detail'&&!/^C\d+$/.test(cell.getAttribute('r')||''))continue;
-           const id=Number(cell.getAttribute('s')||0);
-           cell.setAttribute('s',String(bilingualBorderStyle(id,role)));
+     function englishStyle(baseId){
+       if(styleCache.has(baseId))return styleCache.get(baseId);
+       const original=all(xfs,'xf')[baseId]||all(xfs,'xf')[0];
+       const xf=original.cloneNode(true);
+       const fontId=Number(original.getAttribute('fontId')||0);
+       const baseFont=all(fonts,'font')[fontId]||all(fonts,'font')[0];
+       const font=baseFont.cloneNode(true);
+       if(!Array.from(font.children).some(e=>e.localName==='i'))font.appendChild(sd.createElementNS(n,'i'));
+       const nf=all(fonts,'font').length;fonts.appendChild(font);fonts.setAttribute('count',String(nf+1));
+       xf.setAttribute('fontId',String(nf));xf.setAttribute('applyFont','1');
+       const baseBorder=all(borders,'border')[Number(original.getAttribute('borderId')||0)]||all(borders,'border')[0];
+       const b=baseBorder.cloneNode(true);
+       let top=Array.from(b.children).find(e=>e.localName==='top');
+       if(!top){top=sd.createElementNS(n,'top');b.appendChild(top);}
+       top.setAttribute('style','thin');while(top.firstChild)top.removeChild(top.firstChild);
+       const col=sd.createElementNS(n,'color');col.setAttribute('rgb','FFE2E7EC');top.appendChild(col);
+       const nb=all(borders,'border').length;borders.appendChild(b);borders.setAttribute('count',String(nb+1));
+       xf.setAttribute('borderId',String(nb));xf.setAttribute('applyBorder','1');
+       const ns=all(xfs,'xf').length;xfs.appendChild(xf);xfs.setAttribute('count',String(ns+1));
+       styleCache.set(baseId,ns);return ns;
+     }
+     const content=c=>all(c,'t').map(t=>t.textContent||'').join('');
+     const getCell=(row,col)=>Array.from(row?.children||[]).find(e=>e.localName==='c' && e.getAttribute('r')===col+row.getAttribute('r'));
+     const rows=()=>Array.from(data.children).filter(e=>e.localName==='row');
+     const cellMap=()=>new Map(rows().map(row=>[Number(row.getAttribute('r')),row]));
+     const mergeRoot=all(x,'mergeCells')[0];
+     const mergeEls=()=>mergeRoot?Array.from(mergeRoot.children).filter(e=>e.localName==='mergeCell'):[];
+     const parseRange=ref=>{const m=/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(ref||'');return m?{a:m[1],r1:+m[2],b:m[3]||m[1],r2:+(m[4]||m[2])}:null};
+     const writeRange=q=>q.a+q.r1+':'+q.b+q.r2;
+     const colNum=v=>[...v].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+     function makeMerge(ref){if(!mergeRoot)return;
+       const q=parseRange(ref);if(!q)return;
+       if(mergeEls().some(el=>{const p=parseRange(el.getAttribute('ref'));return p&&colNum(p.a)<=colNum(q.b)&&colNum(q.a)<=colNum(p.b)&&p.r1<=q.r2&&q.r1<=p.r2;}))return;
+       const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref',ref);mergeRoot.appendChild(m);
+     }
+     function boundaryAdjust(at){
+       // Every existing merge is shifted or vertically extended through insertion.
+       for(const m of mergeEls()){
+         const q=parseRange(m.getAttribute('ref'));if(!q)continue;
+         if(q.r1>at){q.r1++;q.r2++;}
+         else if(q.r2>=at){q.r2++;}
+         m.setAttribute('ref',writeRange(q));
+       }
+       // Row and cell references, plus sheet-local print/page references.
+       for(const row of rows()){
+         const old=Number(row.getAttribute('r'));
+         if(old<=at)continue;
+         row.setAttribute('r',String(old+1));
+         for(const cell of Array.from(row.children).filter(e=>e.localName==='c')){
+           cell.setAttribute('r',(cell.getAttribute('r')||'').replace(/\d+$/,String(old+1)));
          }
        }
-       stats[kind]++;
+       const shiftAddress=v=>v.replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g,(whole,col,num)=>col+(Number(num)>at?Number(num)+1:num));
+       // The exporter retains a single printable sheet, but its page breaks,
+       // drawing anchors, and print areas must follow the inserted rows.
+       for(const el of all(x,'hyperlink'))if(el.hasAttribute('ref'))el.setAttribute('ref',shiftAddress(el.getAttribute('ref')));
+       for(const el of all(x,'rowBreaks'))for(const br of Array.from(el.children))if(br.localName==='brk'&&+br.getAttribute('id')>at)br.setAttribute('id',String(+br.getAttribute('id')+1));
+       for(const el of all(x,'dimension'))if(el.hasAttribute('ref'))el.setAttribute('ref',shiftAddress(el.getAttribute('ref')));
+       for(const el of all(x,'conditionalFormatting'))if(el.hasAttribute('sqref'))el.setAttribute('sqref',shiftAddress(el.getAttribute('sqref')));
+       for(const el of all(x,'dataValidation'))if(el.hasAttribute('sqref'))el.setAttribute('sqref',shiftAddress(el.getAttribute('sqref')));
      }
-     console.debug('[Export] Bilingual rows, all sections:',stats);
-     xfs.setAttribute('count',String(Array.from(xfs.children).filter(node=>node.localName==='xf').length));
-     zip.file(stylePath,serial(styles));
+     function splitPair(str){
+       const rr=bilingualRuns(str);
+       const english=rr.filter(t=>t.english);
+       if(english.length!==1)return null;
+       const idx=rr.findIndex(t=>t.english);
+       const before=rr.slice(0,idx).map(t=>t.text).join('').trim();
+       const after=rr.slice(idx+1).map(t=>t.text).join('').trim();
+       const en=english[0].text.trim();
+       if(!before||!/[À-ỹ]/.test(before)||!en||after)return null;
+       return [before,en];
+     }
+     // v5.8.120: Restore the THREE actual source rows of each MRL hall group.
+     // Previously two rows were hidden and Vietnamese, English and quantity
+     // were squeezed into one big wrapped cell. Keep the factory A/B merges.
+     const restoredHallRows=new Set();
+     if(model==='MRL'){
+       const floorNames=['Tầng trên cùng','Tầng chính','Tầng khác'];
+       function ensureCell(row,col){
+         let cell=getCell(row,col);
+         if(!cell){cell=x.createElementNS(n,'c');cell.setAttribute('r',col+row.getAttribute('r'));row.appendChild(cell);}
+         return cell;
+       }
+       function displayLines(value){
+         const runs=bilingualRuns(value);
+         const notes=[];
+         const vi=runs.filter(part=>!part.english).map(part=>part.text).join('')
+           .split(/\r?\n/).map(line=>line.trim()).filter(line=>{
+             if(!line)return false;
+             if(/^\d+\s*hộp\s*\//i.test(line)){notes.push(line);return false;}
+             return true;
+           });
+         const en=runs.filter(part=>part.english).map(part=>part.text.trim()).filter(Boolean);
+         return {vi:vi.join('\n'),en:en.join('\n'),notes:notes.join('\n')};
+       }
+       for(const name of floorNames){
+         const top=rows().find(row=>{
+           const label=content(getCell(row,'B')||x.createElementNS(n,'c'));
+           return label.includes(name) && !!content(getCell(row,'C')||x.createElementNS(n,'c')).trim() &&
+             content(getCell(row,'A')||x.createElementNS(n,'c')).includes('Hiển thị');
+         }) || rows().find(row=>content(getCell(row,'B')||x.createElementNS(n,'c')).includes(name)
+           && content(getCell(row,'C')||x.createElementNS(n,'c')).includes('Hall indicators'));
+         if(!top)continue;
+         const rn=+top.getAttribute('r'), rowMap=cellMap();
+         const englishRow=rowMap.get(rn+1),quantityRow=rowMap.get(rn+2);
+         if(!englishRow||!quantityRow)continue;
+         const primary=ensureCell(top,'C');
+         const parts=displayLines(content(primary));
+         if(!parts.vi||!parts.en)continue; // preserve original layout if unrecognizable
+         const baseStyle=Number(primary.getAttribute('s')||0);
+         // Thin pale separator only between VI and EN. Do not add thick borders.
+         updateCell(x,primary,parts.vi);primary.setAttribute('s',String(vietnameseStyle(baseStyle)));
+         const enCell=ensureCell(englishRow,'C');updateCell(x,enCell,parts.en);
+         enCell.setAttribute('s',String(englishStyle(vietnameseStyle(baseStyle))));
+         const qtyCell=ensureCell(quantityRow,'C');updateCell(x,qtyCell,parts.notes);
+         qtyCell.setAttribute('s',String(baseStyle));
+         const estimate=(value,chars)=>String(value||'').split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/chars)),0);
+         for(const [rr,value] of [[top,parts.vi],[englishRow,parts.en],[quantityRow,parts.notes]]){
+           rr.removeAttribute('hidden');rr.setAttribute('customHeight','1');
+           rr.setAttribute('ht',String(Math.max(17,Math.min(145,estimate(value,80)*15+5))));
+           restoredHallRows.add(+rr.getAttribute('r'));
+         }
+       }
+     }
+     const initial=rows().map(row=>({row,number:+row.getAttribute('r')}));
+     // Bilingual form body, excluding already-split lines and existing
+     // multi-level hall-panel 3-row blocks (which have a separate layout).
+     const selected=[];
+     const originalMap=cellMap();
+     for(const {row,number:rn} of initial){
+       if(rn<13||rn>340||row.getAttribute('hidden')==='1')continue;
+       const c=getCell(row,'C');if(!c||c.getAttribute('t')!=='inlineStr')continue;
+       const next=originalMap.get(rn+1),nextC=next&&getCell(next,'C');
+       if(nextC && /^\s*\(/.test(content(nextC)) && !(getCell(next,'A')&&content(getCell(next,'A')).trim()) && !(getCell(next,'B')&&content(getCell(next,'B')).trim()))continue;
+       const value=content(c),pair=splitPair(value);if(!pair)continue;
+       // Hall indicator blocks are already special merged 3-row records;
+       // avoid splitting the combined count/description into an invalid merge.
+       if(/\b(?:PIV\d|HBV\d|PIH[-\d]|\d+\s*hộp\s*\/)/i.test(value)&&rn>=70&&rn<110)continue;
+       if(mergeEls().some(el=>{const q=parseRange(el.getAttribute('ref'));return q&&colNum(q.a)<=3&&colNum(q.b)>=3&&q.r1<=rn&&q.r2>rn;}))continue;
+       selected.push({row,cell:c,pair});
+     }
+     // Work from the bottom up: each insertion preserves prior row addresses.
+     for(const item of selected.reverse()){
+       const row=item.row,rn=+row.getAttribute('r'),oldStyle=Number(item.cell.getAttribute('s')||0);
+       boundaryAdjust(rn);
+       const extra=x.createElementNS(n,'row');extra.setAttribute('r',String(rn+1));
+       extra.setAttribute('customHeight','1');
+       const enLines=item.pair[1].split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/77)),0);
+       const viLines=item.pair[0].split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/77)),0);
+       extra.setAttribute('ht',String(Math.max(16,Math.min(85,enLines*14+3))));
+       row.setAttribute('ht',String(Math.max(16,Math.min(85,viLines*14+3))));row.setAttribute('customHeight','1');
+       updateCell(x,item.cell,item.pair[0]);item.cell.setAttribute('s',String(vietnameseStyle(oldStyle)));
+       const en=x.createElementNS(n,'c');en.setAttribute('r','C'+(rn+1));
+       en.setAttribute('s',String(englishStyle(oldStyle)));updateCell(x,en,item.pair[1]);extra.appendChild(en);
+       data.insertBefore(extra,row.nextSibling);
+       // If label was not already merged over the two rows, merge it now.
+       for(const col of ['A','B']){
+         const label=getCell(row,col);if(!label||!content(label).trim())continue;
+         const covered=mergeEls().some(el=>{const q=parseRange(el.getAttribute('ref'));return q&&q.r1<=rn&&q.r2>=rn+1&&colNum(q.a)<=colNum(col)&&colNum(q.b)>=colNum(col);});
+         if(!covered)makeMerge(col+rn+':'+col+(rn+1));
+       }
+     }
+     // v5.8.121: normalize EVERY already-separated bilingual C-cell pair
+     // in BOTH models, not only a hard-coded English phrase whitelist.
+     // The upper Vietnamese row loses its bottom edge and the lower English
+     // row receives one SOLID THIN pale-grey top edge (never dotted "hair").
+     const afterSplit=cellMap();
+     const isEnglishDescription=value=>{
+       const str=String(value||'').trim().replace(/^\(/,'').replace(/\)$/,'').trim();
+       if(!str||/[À-ỹ]/.test(str)||/^[0-9]+\s*hộp\s*\//i.test(str))return false;
+       return /\b(?:provided|not supplied|not provided|stainless|steel|hairline|glass|aluminum|aluminium|ceiling|door|floor|hall|indicators?|buttons?|emergency|ventilation|lighting|model|car|motor|frame|painted|granite|with|without|landing|machine|power|traction|safety|panel|handrail|mirror|fireproof|sensor|finish|material|side|operation|supply)\b/i.test(str);
+     };
+     for(const [rn,row] of afterSplit){
+       const next=afterSplit.get(rn+1);
+       if(!next||row.getAttribute('hidden')==='1'||next.getAttribute('hidden')==='1')continue;
+       if(restoredHallRows.has(rn)||restoredHallRows.has(rn+1))continue;
+       const upper=getCell(row,'C'),lower=getCell(next,'C');
+       if(!upper||!lower)continue;
+       const vi=content(upper).trim(),en=content(lower).trim();
+       if(!vi||!en||!/[À-ỹ]/.test(vi)||!isEnglishDescription(en))continue;
+       // A new label in the following row marks the start of a distinct item.
+       if(content(getCell(next,'A')||x.createElementNS(n,'c')).trim()||
+          content(getCell(next,'B')||x.createElementNS(n,'c')).trim())continue;
+       const upperBase=Number(upper.getAttribute('s')||0);
+       lower.setAttribute('s',String(englishStyle(upperBase)));
+       upper.setAttribute('s',String(vietnameseStyle(upperBase)));
+     }
+     if(mergeRoot)mergeRoot.setAttribute('count',String(mergeEls().length));
+     const print=all(workbook,'definedName').find(el=>el.getAttribute('name')==='_xlnm.Print_Area');
+     if(print){const last=rows().reduce((m,row)=>Math.max(m,+row.getAttribute('r')),1);print.textContent=print.textContent.replace(/(\$[A-Z]+\$)\d+\s*$/,(_,col)=>col+last);}
+     zip.file('xl/styles.xml',serial(sd));
    }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
@@ -1013,6 +1379,31 @@
    zip.file(ctPath,serial(types));
    return {zip,freezeCount,hiddenRows:doc.hiddenRows.size,filename:doc.model};
  }
+ // Decompose bilingual specification descriptions into literal Vietnamese and
+ // English fragments. Do not interpret short engineering codes as English.
+ function bilingualRuns(source){
+   const raw=String(source||'');
+   const re=/\((?:[A-Za-z][^()\r\n]*|[A-Za-z][^()\r\n]*\([^()]*\)[^()\r\n]*)\)/g;
+   const out=[];let last=0,m;
+   const englishPhrase=part=>{
+     const inside=part.slice(1,-1).trim();
+     return inside.length>=9 && /(?:\s|[-–])/.test(inside) &&
+       /\b(?:stainless|steel|hairline|provided|not supplied|passenger|hall|indicator|button|model|door|ceiling|car|floor|glass|painted|plastic|quantity|operation|landing|opening|weight|lighting|granite|emergency|round|safety|front|rear|with|without|side|frame|motor|power|finish|material|supply|sensor|travelling|traction|shaft|handrail|mirror|ventilation|fire|speed|design|structure|control|inspection|contact|automatic|type)\b/i.test(inside);
+   };
+   while((m=re.exec(raw))){
+     const segment=m[0];
+     if(!englishPhrase(segment))continue;
+     const prefix=raw.slice(last,m.index);
+     if(prefix)out.push({text:prefix,english:false});
+     const earlier=raw.slice(0,m.index);
+     const currentLine=earlier.slice(earlier.lastIndexOf('\n')+1);
+     // Newline if English text follows Vietnamese on the same physical line.
+     if(/[À-ỹ]/.test(currentLine)&&currentLine.trim() && !/\n$/.test(prefix))out.push({text:'\n',english:false});
+     out.push({text:segment,english:true});last=m.index+segment.length;
+   }
+   if(last<raw.length)out.push({text:raw.slice(last),english:false});
+   return out.length?out:[{text:raw,english:false}];
+ }
  function printHtml(modelData,model){
    const v=(addr)=>text(modelData.cells[addr]);
    const escape=s=>text(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -1026,11 +1417,12 @@
      let sub=/^\s*[-–]\s*Tính năng/.test(a);
      let feature=!!(/\(.*\)/.test(a)&&i>82&&c);
      let rowClass=section?'section':sub?'subsection':feature?'feature':'';
-     rows.push('<tr class="'+rowClass+'"><td>'+escape(a)+'</td><td>'+escape(b)+'</td><td>'+escape(c)+'</td></tr>');
+     const bilingualHtml=(v)=>bilingualRuns(v).map(part=>part.english?'<em>'+escape(part.text)+'</em>':escape(part.text)).join('');
+     rows.push('<tr class="'+rowClass+'"><td>'+escape(a)+'</td><td>'+escape(b)+'</td><td>'+bilingualHtml(c)+'</td></tr>');
    }
    let title=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2';
    return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>SPEC ${title} - A4 PDF</title><style>
-   @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,"Times New Roman",sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
+   @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
  window.SPEC_EXPORT={exportModel,xlsxFromModel,printHtml};

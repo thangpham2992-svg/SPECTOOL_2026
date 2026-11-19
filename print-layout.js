@@ -117,19 +117,31 @@
    // unlike Section V features where both lines carry their own labels.
    // Section I/II/IV rows that already contain both languages in the SAME cell
    // have no internal border; they retain a very light item separator.
-   const bilingualEnglish=new Set(),bilingualVietnamese=new Set();
+   // One bilingual-row detector shared by MR and MRL Version02.
+   // It uses cell CONTENT rather than template border styles: template borders
+   // differ between models, and are not a reliable sign of bilingual pairing.
+   const bilingualUpper=new Set(),bilingualLower=new Set();
+   const hasVietnamese=s=>/[À-ỹ]/.test(String(s||''));
+   const isEnglish=s=>/^\s*\(?[A-Za-z]/.test(String(s||''))&&!hasVietnamese(s);
+   const looksFeature=s=>/^\s*\([A-Z][A-Z0-9-]{1,12}\)/.test(String(s||''));
    for(let rn=1;rn<end;rn++){
-     if(model!=='MRL'||!visibleRows.has(rn)||!visibleRows.has(rn+1))continue;
-     const upper=cells.get('C'+rn),lower=cells.get('C'+(rn+1));
-     if(!upper?.value?.trim()||!lower?.value?.trim())continue;
-     const upperStyle=styles.xfs[upper.style],lowerStyle=styles.xfs[lower.style];
-     // Actual XLSX cell styles mark only the two lines of a single bilingual
-     // item (no lower edge on upper C; no upper edge on lower C).
-     if(!upperStyle?.border?.bottom&&!lowerStyle?.border?.top&&
-        upperStyle?.border?.top&&lowerStyle?.border?.bottom){
-       bilingualEnglish.add(rn);bilingualVietnamese.add(rn+1);
-     }
+     if(!visibleRows.has(rn)||!visibleRows.has(rn+1))continue;
+     const upper=String(cells.get('C'+rn)?.value||'').trim();
+     const lower=String(cells.get('C'+(rn+1))?.value||'').trim();
+     const label=String(cells.get('A'+rn)?.value||'').trim();
+     const nextLabel=String(cells.get('A'+(rn+1))?.value||'').trim();
+     if(!upper||!lower||romanSection.test(label)||romanSection.test(nextLabel))continue;
+     // A Vietnam-first pair normally has an English parenthetical line below.
+     // A feature pair follows the source's English-first / Vietnamese-second convention.
+     const vnThenEn=hasVietnamese(upper)&&isEnglish(lower)&&/^\(/.test(lower)
+       &&!nextLabel&&!String(cells.get('B'+(rn+1))?.value||'').trim();
+     const enThenVn=isEnglish(upper)&&hasVietnamese(lower)
+       &&looksFeature(label)&&hasVietnamese(nextLabel);
+     if(vnThenEn||enThenVn){bilingualUpper.add(rn);bilingualLower.add(rn+1)}
    }
+   // Prelude ends at the first real specification section (different row in
+   // MR and MRL). Do not strip borders from Manufacturer or Basic Spec rows.
+   const firstSectionRow=blueRomanRows.size?Math.min(...blueRomanRows):11;
    const printRows=[];
    for(let rowNum=1;rowNum<=end;rowNum++){
      const row=visibleRows.get(rowNum);if(!row)continue;
@@ -139,8 +151,9 @@
        const key=colAddr(col)+rowNum;if(covered.has(key))continue;
        const val=cells.get(key)||{value:'',style:0};const merge=merges.get(key)||{colspan:1,rowspan:1};
        const extra=merge.colspan>1?' colspan="'+merge.colspan+'"':'';const vextra=merge.rowspan>1?' rowspan="'+merge.rowspan+'"':'';
-       let style=formatStyle(val.style,styles,model==='MRL');
-       if(isIOS)style=style.replace(/(border-(?:left|right|top|bottom):)0\.45px solid /g,'$1'+'0.8px solid ');
+       // PDF grid must never inherit irregular workbook border colors/weights.
+       // Font, fill and alignment still come from the original XLSX style.
+       let style=formatStyle(val.style,styles,true);
        // Explicit inline background prevents theme tint and browser print defaults
        // from suppressing the original pale-blue I/II/III/IV section headers.
        if(blueRomanRows.has(rowNum))style+=';background-color:#d9edf7;color:#173c56;font-weight:700';
@@ -150,12 +163,12 @@
      const customHeight=attr(row,'ht')!=='';
      const minHeight=Math.max(isBlank?2:0,Math.min(72,rowHeight*1.07));
      const rowValue=[1,2,3].map(i=>String(cells.get(colAddr(i)+rowNum)?.value||'')).join(' ');
-     const cl=(rowNum<13?' excel-prelude':'')+(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
-     const pairClass=bilingualEnglish.has(rowNum)?' excel-bilingual-en':bilingualVietnamese.has(rowNum)?' excel-bilingual-vi':'';
+     const cl=(rowNum<firstSectionRow?' excel-prelude':'')+(isBlank?' excel-space':'')+(/^(?:I|II|III|IV|V|VI)\.\s|CÁC TÍNH NĂNG|CÁC TÍNH NĂNG|Các tính năng/i.test(rowValue.trim())?' excel-heading':'')+(/Các tính năng \(Features\)/i.test(rowValue)?' excel-features-title':'');
+     const pairClass=bilingualUpper.has(rowNum)?' excel-bilingual-upper':bilingualLower.has(rowNum)?' excel-bilingual-lower':'';
      printRows.push('<tr class="excel-row'+cl+pairClass+'" data-source-row="'+rowNum+'" style="height:'+minHeight.toFixed(1)+'px">'+rowCells.join('')+'</tr>');
    }
    const iosPrintCSS=isIOS?`
-   /* iOS-only: make native XLSX borders visible without inventing borders on unbordered cells. */
+   /* iOS: preserve exactly the same vector grid colors as desktop PDF. */
    @media print {
      html,body,.paper,table.excel,table.excel td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
    }
@@ -169,22 +182,27 @@
    .paper{margin:14px auto;max-width:920px;padding:5mm 4mm;box-shadow:0 5px 22px #14233718;background:white}
    table.excel{border-collapse:collapse;border-spacing:0;table-layout:fixed;width:100%;font-size:8.2pt;line-height:1.18}
    table.excel td{padding:3px 4px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;line-height:1.23;min-width:0}
-   main.mrl-export table.excel tr[data-source-row] td{border:0}
-   main.mrl-export table.excel tr[data-source-row]:not(.excel-prelude):not(.excel-space) td{border:0.45px solid #d1dbe5}
-   main.mrl-export table.excel tr.excel-heading td{border-color:#a7b9c8}
-   /* One bilingual item = one visual group across all specification sections.
-      Preserve the outer bottom border of a rowspan cell spanning both lines. */
-   main.mrl-export table.excel tr.excel-bilingual-en td:not([rowspan]){border-bottom:0!important}
-   main.mrl-export table.excel tr.excel-bilingual-vi td{border-top:0!important}
-   table.excel tr.excel-bilingual-en{break-after:avoid;page-break-after:avoid}
-   table.excel tr.excel-bilingual-vi{break-before:avoid;page-break-before:avoid}
-   main.mrl-export table.excel tr[data-source-row] td[data-cell^="A1"],main.mrl-export table.excel tr[data-source-row] td[data-cell^="A2"]{border:0}
+   /* Unified PDF border system: MR and MRL use exactly the same vector stroke.
+      Source workbook edges are deliberately NOT emitted as inline borders.
+      0.75pt = 1 CSS pixel; all normal sides have the same width/color. */
+   table.excel tr[data-source-row]:not(.excel-prelude):not(.excel-space) td{
+     border:0.75pt solid #596571;
+   }
+   /* The inner rule of a true Vietnamese/English pair is lighter, not thicker.
+      Apply to both adjacent cells to avoid border-collapse color conflicts.
+      Rowspanned labels keep one uninterrupted outline. */
+   table.excel tr.excel-bilingual-upper td:not([rowspan]){border-bottom:0.5pt solid #c6ced6!important}
+   table.excel tr.excel-bilingual-lower td:not([rowspan]){border-top:0.5pt solid #c6ced6!important}
+   table.excel tr.excel-bilingual-upper{break-after:avoid;page-break-after:avoid}
+   table.excel tr.excel-bilingual-lower{break-before:avoid;page-break-before:avoid}
+   /* The decorative prelude/blank spacer rows are outside the grid. */
+   table.excel tr.excel-prelude td,table.excel tr.excel-space td{border:0}
    /* MRL entrance is a single logical device/floor section: start it on a new
       page to prevent a top-floor row being orphaned from main/other floors. */
    main.mrl-export tr[data-source-row="69"]{break-before:page;page-break-before:always}
    tr.excel-row{break-inside:avoid;page-break-inside:avoid}
    tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
-   @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;padding:0;margin:0;width:100%;max-width:100%}table.excel{width:100%;} .paper{zoom:.96;width:104.17%;} }
+   @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;padding:0;margin:0;width:100%;max-width:100%;zoom:1}table.excel{width:100%;} }
    `;
    return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+'</style></head><body>'+
    '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc / A4 Portrait · Dựa trên SpecFormExport</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+

@@ -262,6 +262,15 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 .jamb-jd-range{font-size:11px;color:#5a7086}
 @media(max-width:740px){.jamb-jd-field{margin-top:6px;padding:7px}.jamb-jd-field select{max-width:none}}
 </style>
+
+<style id="hall-panel-quantity-58109">
+.hall-qty-pair{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:8px;align-items:end;width:100%}
+.hall-qty-pair>.field{min-width:0;width:100%}.hall-qty-pair>.field select{width:100%;min-width:0;max-width:100%}
+.hall-qty-wrap{display:flex;flex-direction:column;gap:5px;min-width:0}.hall-qty-label{font-size:11px;color:#455a70;font-weight:700}
+.hall-qty-wrap select{width:100%;height:39px;padding:5px 7px;border:1px solid #b4c9dc;border-radius:5px;background:#fff}
+.hall-display-info{display:block;margin:5px 0 0;font-size:11px;color:#60768b}
+@media(max-width:510px){.hall-qty-pair{grid-template-columns:minmax(0,1fr) 84px;gap:5px}}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
@@ -350,7 +359,6 @@ window.SPEC_PROOFREAD = function(input){
   [/Công suất máy kéo\s*\(Motor\)\s*–\s*kW/gu,'Công suất máy kéo (Motor) – kW'],
   [/được ấn nút/gu,'được nhấn nút'],
   [/(?<!\d)1 công tắc/gu,'một công tắc'],
-  [/(?<!\d)1 thang/gu,'một thang'],
   [/(?<!\d)1 chiều/gu,'một chiều'],
   [/(?<!\d)3 tầng như tiêu chuẩn/gu,'ba tầng theo tiêu chuẩn']
  ];
@@ -398,12 +406,12 @@ window.SPEC_PROOFREAD = function(input){
 <script src="feature-v02.js?v=5.8.79"></script>
 <script src="mirror-rules.js?v=5.8.79"></script>
 <script src="jamb-depth.js?v=5.8.94"></script>
-<script src="export-engine.js?v=5.8.106"></script>
-<script src="print-layout.js?v=5.8.91"></script>
+<script src="export-engine.js?v=5.8.122"></script>
+<script src="print-layout.js?v=5.8.122"></script>
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
-<script src="app.js?v=5.8.107"></script>
+<script src="app.js?v=5.8.110"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

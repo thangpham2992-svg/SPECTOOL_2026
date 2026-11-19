@@ -914,6 +914,12 @@ function workbookChoices(field,engine=null){
   const wall=String(currentValue($('model').value==='MR'?'D47':'D43')||'').trim();
   if(wall&&list.some(x=>String(x).trim()===wall))list=[wall];
  }
+ // v5.8.111: MR-specific UI catalog. The original GXLM2P workbook contains
+ // legacy PIV "H" entries, but the MR order-entry dropdown excludes that suffix.
+ // MRL Version02 is NOT affected; keep the actual workbook unchanged.
+ if($('model').value==='MR'&&/^K36_PIV(?:MainFloor|OtherFloor)$/.test(field.name)){
+   list=list.filter(v=>!/^PIV\d+-[A-Z]\d{3,4}H$/i.test(String(v).trim()));
+ }
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
 function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
@@ -1211,6 +1217,11 @@ function row(field,displayName='',compact=false){
      if(allowed&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
    }
    syncDropdownOptions();
+   if(/^K36_(?:PIV|HBV|PIH_PID)(?:TopFloor|MainFloor|OtherFloor)$/.test(field.name)){
+    hallManualSelections.add(field.cell);hallAutoSelections.delete(field.cell);
+    autoFillHallSiblingFields(field);
+   }
+   if(field.name==='K0_Qty')refreshHallQuantities();
    refreshNY40CopChoices();
    refreshSideDrop();
    refreshLocks();
@@ -1225,7 +1236,7 @@ function row(field,displayName='',compact=false){
     if(['D13','D17','D31','D16','D84','D23'].includes(field.cell))refreshMRLShaftMinimum();
    }
    if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
-   if(field.name==='K13_Operation')refreshGroupControlPreview();
+   if(field.name==='K13_Operation'){refreshGroupControlPreview();refreshHallQuantities();}
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    if($('model').value==='MRL'&&['D36','D37'].includes(field.cell))refreshMRLOverheadMinimum(false);
    invalidateCheck();status('Đã thay đổi thông số. Cần chạy lại Check Spec.');
@@ -1669,6 +1680,127 @@ function refreshNY40CopChoices(){
    }else if(help)help.hidden=true;
  }
 }
+// v5.8.110 - Hall panel rapid entry. Suggestions never override a manually selected position.
+const HALL_QTY_KEY = cell=>'HALL_QTY_'+cell;
+let hallManualSelections=new Set(),hallAutoSelections=new Set(),hallManualQuantities=new Set();
+function hallIndicatorCount(code,kind){
+ if(kind==='HBV')return 0;
+ if(kind==='PIH_PID')return 1;
+ if(kind!=='PIV')return null;
+ const match=String(code||'').toUpperCase().match(/PIV\d*[- ]?([A-Z])(\d{3,4})/);
+ if(!match)return null;
+ const family=match[1]+match[2];
+ const singles=new Set(['A1010','A1030','A1080','C710','C730','C766','C780']);
+ const doubles=new Set(['A1020','A1040','A1090','C720','C740','C776','C790']);
+ return singles.has(family)?1:doubles.has(family)?2:null;
+}
+function hallGroupCars(){
+ const model=$('model').value;
+ const raw=String(currentValue(model==='MR'?'D21':'D22')||'').toUpperCase().trim();
+ const hit=raw.match(/(?:^|\D)([1-4])\s*C(?:\D|$)/);
+ return hit?Number(hit[1]):1;
+}
+function hallProjectCars(){
+ const n=Number(currentValue('D11'));
+ return Number.isInteger(n)&&n>=1?Math.min(4,n):hallGroupCars();
+}
+function hallQuantityMax(kind,code){
+ const cars=hallGroupCars(),displays=hallIndicatorCount(code,kind);
+ if(displays===2&&cars>=2)return cars-1;
+ return Math.max(1,Math.min(4,cars));
+}
+function hallQuantityDefault(kind,code,max){
+ // Only one-indicator call panels take the initial Quantity of lifts (D11).
+ // A double-indicator panel remains 1 by default; it may be increased manually.
+ return kind==='PIV'&&hallIndicatorCount(code,kind)===1 ? Math.min(max,hallProjectCars()) : 1;
+}
+function refreshHallQuantities(){
+ document.querySelectorAll('.hall-qty-pair').forEach(pair=>{
+  const input=pair.querySelector('select[data-cell]'),qty=pair.querySelector('select.hall-qty');
+  if(!input||!qty)return;
+  const kind=pair.dataset.kind||'PIV';
+  const val=String(input.value||''),absent=!val||/^(?:Not supplied|Không cung cấp)/i.test(val);
+  const num=hallIndicatorCount(val,kind),max=hallQuantityMax(kind,val);
+  const key=HALL_QTY_KEY(input.dataset.cell);
+  const fallback=hallQuantityDefault(kind,val,max);
+  const saved=Number(changes[key]);
+  const desired=hallManualQuantities.has(key)&&Number.isInteger(saved) ? Math.max(1,Math.min(max,saved)) : fallback;
+  qty.replaceChildren();for(let n=1;n<=max;n++){const opt=document.createElement('option');opt.value=String(n);opt.textContent=String(n);qty.append(opt)}
+  qty.value=String(desired);qty.disabled=absent;
+  // Keep the export quantity in sync even if the user has not manually changed the selector.
+  changes[key]=String(desired);
+  const info=pair.closest('.hall-choice-item')?.querySelector('.hall-display-info');
+  if(info){
+   info.hidden=absent;
+   info.textContent=kind==='HBV'?'Hộp nút gọi (không có màn hình hiển thị).':kind==='PIH_PID'?'Bảng hiển thị vị trí tầng.':num===1?'Loại 1 hiển thị / Single indicator':num===2?'Loại 2 hiển thị / Double indicator':'Chưa xác định số màn hình từ database; cần xác minh mã.';
+  }
+ });
+}
+// Match only the model/family body, e.g. PIV1-A1010H2 -> PIV1-A1010N.
+// Only values listed in the TARGET dropdown may be chosen.
+function hallCodeBody(code){
+ const match=String(code||'').trim().toUpperCase().match(/^(PIV\d*|HBV\d*|PIH|PID)[- ]?([A-Z]\d{3,4})([A-Z0-9]*)$/);
+ return match?{prefix:match[1],body:match[2],suffix:match[3]}:null;
+}
+function hallSiblingSuggestion(source,select,floor){
+ const parsed=hallCodeBody(source);
+ if(!parsed||!select||select.tagName!=='SELECT')return '';
+ const candidates=[...select.options].filter(o=>!o.disabled&&!o.dataset.invalid).map(o=>({value:o.value,code:hallCodeBody(o.value)}))
+  .filter(o=>o.code&&o.code.body===parsed.body&&o.code.prefix.replace(/\d+/g,'')===parsed.prefix.replace(/\d+/g,''));
+ if(!candidates.length)return '';
+ const preferred=floor==='TopFloor'?['H2','H','HA','N','NA']:['N','NA','B','BA','H2','H'];
+ candidates.sort((a,b)=>{
+  const rank=o=>{
+   const prefixPenalty=o.code.prefix===parsed.prefix?0:30;
+   const variant=preferred.indexOf(o.code.suffix);
+   return prefixPenalty+(variant<0?20:variant);
+  };
+  return rank(a)-rank(b);
+ });
+ return candidates[0].value;
+}
+function autoFillHallSiblingFields(sourceField){
+ const sourceName=sourceField?.name||'';
+ const match=sourceName.match(/^K36_(PIV|HBV|PIH_PID)(TopFloor|MainFloor)$/);
+ if(!match)return;
+ const kind=match[1],from=match[2],model=$('model').value;
+ const sourceValue=String(currentValue(sourceField.cell)||'');
+ if(!hallCodeBody(sourceValue))return;
+ // NEXIEZ-MR: Main Floor (1) -> Other Floors (2), PIV/PIH only.
+ // HBV (call-button box) and LCD PIV families C766/C776 are manually selected.
+ // NEXIEZ-MRL Version02 retains its existing independent autofill behavior.
+ if(model==='MR'){
+  if(from!=='MainFloor'||kind==='HBV')return;
+  if(kind==='PIV'&&/C(?:766|776)(?!\d)/i.test(sourceValue))return;
+ }
+ const destinations=model==='MRL' ? (from==='TopFloor'?['MainFloor','OtherFloor']:['TopFloor','OtherFloor']) : ['OtherFloor'];
+ for(const floor of destinations){
+  const target=current.fields.find(f=>f.name==='K36_'+kind+floor);
+  if(!target||target.cell===sourceField.cell||hallManualSelections.has(target.cell))continue;
+  const el=activeInput(target.cell);
+  const next=hallSiblingSuggestion(sourceValue,el,floor);
+  if(!next||next===String(currentValue(target.cell)))continue;
+  if(model==='MR'&&kind==='PIV'&&/C(?:766|776)(?!\d)/i.test(next))continue;
+  applyValue(target.cell,next);
+  hallAutoSelections.add(target.cell);
+  // A newly suggested single panel gets its project-quantity default.
+  hallManualQuantities.delete(HALL_QTY_KEY(target.cell));
+ }
+ refreshHallQuantities();
+}
+function mountHallQuantity(item,input,kind){
+ if(kind==='PIH_PID')return;
+ const wrapper=input.closest('.field');if(!wrapper)return;
+ const pair=document.createElement('div');pair.className='hall-qty-pair';pair.dataset.kind=kind;
+ const qtyWrap=document.createElement('div');qtyWrap.className='hall-qty-wrap';
+ const qtyLabel=document.createElement('label');qtyLabel.className='hall-qty-label';qtyLabel.textContent='Số hộp / Qty';
+ const qty=document.createElement('select');qty.className='hall-qty';qty.setAttribute('aria-label','Số lượng hộp gọi');
+ qty.onchange=()=>{const key=HALL_QTY_KEY(input.dataset.cell);hallManualQuantities.add(key);changes[key]=qty.value;invalidateCheck();};
+ qtyWrap.append(qtyLabel,qty);wrapper.parentNode.insertBefore(pair,wrapper);pair.append(wrapper,qtyWrap);
+ const info=document.createElement('small');info.className='hall-display-info';item.append(info);
+ input.addEventListener('change',()=>{hallManualQuantities.delete(HALL_QTY_KEY(input.dataset.cell));refreshHallQuantities();});
+ refreshHallQuantities();
+}
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
@@ -1758,8 +1890,8 @@ function renderAllSpecRows(){
   {key:'OtherFloor',vi:'Tầng khác',en:'Other floors',cells:['E81','E82','E83']},
   {key:'MainFloor',vi:'Tầng chính',en:'Main floor',cells:['E78','E79','E80']}
  ] : [
-  {key:'OtherFloor',vi:'Tầng khác',en:'Other floors',cells:['E81','E82']},
-  {key:'MainFloor',vi:'Tầng chính',en:'Main floor',cells:['E78','E79','E80']}
+  {key:'MainFloor',vi:'Tầng chính',en:'Main floor',cells:['E78','E79','E80']},
+  {key:'OtherFloor',vi:'Tầng khác',en:'Other floors',cells:['E81','E82']}
  ];
  const entranceSection=[...root.querySelectorAll('.spec-section')].find(x=>x.dataset.section==='IV');
  const landingRows=entranceSection?.querySelector('.section-fields');
@@ -1781,7 +1913,7 @@ function renderAllSpecRows(){
     if(!wrapper||!oldRow)continue;
     const item=document.createElement('div');item.className='hall-choice-item';item.dataset.sourceRow=oldRow.dataset.row;
     const label=document.createElement('label');label.className='hall-choice-label';label.textContent=labels[i];
-    item.append(label,wrapper);content.append(item);oldRow.remove();
+    item.append(label,wrapper);content.append(item);mountHallQuantity(item,input,['PIV','HBV','PIH_PID'][i]);oldRow.remove();
    }
    if($('model').value==='MRL'&&window.SPEC_HALL_LANTERN){
     const opts=window.SPEC_HALL_LANTERN;
@@ -1937,7 +2069,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){clearGroupControlPreview();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
