@@ -279,7 +279,7 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 <details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
 <section class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="project-fields" class="project-grid"></div></section>
 <section class="leadtime-check" id="product-leadtime" aria-live="polite"><div class="leadtime-label">Product Lead Time (ETD)</div><div class="leadtime-main"><strong id="leadtime-days">—</strong><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div></div></section>
-<section class="action-panel"><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết máy kéo / động cơ và Độ êm / Độ ồn</strong></span></label><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary" id="final-xlsx" type="button">Xuất Excel (.xlsx)</button><button class="btn btn-secondary" id="final-pdf" type="button">Xuất A4 PDF</button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
+<section class="action-panel"><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary" id="final-xlsx" type="button">Xuất Excel (.xlsx)</button><button class="btn btn-secondary" id="final-pdf" type="button">Xuất A4 PDF</button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
 <nav class="spec-nav" id="spec-nav" aria-label="Điều hướng nhóm thông số / Sections"></nav>
 <div class="fields-root" id="fields"></div>
 <section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
@@ -406,12 +406,12 @@ window.SPEC_PROOFREAD = function(input){
 <script src="feature-v02.js?v=5.8.79"></script>
 <script src="mirror-rules.js?v=5.8.79"></script>
 <script src="jamb-depth.js?v=5.8.94"></script>
-<script src="export-engine.js?v=5.8.132"></script>
+<script src="export-engine.js?v=5.8.138"></script>
 <script src="print-layout.js?v=5.8.130"></script>
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
-<script src="app.js?v=5.8.110"></script>
+<script src="app.js?v=5.8.138"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

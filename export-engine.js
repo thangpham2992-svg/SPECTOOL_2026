@@ -480,6 +480,164 @@
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
  }
+ // Material thickness for MR and MRL Version2; applied only when technical export is enabled.
+ // Laminated steel sheet corresponds to the PPS column of the supplied material-thickness chart.
+ // v5.8.135: single-tool export descriptions, using distinct MR/MRL reference charts.
+ // Do not overwrite an unverified door/wall thickness with an assumed value.
+ function attachMRMaterialThickness(model,changes,db,doc){
+   if(!['MR','MRL'].includes(model)||!doc?.cells)return;
+   const eng=new window.SpecExcelSourceEngine.SourceEngine(db,changes);
+   const read=a=>text(eng.safe('SpecForm',a).value).trim();
+   const mrl=model==='MRL';
+   const isUnavailable=v=>/^(?:Not suppl(?:ied|y)|Không cung cấp)(?:\s*\(Not supplied\))?\.?$/i.test(text(v).trim());
+   const endsWithThickness=v=>/(?:\bdày\s*\d+(?:[.,]\d+)?\s*mm|\bthickness\s*\d+(?:[.,]\d+)?\s*mm)/i.test(v);
+   // Panel/model descriptions in Section IV: 1.5 mm, only in detailed Export.
+   // MR: separate PIV/HBV/PIH rows; MRL: consolidated 3-floor blocks.
+   // Keep the standard Export descriptions unchanged when detail is disabled.
+   if(!doc.includeTechDetails)return;
+   // v5.8.139: Every supplied car operating panel (COP), including wheelchair COP,
+   // has 2.0 mm panel thickness in the detailed Excel/PDF export. Do not alter
+   // other feature descriptions that incidentally mention a COP.
+   const copExportRows=mrl?[60]:[59,60];
+   // In the MRL workbook, row 60 is the principal COP.
+   // In the MR workbook, row 59 is the principal COP and row 60 the wheelchair COP.
+   const effectiveCopRows=copExportRows;
+   const appendCopThickness=(raw)=>{
+     const source=text(raw).trim();
+     if(!source||isUnavailable(source)||/\b(?:Not supplied|Không cung cấp)\b/i.test(source))return raw;
+     if(/(?:\bdày\s*2(?:[.,]0)?\s*mm|\bthickness\s*2(?:[.,]0)?\s*mm)/i.test(source))return raw;
+     const m=source.match(/^([\s\S]*?)\s*\(([^()]*)\)\.?\s*$/);
+     if(m){
+       const vi=m[1].replace(/[.;]\s*$/,'').trim();
+       const en=m[2].replace(/[.;]\s*$/,'').trim();
+       return vi+', dày 2.0 mm. ('+en+', thickness 2.0 mm).';
+     }
+     return source.replace(/[.;]\s*$/,'')+', dày 2.0 mm (thickness 2.0 mm).';
+   };
+   for(const row of effectiveCopRows){
+     const addr='C'+row;
+     if(Object.hasOwn(doc.cells,addr))doc.cells[addr]=appendCopThickness(doc.cells[addr]);
+   }
+   const rows=mrl?[76,79,82]:[76,77,78,79,80,81];
+   const panelCode=/(?:\b(?:PIV|HBV|PIH|PID)\s*\d*\s*[-–]?\s*[A-Z]?\d+[A-Z0-9-]*\b)/i;
+   const panelLanguage=/(?:hiển thị|hộp gọi|nút gọi|hall indicators|hall buttons|hall position indicators|hall calls)/i;
+   const amendPanelLine=(line)=>{
+     if(!panelCode.test(line)||!panelLanguage.test(line)||/\b(?:Not supplied|Không cung cấp)\b/i.test(line))return line;
+     if(endsWithThickness(line))return line;
+     if(/^\s*\(/.test(line)){
+       let body=line.trim();const match=body.match(/^(\s*\()(.*?)(\)\.?\s*)$/);
+       if(match)return match[1]+match[2].replace(/[.,;]\s*$/,'')+', thickness 1.5 mm'+match[3];
+       return line+' (thickness 1.5 mm)';
+     }
+     return line.replace(/[.;]\s*$/,'')+', dày 1.5 mm';
+   };
+   for(const row of rows){
+     const addr='C'+row, original=text(doc.cells[addr]);
+     if(!original||isUnavailable(original))continue;
+     doc.cells[addr]=original.split('\n').map(amendPanelLine).join('\n');
+   }
+   const hl=Number(read(mrl?'D30':'D31'));
+   const hh=Number(read(mrl?'D32':'D33'));
+   const k=hl-25.5; // K = HL - 25.5 mm, applies to MR and MRL Version02
+   const fire=/EN81[-\s]*58\s*\(II\)/i.test(read(mrl?'D84':'D83'));
+   const hhk=hh+(fire?10:0);
+   const opening=read(mrl?'D15':'D14').toUpperCase();
+   const windowType=[read(mrl?'D46':'D50'),read(mrl?'D48':'D52'),read('D50'),read('D51')].join(' ');
+   const hasWindow=/DSJ1|DS1|LARGE\s*WINDOW/i.test(windowType);
+   const material=v=>{
+     const t=text(v).toUpperCase();
+     if(/LAMINATED|LAMINATE/.test(t))return 'LAMINATED';
+     if(/SUS[-\s]*HE/.test(t))return 'SUS-HE';
+     if(/SUS[-\s]*HL|SUS\s*430(?:J1L)?|STAINLESS STEEL HAIRLINE/.test(t))return 'SUS-HL';
+     if(/SUS[-\s]*M\b/.test(t))return 'SUS-M';
+     if(/\bPPS\b/.test(t))return mrl?'LAMINATED':'PPS';
+     if(/\bPP\b|PAINTED STEEL|PAINTED/.test(t))return 'PP';
+     return null;
+   };
+   const wallThickness=m=>{
+     if(m==='SUS-HL'||(mrl&&m==='LAMINATED')){
+       if(k>=2174.5&&k<=2274.5)return 1.0;
+       if(k>2274.5&&k<2775)return 1.2;
+       return null;
+     }
+     return (mrl?{'PP':1.2}:{'PP':1.2,'SUS-HE':1.2,'SUS-M':1.5,'PPS':0.8})[m]??null;
+   };
+   const carDoorThickness=m=>{
+     if(hasWindow)return 1.5;
+     if(mrl)return ({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null;
+     if(['PP','SUS-HL','SUS-HE'].includes(m)){
+       if(hhk>=2100&&hhk<2401)return 1.2;
+       if(hhk>=2401&&hhk<2601)return m==='PP'?1.6:1.5;
+       return null;
+     }
+     return ({'SUS-M':1.5,'PPS':0.8})[m]??null;
+   };
+   const transomThickness=m=>mrl?({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null:({'PP':1.2,'SUS-HL':1.2,'SUS-HE':1.2,'SUS-M':1.5,'PPS':0.8})[m]??null;
+   const frontThickness=m=>mrl?({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null:({'PP':1.2,'SUS-HL':1.2,'SUS-M':1.5})[m]??null;
+   const entranceThickness=m=>{
+     if(hasWindow)return 1.5;
+     if(fire){if(opening==='CO')return 1.5;if(opening==='2S')return 1.2;return null;}
+     if(mrl)return ({'PP':1.6,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null;
+     return ({'PP':1.2,'SUS-HL':1.2,'SUS-HE':1.5,'SUS-M':1.5,'PPS':0.8})[m]??null;
+   };
+   const jambThickness=m=>mrl?({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null:({'PP':1.2,'SUS-HL':1.2})[m]??null;
+   const supplement=(addr,thickness,english,unverified=false)=>{
+     const original=text(doc.cells[addr]).trim();
+     if(!original||isUnavailable(original)||endsWithThickness(original))return;
+     if(unverified){
+       const phrase=english?'thickness to be confirmed':'chiều dày cần xác minh';
+       const stripped=original.replace(/^\(/,'').replace(/\)\.?\s*$/,'').replace(/[.;]\s*$/,'');
+       doc.cells[addr]=english?'('+stripped+', '+phrase+').':stripped+', '+phrase+'.';
+       return;
+     }
+     if(!Number.isFinite(thickness))return;
+     const val=Number(thickness).toFixed(1)+' mm';
+     const stripped=original.replace(/^\(/,'').replace(/\)\.?\s*$/,'').replace(/[.;]\s*$/,'');
+     doc.cells[addr]=english?'('+stripped+', thickness '+val+').':stripped+', dày '+val+'.';
+   };
+   const components=mrl?[
+     ['Car wall',read('D43'),wallThickness,47,48],
+     ['Car door',read('D46'),carDoorThickness,49,50],
+     ['Transom panel',read('D49'),transomThickness,51,52],
+     ['Front return panel',read('D52'),frontThickness,53,54],
+     ['Entrance door – main',read('E73'),entranceThickness,72,73],
+     ['Entrance door – other',read('E74'),entranceThickness,74,75],
+     ['Jamb w/o TP – main',read('E71'),jambThickness,68,69],
+     ['Jamb w/o TP – other',read('E72'),jambThickness,70,71]
+   ]:[
+     ['Car wall',read('D47'),wallThickness,48,49],
+     ['Car door',read('D50'),carDoorThickness,50,51],
+     ['Transom panel',read('D53'),transomThickness,52,53],
+     ['Front return panel',read('D56'),frontThickness,54,55],
+     ['Entrance door – main',read('E76'),entranceThickness,72,73],
+     ['Entrance door – other',read('E77'),entranceThickness,74,75],
+     ['Jamb w/o TP – main',read('E74'),jambThickness,68,69],
+     ['Jamb w/o TP – other',read('E75'),jambThickness,70,71]
+   ];
+   doc.materialThicknessResults=[];
+   for(const [name,raw,fn,viRow,enRow] of components){
+     if(name.startsWith('Jamb')){
+       const style=read(mrl?(name.endsWith('main')?'D71':'D72'):(name.endsWith('main')?'D74':'D75'));
+       if(style&&!/E-102|WITHOUT\s*TP|W\/O\s*TP/i.test(style))continue;
+     }
+     const mat=material(raw),thickness=mat?fn(mat):null;
+     doc.materialThicknessResults.push({name,material:mat,thickness,k});
+     const unverified=name==='Car wall'&&mat==='SUS-HL'&&thickness===null&&Number.isFinite(k);
+     const unverifiedLam=name==='Car wall'&&mrl&&mat==='LAMINATED'&&thickness===null&&Number.isFinite(k);
+     if(!Number.isFinite(thickness)&&!(unverified||unverifiedLam))continue;
+     supplement('C'+viRow,thickness,false,unverified||unverifiedLam);
+     supplement('C'+enRow,thickness,true,unverified||unverifiedLam);
+   }
+   // Kickplate source contains Vietnamese and English within the SAME cell.
+   // Preserve both descriptions and add thickness to each language separately.
+   const kickAddr='C'+(mrl?55:56);
+   const kickRaw=text(doc.cells[kickAddr]).trim();
+   const kickMatch=kickRaw.match(/^([\s\S]*?)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\.?\s*$/);
+   if(kickMatch&&!endsWithThickness(kickRaw)){
+     doc.cells[kickAddr]=kickMatch[1].replace(/[.;]\s*$/,'')+', dày 1.2 mm.\n('+kickMatch[2].replace(/[.;]\s*$/,'')+', thickness 1.2 mm).';
+   }else supplement(kickAddr,1.2,false);
+   doc.materialThicknessResults.push({name:'Kickplate',thickness:1.2});
+ }
  function updateCell(document, c, v){
    for(const old of Array.from(c.childNodes))if(['f','v','is'].includes(old.localName))c.removeChild(old);
    if(v===null||v===undefined||v===''){c.removeAttribute('t');return;}
@@ -1593,32 +1751,24 @@
    if(doc.includeTechDetails===true){
      const speedMpm=model==='MRL'?Number(doc.mrlMotor?.speed):Number(doc.traction?.speed);
      const highSpeed=model==='MRL'&&speedMpm>=120;
+     // v5.8.138: concise grouping requested for both MR/MRL.
+     // Peak-start/stop and constant-speed vertical/horizontal vibration share one row.
      const rideRows=[
-       ['Độ giật khi khởi động (m/s²)','0–Pmax 0,30 (30 gal) hoặc thấp hơn'],
-       ['Độ giật khi dừng (m/s²)','0–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Độ giật khi khởi động / dừng (m/s²)','0–Pmax 0,30 (30 gal) hoặc thấp hơn'],
        ['Gia tốc (m/s²)','0,60 ± 0,10'],
        ['Gia tốc giảm tốc (m/s²)','0,60 ± 0,10'],
-       ['Rung đứng – tốc độ không đổi (m/s²)',`P–Pmax ${highSpeed?'0,25 (25 gal)':'0,20 (20 gal)'} hoặc thấp hơn`],
-       ['Rung đứng – khi tăng tốc / tại mối nối ray (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
-       ['Rung ngang – tốc độ không đổi (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
-       ['Rung ngang – khi tăng tốc / tại mối nối ray (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Rung đứng / rung ngang – tốc độ không đổi (m/s²)',`Đứng: ${highSpeed?'0,25':'0,20'}; ngang: 0,30 (P–Pmax, hoặc thấp hơn)`],
        ['Độ chính xác dừng tầng (mm)','Trong phạm vi ±5 mm']
      ];
      const noiseRows=model==='MR'?[
        ['Độ ồn trong cabin [dB(A)]','Không quá 50 (tối đa 55)'],
        ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50'],
-       ['Độ ồn phòng cạnh hố thang','NC30 hoặc thấp hơn'],
        ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52'],
-       ['Độ ồn tại khớp nối cửa [dB(A)]','Không quá 55'],
-       ['Độ ồn khi cửa đảo chiều [dB(A)]','Không quá 57'],
        ['Độ ồn phòng máy [dB(A)]','Không quá 80']
      ]:[
        ['Độ ồn trong cabin [dB(A)]',highSpeed?'Không quá 55 (tối đa 60)':'Không quá 50 (tối đa 55)'],
        ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50 (tối đa 55)'],
-       ['Độ ồn tại phòng liền kề hố thang','NC30 hoặc thấp hơn (tham khảo; phụ thuộc kết cấu công trình)'],
-       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52'],
-       ['Độ ồn tại khớp nối cửa và tiếng đóng cửa [dB(A)]','Không quá 55'],
-       ['Độ ồn khi cửa đảo chiều [dB(A)]','Không quá 57']
+       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52']
      ];
      // Earlier bilingual splitting may insert rows BEFORE the Motor block. Locate
      // its LAST physical row by the actual label, never by the old row number.
@@ -1647,13 +1797,45 @@
      const rowsRoot=all(x,'sheetData')[0];
      const prior=targetRows.find(row=>Number(row.getAttribute('r'))===insertAfter);
      const baseCell=col=>Array.from(prior?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+insertAfter);
-     const styleA=baseCell('A')?.getAttribute('s')||'0';
-     const styleB=baseCell('B')?.getAttribute('s')||'0';
-     const styleC=baseCell('C')?.getAttribute('s')||'0';
+     // Dedicated fully bordered, wrapped Excel styles. Using the motor-row
+     // styles unchanged previously produced missing vertical lines and clipping.
+     const stylesDoc=parse(await zip.file('xl/styles.xml').async('string'));
+     const styleXfs=all(stylesDoc,'cellXfs')[0],styleBorders=all(stylesDoc,'borders')[0];
+     if(!styleXfs||!styleBorders)throw Error('Ride/Noise: no stylesheet');
+     const makeRideStyle=(baseId)=>{
+       const base=all(styleXfs,'xf')[Number(baseId)]||all(styleXfs,'xf')[0];
+       const xf=base.cloneNode(true);
+       const border=stylesDoc.createElementNS(n,'border');
+       for(const sideName of ['left','right','top','bottom']){
+         const side=stylesDoc.createElementNS(n,sideName);
+         side.setAttribute('style','thin');
+         const color=stylesDoc.createElementNS(n,'color');color.setAttribute('rgb','FF777777');
+         side.appendChild(color);border.appendChild(side);
+       }
+       const bid=all(styleBorders,'border').length;
+       styleBorders.appendChild(border);styleBorders.setAttribute('count',String(bid+1));
+       xf.setAttribute('borderId',String(bid));xf.setAttribute('applyBorder','1');
+       let alignment=Array.from(xf.children).find(el=>el.localName==='alignment');
+       if(!alignment){alignment=stylesDoc.createElementNS(n,'alignment');xf.appendChild(alignment);}
+       alignment.setAttribute('wrapText','1');alignment.setAttribute('vertical','center');
+       xf.setAttribute('applyAlignment','1');
+       const id=all(styleXfs,'xf').length;styleXfs.appendChild(xf);
+       styleXfs.setAttribute('count',String(id+1));return String(id);
+     };
+     const styleA=makeRideStyle(baseCell('A')?.getAttribute('s')||'0');
+     const styleB=makeRideStyle(baseCell('B')?.getAttribute('s')||'0');
+     const styleC=makeRideStyle(baseCell('C')?.getAttribute('s')||'0');
+     zip.file('xl/styles.xml',serial(stylesDoc));
      const refRow=Array.from(rowsRoot.children).find(el=>el.localName==='row'&&Number(el.getAttribute('r'))>insertAfter);
      const addLine=(rn,group,item,value)=>{
        const row=x.createElementNS(n,'row');row.setAttribute('r',String(rn));
-       const height=Math.max(22, Math.min(35,(item.length>42||value.length>44)?32:24));
+       // A short row for one-line text; taller for wrapped content in B/C.
+       // Est. column B ~30 chars; C ~55 chars, 16 pt per visible text line.
+       const lineCount=Math.max(
+         1,Math.ceil(item.length/29),Math.ceil(value.length/49),
+         ...[item,value].map(t=>t.split('\n').length)
+       );
+       const height=Math.max(27,19*lineCount+8);
        row.setAttribute('ht',String(height));row.setAttribute('customHeight','1');
        for(const [col,content,style] of [['A',group,styleA],['B',item,styleB],['C',value,styleC]]){
          const cell=x.createElementNS(n,'c');cell.setAttribute('r',col+rn);cell.setAttribute('s',style);
@@ -1811,5 +1993,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={exportModel,xlsxFromModel,printHtml};
+ window.SPEC_EXPORT={exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();

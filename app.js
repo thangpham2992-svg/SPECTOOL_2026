@@ -2371,6 +2371,7 @@ async function buildFinalExport(){
   const evaluation=window.SPEC_EXPORT.exportModel(model,changes,db);
   // Optional presentation-only detail rows; defaults OFF for both models.
   evaluation.includeTechDetails=Boolean($('export-tech-details')?.checked);
+  window.SPEC_EXPORT.attachMRMaterialThickness?.(model,changes,db,evaluation);
   const bytes=sourceFiles[model]?.bytes||bytesFromB64(window.SPEC_WORKBOOKS[model]);
   const zip=await JSZip.loadAsync(bytes);
   const packageResult=await window.SPEC_EXPORT.xlsxFromModel(zip,model,db,evaluation);
