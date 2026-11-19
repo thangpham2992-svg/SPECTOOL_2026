@@ -514,9 +514,24 @@
      }
      return source.replace(/[.;]\s*$/,'')+', dày 2.0 mm (thickness 2.0 mm).';
    };
+   // v5.8.144: Validate the EXPORT ROW LABEL, not only a fixed row number.
+   // In some model/layout combinations the preceding car sill (ngưỡng cửa)
+   // occupies a nearby row. Only real car operating panels may receive 2 mm.
    for(const row of effectiveCopRows){
+     const label=text(doc.cells['A'+row]).trim();
+     if(/(?:ngưỡng cửa|car sill)/i.test(label))continue;
+     if(!/(?:bảng điều khiển|car operat(?:ing|ion) panel|wheelchair COP)/i.test(label))continue;
      const addr='C'+row;
      if(Object.hasOwn(doc.cells,addr))doc.cells[addr]=appendCopThickness(doc.cells[addr]);
+   }
+   // Car sill has no specified sheet thickness: do not export a COP thickness
+   // into this field even if the spreadsheet layout changes in the future.
+   for(const [addr,label] of Object.entries(doc.cells)){
+     if(!/^A\d+$/.test(addr)||!/(?:ngưỡng cửa phòng thang|car sill)/i.test(text(label)))continue;
+     const result='C'+addr.slice(1);
+     if(typeof doc.cells[result]==='string')doc.cells[result]=doc.cells[result]
+       .replace(/,\s*dày\s*2(?:[.,]0)?\s*mm(?=\.|\s*\()/gi,'')
+       .replace(/,\s*thickness\s*2(?:[.,]0)?\s*mm(?=\)|\.)/gi,'');
    }
    const rows=mrl?[76,79,82]:[76,77,78,79,80,81];
    const panelCode=/(?:\b(?:PIV|HBV|PIH|PID)\s*\d*\s*[-–]?\s*[A-Z]?\d+[A-Z0-9-]*\b)/i;
@@ -1761,14 +1776,14 @@
        ['Độ chính xác dừng tầng (mm)','Trong phạm vi ±5 mm']
      ];
      const noiseRows=model==='MR'?[
-       ['Độ ồn trong cabin [dB(A)]','Không quá 50 (tối đa 55)'],
-       ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50'],
-       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52'],
-       ['Độ ồn phòng máy [dB(A)]','Không quá 80']
+       ['Độ ồn trong cabin [dB(A)]','≤ 50 (tối đa 55)'],
+       ['Độ ồn tại sảnh tầng [dB(A)]','≤ 50'],
+       ['Độ ồn khi cửa mở và đóng [dB(A)]','≤ 52'],
+       ['Độ ồn phòng máy [dB(A)]','≤ 80']
      ]:[
-       ['Độ ồn trong cabin [dB(A)]',highSpeed?'Không quá 55 (tối đa 60)':'Không quá 50 (tối đa 55)'],
-       ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50 (tối đa 55)'],
-       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52']
+       ['Độ ồn trong cabin [dB(A)]',highSpeed?'≤ 55 (tối đa 60)':'≤ 50 (tối đa 55)'],
+       ['Độ ồn tại sảnh tầng [dB(A)]','≤ 50 (tối đa 55)'],
+       ['Độ ồn khi cửa mở và đóng [dB(A)]','≤ 52']
      ];
      // Earlier bilingual splitting may insert rows BEFORE the Motor block. Locate
      // its LAST physical row by the actual label, never by the old row number.
