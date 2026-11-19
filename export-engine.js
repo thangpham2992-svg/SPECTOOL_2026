@@ -1600,7 +1600,82 @@
      if(part.endsWith('/calcChain.xml')||/^\/xl\/worksheets\/sheet(?:1|3)\.xml$/.test(part))item.remove();
    }
    zip.file(ctPath,serial(types));
+   // Refuse to download a workbook if the OOXML package contains the same
+   // structural faults that triggered Microsoft Excel Repair in v5.8.123.
+   // This final pass runs AFTER ZIP serialization input has been fully edited.
+   await verifyExportPackage(zip,finalpath);
    return {zip,freezeCount,hiddenRows:doc.hiddenRows.size,filename:doc.model};
+ }
+ // v5.8.127: Fail closed on malformed OOXML. Do not silently generate a
+ // workbook that Microsoft Excel will need to repair by removing cell content.
+ async function verifyExportPackage(zip,worksheetPath){
+   const read=async path=>{const f=zip.file(path);if(!f)throw Error('XLSX integrity: missing '+path);
+     const doc=parse(await f.async('string'));
+     if(doc.getElementsByTagName('parsererror').length)throw Error('XLSX integrity: malformed '+path);
+     return doc;
+   };
+   const [ws,style]=await Promise.all([read(worksheetPath),read('xl/styles.xml')]);
+   const styleItems=type=>all(style,type)[0];
+   const collect=(parent,type)=>parent?Array.from(parent.children).filter(e=>e.localName===type):[];
+   const categories={fonts:'font',fills:'fill',borders:'border',cellStyleXfs:'xf',cellXfs:'xf',cellStyles:'cellStyle',numFmts:'numFmt',dxfs:'dxf'};
+   for(const [name,childName] of Object.entries(categories)){
+     const el=styleItems(name);if(!el)continue;
+     const records=collect(el,childName);
+     if(el.hasAttribute('count')&&Number(el.getAttribute('count'))!==records.length)
+       throw Error('XLSX integrity: '+name+' count '+el.getAttribute('count')+' != '+records.length);
+   }
+   const borders=collect(styleItems('borders'),'border');
+   const cellXfs=collect(styleItems('cellXfs'),'xf');
+   const fonts=collect(styleItems('fonts'),'font');
+   const fills=collect(styleItems('fills'),'fill');
+   const bOrder=['left','right','top','bottom','diagonal','vertical','horizontal','start','end'];
+   for(const [i,border] of borders.entries()){
+     const names=Array.from(border.children).map(e=>e.localName);
+     const sorted=[...names].sort((a,b)=>bOrder.indexOf(a)-bOrder.indexOf(b));
+     if(names.some((value,j)=>value!==sorted[j])||new Set(names).size!==names.length)
+       throw Error('XLSX integrity: invalid border '+i);
+   }
+   for(const [i,xf] of cellXfs.entries()){
+     for(const [prop,limit] of [['fontId',fonts.length],['fillId',fills.length],['borderId',borders.length]]){
+       const val=Number(xf.getAttribute(prop)||0);
+       if(!Number.isInteger(val)||val<0||val>=limit)
+         throw Error('XLSX integrity: '+prop+' of style '+i+' invalid');
+     }
+   }
+   const toCol=letters=>[...letters].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+   let lastRow=0;const occupied=new Set();
+   const data=all(ws,'sheetData')[0];if(!data)throw Error('XLSX integrity: missing sheetData');
+   for(const row of collect(data,'row')){
+     const r=Number(row.getAttribute('r'));
+     if(!Number.isInteger(r)||r<=lastRow)throw Error('XLSX integrity: unordered row '+r);
+     lastRow=r;let lastColumn=0;
+     for(const cell of collect(row,'c')){
+       const address=cell.getAttribute('r')||'';
+       const m=/^([A-Z]+)([1-9][0-9]*)$/.exec(address);
+       if(!m||Number(m[2])!==r)throw Error('XLSX integrity: misplaced cell '+address);
+       const col=toCol(m[1]);if(col<=lastColumn)throw Error('XLSX integrity: duplicate/unsorted '+address);
+       lastColumn=col;
+       const id=Number(cell.getAttribute('s')||0);
+       if(!Number.isInteger(id)||id<0||id>=cellXfs.length)
+         throw Error('XLSX integrity: invalid style in '+address);
+       if(cell.getAttribute('t')==='inlineStr' && collect(cell,'is').length!==1)
+         throw Error('XLSX integrity: missing inline string '+address);
+       if(cell.getAttribute('t')==='inlineStr' && collect(cell,'v').length)
+         throw Error('XLSX integrity: unexpected numeric value '+address);
+     }
+   }
+   const mroot=all(ws,'mergeCells')[0];
+   for(const merge of collect(mroot,'mergeCell')){
+     const ref=merge.getAttribute('ref')||'';
+     const m=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
+     if(!m)throw Error('XLSX integrity: invalid merge '+ref);
+     const c1=toCol(m[1]),c2=toCol(m[3]),r1=Number(m[2]),r2=Number(m[4]);
+     if(c1>c2||r1>r2)throw Error('XLSX integrity: reversed merge '+ref);
+     for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++){
+       const key=r+':'+c;if(occupied.has(key))throw Error('XLSX integrity: overlapping merge '+ref);
+       occupied.add(key);
+     }
+   }
  }
  // Decompose bilingual specification descriptions into literal Vietnamese and
  // English fragments. Do not interpret short engineering codes as English.
