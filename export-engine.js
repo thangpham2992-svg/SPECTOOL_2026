@@ -90,6 +90,13 @@
        else {cells[addr]='';unresolved.push({addr,formula:entry.f,error:result.error})}
      }else cells[addr]=entry?.v??entry??'';
    }
+   // v5.8.125: use the same corrected bilingual label in MR/MRL Excel
+   // and the PDF, which is generated from the same export worksheet.
+   // Match the exact old heading only; do not rewrite technical fire options.
+   for(const addr of Object.keys(cells)){
+     if(/^Cửa chống cháy\s*\(Fireproof door\)\s*$/i.test(text(cells[addr]).trim()))
+       cells[addr]='Giới hạn chịu lửa cửa tầng\n(Entrance Fire resistance / Fire rating)';
+   }
    // Explicit rated duration requested for the EN81-58(II) option in both
    // NEXIEZ-MR and NEXIEZ-MRL Version2. The source SpecFormExport omits
    // the duration; keep the remaining options (No, GHCL E30) unchanged.
@@ -1338,6 +1345,34 @@
      // The upper Vietnamese row loses its bottom edge and the lower English
      // row receives one SOLID THIN pale-grey top edge (never dotted "hair").
      const afterSplit=cellMap();
+     // Factory MRL entrance rows sometimes repeat English inside the
+     // Vietnamese cell while the actual English row remains hidden. Restore
+     // those existing lines instead of leaving a false single-row bilingual
+     // cell (no row insertions, so all factory merges stay intact).
+     if(model==='MRL')for(const [rn,viRow] of afterSplit){
+       const enRow=afterSplit.get(rn+1);
+       if(!enRow||enRow.getAttribute('hidden')!=='1')continue;
+       const viCell=getCell(viRow,'C'),enCell=getCell(enRow,'C');
+       if(!viCell||!enCell)continue;
+       let pair=splitPair(content(viCell));
+       if(!pair){
+         const current=content(viCell),alreadyEnglish=content(enCell).trim();
+         if(current.endsWith(alreadyEnglish)&&/[À-ỹ]/.test(current))
+           pair=[current.slice(0,-alreadyEnglish.length).trim(),alreadyEnglish];
+       }
+       if(!pair||!/^\s*\([A-Za-z]/.test(content(enCell)))continue;
+       const normalize=t=>String(t||'').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'');
+       if(normalize(pair[1])!==normalize(content(enCell)))continue;
+       if(!/Jamb|Landing door|Khung cửa|Cửa tầng/i.test(
+         content(getCell(viRow,'A')||x.createElementNS(n,'c'))))continue;
+       updateCell(x,viCell,pair[0]);updateCell(x,enCell,pair[1]);
+       enRow.removeAttribute('hidden');
+       for(const [rr,v] of [[viRow,pair[0]],[enRow,pair[1]]]){
+         rr.setAttribute('customHeight','1');
+         rr.setAttribute('ht',String(Math.max(17,Math.min(64,
+           v.split('\n').reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/72)),0)*15+3))));
+       }
+     }
      const isEnglishDescription=value=>{
        const str=String(value||'').trim().replace(/^\(/,'').replace(/\)$/,'').trim();
        if(!str||/[À-ỹ]/.test(str)||/^[0-9]+\s*hộp\s*\//i.test(str))return false;
@@ -1346,21 +1381,209 @@
      for(const [rn,row] of afterSplit){
        const next=afterSplit.get(rn+1);
        if(!next||row.getAttribute('hidden')==='1'||next.getAttribute('hidden')==='1')continue;
-       if(restoredHallRows.has(rn)||restoredHallRows.has(rn+1))continue;
+       // A hall triple is detected by its content, not stale pre-insertion row numbers.
+       const qtyRow=afterSplit.get(rn+2);
+       if(/Hiển thị & nút gọi tầng/i.test(content(getCell(row,'C')||x.createElementNS(n,'c'))) &&
+         /Hall indicators/i.test(content(getCell(next,'C')||x.createElementNS(n,'c'))) &&
+         /^\s*\d+\s*hộp\s*\//i.test(content(getCell(qtyRow,'C')||x.createElementNS(n,'c'))))continue;
        const upper=getCell(row,'C'),lower=getCell(next,'C');
        if(!upper||!lower)continue;
        const vi=content(upper).trim(),en=content(lower).trim();
-       if(!vi||!en||!/[À-ỹ]/.test(vi)||!isEnglishDescription(en))continue;
+       if(!vi||!en||!/[À-ỹ]/.test(vi)||!(isEnglishDescription(en)||(/^\s*\([A-Za-z]/.test(en)&&en.length>12)))continue;
        // A new label in the following row marks the start of a distinct item.
        if(content(getCell(next,'A')||x.createElementNS(n,'c')).trim()||
           content(getCell(next,'B')||x.createElementNS(n,'c')).trim())continue;
        const upperBase=Number(upper.getAttribute('s')||0);
-       lower.setAttribute('s',String(englishStyle(upperBase)));
+       // Never derive the English cell from the Vietnamese style: the latter
+       // intentionally has NO bottom border. Using it for both rows erased
+       // the OUTER bottom edge (MR rows 71-72/88-89 and MRL equivalents).
+       lower.setAttribute('s',String(englishStyle(Number(lower.getAttribute('s')||0))));
        upper.setAttribute('s',String(vietnameseStyle(upperBase)));
+     }
+     // v5.8.123: final perimeter repair for BOTH source formats.
+     // Separate VI/EN rows use exactly one light separator BETWEEN the rows,
+     // while the bottom of the English row remains a normal black table edge.
+     // Do not paint generic borders on merged regions or introduce thick rules.
+     const perimeterStyles=new Map();
+     function perimeterStyle(styleId, edits){
+       const key=styleId+':'+Object.entries(edits).map(([k,v])=>k+'='+v).join(';');
+       if(perimeterStyles.has(key))return perimeterStyles.get(key);
+       const base=all(xfs,'xf')[styleId]||all(xfs,'xf')[0],xf=base.cloneNode(true);
+       const baseBorder=all(borders,'border')[Number(base.getAttribute('borderId')||0)]||all(borders,'border')[0];
+       const border=baseBorder.cloneNode(true);
+       for(const [sideName,value] of Object.entries(edits)){
+         let side=Array.from(border.children).find(e=>e.localName===sideName);
+         if(!side){side=sd.createElementNS(n,sideName);border.appendChild(side);}
+         while(side.firstChild)side.removeChild(side.firstChild);
+         if(value==='none'){side.removeAttribute('style');continue;}
+         side.setAttribute('style','thin');
+         const color=sd.createElementNS(n,'color');
+         color.setAttribute('rgb',value==='separator'?'FFE2E7EC':'FF000000');
+         side.appendChild(color);
+       }
+       const bid=all(borders,'border').length;borders.appendChild(border);
+       xf.setAttribute('borderId',String(bid));xf.setAttribute('applyBorder','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);
+       perimeterStyles.set(key,id);return id;
+     }
+     function hasBilingualPair(rn){
+       const upperRow=afterSplit.get(rn),lowerRow=afterSplit.get(rn+1);
+       if(!upperRow||!lowerRow||upperRow.getAttribute('hidden')==='1'||lowerRow.getAttribute('hidden')==='1')return false;
+       const qtyRow=afterSplit.get(rn+2);
+       if(/Hiển thị & nút gọi tầng/i.test(content(getCell(upperRow,'C')||x.createElementNS(n,'c'))) &&
+         /Hall indicators/i.test(content(getCell(lowerRow,'C')||x.createElementNS(n,'c'))) &&
+         /^\s*\d+\s*hộp\s*\//i.test(content(getCell(qtyRow,'C')||x.createElementNS(n,'c'))))return false;
+       const vi=content(getCell(upperRow,'C')||x.createElementNS(n,'c')).trim();
+       const en=content(getCell(lowerRow,'C')||x.createElementNS(n,'c')).trim();
+       if(!vi||!en||!/[À-ỹ]/.test(vi)||!(isEnglishDescription(en)||(/^\s*\([A-Za-z]/.test(en)&&en.length>12)))return false;
+       return !(content(getCell(lowerRow,'A')||x.createElementNS(n,'c')).trim()||
+         content(getCell(lowerRow,'B')||x.createElementNS(n,'c')).trim());
+     }
+     for(const [rn,row] of afterSplit){
+       if(!hasBilingualPair(rn))continue;
+       const bottomRow=afterSplit.get(rn+1),vi=getCell(row,'C'),en=getCell(bottomRow,'C');
+       vi.setAttribute('s',String(perimeterStyle(Number(vi.getAttribute('s')||0),
+         {left:'table',right:'table',bottom:'none'})));
+       en.setAttribute('s',String(perimeterStyle(Number(en.getAttribute('s')||0),
+         {left:'table',right:'table',top:'separator',bottom:'table'})));
+       // The fireproof-door label must span A:B *and* both language rows.
+       // MR's source template had A88:A89 only; MRL already used A:B.
+       const label=content(getCell(row,'A')||x.createElementNS(n,'c')).trim();
+       if(/Cửa chống cháy|Fireproof door|Giới hạn chịu lửa cửa tầng|Entrance Fire resistance/i.test(label)){
+         const candidates=mergeEls().filter(el=>{const q=parseRange(el.getAttribute('ref'));
+           return q&&q.a==='A'&&q.r1===rn&&q.r2===rn+1;});
+         if(candidates.length===1){
+           const q=parseRange(candidates[0].getAttribute('ref'));
+           if(q.b==='A'){
+             const overlaps=mergeEls().some(el=>el!==candidates[0]&&(()=>{
+               const p=parseRange(el.getAttribute('ref'));
+               return p&&colNum(p.a)<=2&&colNum(p.b)>=1&&p.r1<=rn+1&&p.r2>=rn;})());
+             if(!overlaps && !content(getCell(row,'B')||x.createElementNS(n,'c')).trim())
+               candidates[0].setAttribute('ref','A'+rn+':B'+(rn+1));
+           }
+         }
+         // Every side of a merged 2x2 perimeter needs an edge on the last
+         // row; otherwise Excel displays a missing/dotted bottom border.
+         const makeOrGet=(target,col)=>{
+           let cell=getCell(target,col);
+           if(!cell){cell=x.createElementNS(n,'c');cell.setAttribute('r',col+target.getAttribute('r'));target.appendChild(cell);}
+           return cell;
+         };
+         for(const col of ['A','B']){
+           const first=makeOrGet(row,col),last=makeOrGet(bottomRow,col);
+           const originalId=Number(first.getAttribute('s')||0);
+           first.setAttribute('s',String(perimeterStyle(originalId,
+             {left:col==='A'?'table':'none',right:col==='B'?'table':'none',bottom:'none'})));
+           last.setAttribute('s',String(perimeterStyle(originalId,
+             {left:col==='A'?'table':'none',right:col==='B'?'table':'none',top:'none',bottom:'table'})));
+         }
+         // v5.8.126: The 2x2 merged label A:B must WRAP as one Excel cell.
+         // Previously A had no wrapText and the extended Fire Rating label
+         // was truncated, even though the merge itself was valid.
+         const firstLabel=makeOrGet(row,'A');
+         const originalStyle=all(xfs,'xf')[Number(firstLabel.getAttribute('s')||0)];
+         if(originalStyle){
+           const wrapped=originalStyle.cloneNode(true);
+           let align=Array.from(wrapped.children).find(e=>e.localName==='alignment');
+           if(!align){align=sd.createElementNS(n,'alignment');
+             const next=Array.from(wrapped.children).find(e=>['protection','extLst'].includes(e.localName));
+             if(next)wrapped.insertBefore(align,next);else wrapped.appendChild(align);}
+           align.setAttribute('wrapText','1');align.setAttribute('vertical','center');
+           wrapped.setAttribute('applyAlignment','1');
+           const newStyleId=all(xfs,'xf').length;xfs.appendChild(wrapped);
+           firstLabel.setAttribute('s',String(newStyleId));
+         }
+         // The title occupies about three Arial 11pt lines at A:B width.
+         // Give the two merged rows enough combined height without widening
+         // all other descriptions or introducing extra blank lines.
+         for(const [r,minHeight] of [[row,29],[bottomRow,25]]){
+           const existing=Number(r.getAttribute('ht')||0);
+           r.setAttribute('ht',String(Math.max(existing,minHeight)));
+           r.setAttribute('customHeight','1');
+         }
+       }
+     }
+     // MRL hall groups have 3 physical rows (VI / EN / quantity).
+     // Find them by CONTENT after all row insertions (stored row numbers can
+     // shift when earlier bilingual cells were split into two Excel rows).
+     // English is the middle row; ONLY the quantity row closes the box.
+     if(model==='MRL')for(const [rn,viRow] of afterSplit){
+       const enRow=afterSplit.get(rn+1),qtyRow=afterSplit.get(rn+2);
+       if(!enRow||!qtyRow)continue;
+       const vi=getCell(viRow,'C'),en=getCell(enRow,'C'),qty=getCell(qtyRow,'C');
+       if(!vi||!en||!qty)continue;
+       if(!/Hiển thị/i.test(content(vi)) || !/Hall indicators/i.test(content(en)) ||
+          !/^\s*\d+\s*hộp\s*\//i.test(content(qty)))continue;
+       vi.setAttribute('s',String(perimeterStyle(Number(vi.getAttribute('s')||0),
+         {left:'table',right:'table',bottom:'none'})));
+       en.setAttribute('s',String(perimeterStyle(Number(en.getAttribute('s')||0),
+         {left:'table',right:'table',top:'separator',bottom:'none'})));
+       qty.setAttribute('s',String(perimeterStyle(Number(qty.getAttribute('s')||0),
+         {left:'table',right:'table',top:'none',bottom:'table'})));
      }
      if(mergeRoot)mergeRoot.setAttribute('count',String(mergeEls().length));
      const print=all(workbook,'definedName').find(el=>el.getAttribute('name')==='_xlnm.Print_Area');
      if(print){const last=rows().reduce((m,row)=>Math.max(m,+row.getAttribute('r')),1);print.textContent=print.textContent.replace(/(\$[A-Z]+\$)\d+\s*$/,(_,col)=>col+last);}
+     // v5.8.124: OOXML integrity guard. Styles created during the last
+     // bilingual perimeter pass MUST be included in collection counts.
+     // More importantly, CT_Border children have a fixed schema order:
+     // <left>, <right>, <top>, <bottom>... Earlier code appended missing
+     // sides at the end, producing invalid records that Excel repairs.
+     const borderSequence=['left','right','top','bottom','diagonal','vertical','horizontal','start','end'];
+     const seqIndex=name=>{const i=borderSequence.indexOf(name);return i<0?100:i;};
+     for(const border of all(borders,'border')){
+       const sides=Array.from(border.children);
+       const seen=new Set();
+       for(const node of sides){
+         if(seen.has(node.localName))throw Error('XLSX: duplicate border edge '+node.localName);
+         seen.add(node.localName);
+       }
+       const ordered=sides.slice().sort((a,b)=>seqIndex(a.localName)-seqIndex(b.localName));
+       if(sides.some((node,i)=>node!==ordered[i]))for(const node of ordered)border.appendChild(node);
+     }
+     for(const [tag,member] of [
+       ['numFmts','numFmt'],['fonts','font'],['fills','fill'],['borders','border'],
+       ['cellStyleXfs','xf'],['cellXfs','xf'],['cellStyles','cellStyle'],['dxfs','dxf']
+     ]){
+       const collection=all(sd,tag)[0];
+       if(collection)collection.setAttribute('count',String(Array.from(collection.children).filter(e=>e.localName===member).length));
+     }
+     const styleRecords=all(xfs,'xf'),borderRecords=all(borders,'border');
+     const fontsCount=all(all(sd,'fonts')[0],'font').length;
+     const fillsCount=all(all(sd,'fills')[0],'fill').length;
+     for(const [i,xf] of styleRecords.entries()){
+       for(const [attr,max] of [['borderId',borderRecords.length],['fontId',fontsCount],['fillId',fillsCount]]){
+         const id=Number(xf.getAttribute(attr)||0);
+         if(!Number.isInteger(id)||id<0||id>=max)throw Error('XLSX: invalid '+attr+' at cellXf '+i);
+       }
+     }
+     for(const c of all(x,'c')){
+       const id=Number(c.getAttribute('s')||0);
+       if(!Number.isInteger(id)||id<0||id>=styleRecords.length)
+         throw Error('XLSX: invalid cell style '+c.getAttribute('r')+' -> '+id);
+     }
+     // v5.8.126: Microsoft Excel repairs sheet2.xml when cells in a row
+     // are written out-of-order. Previous Fire Rating perimeter repair
+     // appended A/B after C, creating <c r="C93"/><c r="A93"/><c r="B93"/>.
+     // Enforce strictly ascending cell references in EVERY row, independent
+     // of the source model, and refuse duplicate/foreign-row cells.
+     const excelColNumber=letters=>[...letters].reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0);
+     for(const worksheetRow of all(x,'row')){
+       const rowNumber=Number(worksheetRow.getAttribute('r')||0);
+       const cells=Array.from(worksheetRow.children).filter(el=>el.localName==='c');
+       const sorted=cells.map(el=>{
+         const addr=el.getAttribute('r')||'';
+         const match=/^([A-Z]+)([1-9][0-9]*)$/.exec(addr);
+         if(!match||Number(match[2])!==rowNumber)
+           throw Error('XLSX: incorrect cell coordinate '+addr+' on row '+rowNumber);
+         return {el,addr,col:excelColNumber(match[1])};
+       }).sort((a,b)=>a.col-b.col);
+       for(let i=1;i<sorted.length;i++)if(sorted[i].col===sorted[i-1].col)
+         throw Error('XLSX: duplicate cell '+sorted[i].addr);
+       // Always place the cell sequence before the optional extLst node.
+       const ext=Array.from(worksheetRow.children).find(el=>el.localName==='extLst')||null;
+       for(const entry of sorted)worksheetRow.insertBefore(entry.el,ext);
+     }
      zip.file('xl/styles.xml',serial(sd));
    }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
