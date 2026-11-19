@@ -1586,6 +1586,94 @@
      }
      zip.file('xl/styles.xml',serial(sd));
    }
+   // v5.8.131: OPTIONAL Ride Comfort & Noise (Vietnamese-only, columns A:C).
+   // Insert AFTER the motor/traction detail, before the Main Code. The data are
+   // model-specific; MRL speed is read from SpecForm D17 (mpm), not another UI input.
+   // The same XLSX is the source of the printable PDF, ensuring export parity.
+   if(doc.includeTechDetails===true){
+     const speedMpm=model==='MRL'?Number(doc.mrlMotor?.speed):Number(doc.traction?.speed);
+     const highSpeed=model==='MRL'&&speedMpm>=120;
+     const rideRows=[
+       ['Độ giật khi khởi động (m/s²)','0–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Độ giật khi dừng (m/s²)','0–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Gia tốc (m/s²)','0,60 ± 0,10'],
+       ['Gia tốc giảm tốc (m/s²)','0,60 ± 0,10'],
+       ['Rung đứng – tốc độ không đổi (m/s²)',`P–Pmax ${highSpeed?'0,25 (25 gal)':'0,20 (20 gal)'} hoặc thấp hơn`],
+       ['Rung đứng – khi tăng tốc / tại mối nối ray (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Rung ngang – tốc độ không đổi (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Rung ngang – khi tăng tốc / tại mối nối ray (m/s²)','P–Pmax 0,30 (30 gal) hoặc thấp hơn'],
+       ['Độ chính xác dừng tầng (mm)','Trong phạm vi ±5 mm']
+     ];
+     const noiseRows=model==='MR'?[
+       ['Độ ồn trong cabin [dB(A)]','Không quá 50 (tối đa 55)'],
+       ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50'],
+       ['Độ ồn phòng cạnh hố thang','NC30 hoặc thấp hơn'],
+       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52'],
+       ['Độ ồn tại khớp nối cửa [dB(A)]','Không quá 55'],
+       ['Độ ồn khi cửa đảo chiều [dB(A)]','Không quá 57'],
+       ['Độ ồn phòng máy [dB(A)]','Không quá 80']
+     ]:[
+       ['Độ ồn trong cabin [dB(A)]',highSpeed?'Không quá 55 (tối đa 60)':'Không quá 50 (tối đa 55)'],
+       ['Độ ồn tại sảnh tầng [dB(A)]','Không quá 50 (tối đa 55)'],
+       ['Độ ồn tại phòng liền kề hố thang','NC30 hoặc thấp hơn (tham khảo; phụ thuộc kết cấu công trình)'],
+       ['Độ ồn khi cửa mở và đóng [dB(A)]','Không quá 52'],
+       ['Độ ồn tại khớp nối cửa và tiếng đóng cửa [dB(A)]','Không quá 55'],
+       ['Độ ồn khi cửa đảo chiều [dB(A)]','Không quá 57']
+     ];
+     // Earlier bilingual splitting may insert rows BEFORE the Motor block. Locate
+     // its LAST physical row by the actual label, never by the old row number.
+     const anchorLabel=model==='MR'?/Cáp tải \(Hoisting rope\)/:/Công suất máy kéo \(Motor\)/;
+     const anchorRow=all(x,'row').find(row=>Array.from(row.children).some(c=>c.localName==='c'&&/^A\d+$/.test(c.getAttribute('r')||'')&&anchorLabel.test(all(c,'t').map(t=>t.textContent||'').join(''))));
+     if(!anchorRow)throw Error('Ride Comfort & Noise: cannot locate motor detail insertion point');
+     const insertAfter=Number(anchorRow.getAttribute('r'));
+     const total=rideRows.length+noiseRows.length;
+     const targetRows=all(x,'row');
+     const shiftReference=str=>String(str).replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g,(match,col,num)=>col+(Number(num)>insertAfter?Number(num)+total:num));
+     for(const row of targetRows){
+       const old=Number(row.getAttribute('r'));
+       if(old<=insertAfter)continue;
+       row.setAttribute('r',String(old+total));
+       for(const c of Array.from(row.children).filter(el=>el.localName==='c')){
+         if(c.getAttribute('r'))c.setAttribute('r',shiftReference(c.getAttribute('r')));
+       }
+     }
+     for(const m of all(x,'mergeCell')){
+       const ref=m.getAttribute('ref');if(ref)m.setAttribute('ref',shiftReference(ref));
+     }
+     const dim=all(x,'dimension')[0];if(dim?.getAttribute('ref'))dim.setAttribute('ref',shiftReference(dim.getAttribute('ref')));
+     for(const br of all(x,'brk'))if(Number(br.getAttribute('id'))>insertAfter)br.setAttribute('id',String(Number(br.getAttribute('id'))+total));
+     const printName=all(workbook,'definedName').find(el=>el.getAttribute('name')==='_xlnm.Print_Area');
+     if(printName)printName.textContent=shiftReference(printName.textContent);
+     const rowsRoot=all(x,'sheetData')[0];
+     const prior=targetRows.find(row=>Number(row.getAttribute('r'))===insertAfter);
+     const baseCell=col=>Array.from(prior?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+insertAfter);
+     const styleA=baseCell('A')?.getAttribute('s')||'0';
+     const styleB=baseCell('B')?.getAttribute('s')||'0';
+     const styleC=baseCell('C')?.getAttribute('s')||'0';
+     const refRow=Array.from(rowsRoot.children).find(el=>el.localName==='row'&&Number(el.getAttribute('r'))>insertAfter);
+     const addLine=(rn,group,item,value)=>{
+       const row=x.createElementNS(n,'row');row.setAttribute('r',String(rn));
+       const height=Math.max(22, Math.min(35,(item.length>42||value.length>44)?32:24));
+       row.setAttribute('ht',String(height));row.setAttribute('customHeight','1');
+       for(const [col,content,style] of [['A',group,styleA],['B',item,styleB],['C',value,styleC]]){
+         const cell=x.createElementNS(n,'c');cell.setAttribute('r',col+rn);cell.setAttribute('s',style);
+         updateCell(x,cell,content);row.appendChild(cell);
+       }
+       rowsRoot.insertBefore(row,refRow||null);
+     };
+     let rn=insertAfter+1;
+     const rideStart=rn;
+     for(const [i,[label,value]] of rideRows.entries())addLine(rn++,i===0?'ĐỘ ÊM VẬN HÀNH':'',label,value);
+     const rideEnd=rn-1,noiseStart=rn;
+     for(const [i,[label,value]] of noiseRows.entries())addLine(rn++,i===0?'ĐỘ ỒN':'',label,value);
+     const noiseEnd=rn-1;
+     let merges=all(x,'mergeCells')[0];
+     if(!merges){merges=x.createElementNS(n,'mergeCells');const before=Array.from(x.documentElement.children).find(el=>['conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup'].includes(el.localName));if(before)x.documentElement.insertBefore(merges,before);else x.documentElement.appendChild(merges);}
+     for(const range of [`A${rideStart}:A${rideEnd}`,`A${noiseStart}:A${noiseEnd}`]){
+       const merge=x.createElementNS(n,'mergeCell');merge.setAttribute('ref',range);merges.appendChild(merge);
+     }
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+   }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
