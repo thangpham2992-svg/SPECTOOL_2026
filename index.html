@@ -271,6 +271,69 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 .hall-display-info{display:block;margin:5px 0 0;font-size:11px;color:#60768b}
 @media(max-width:510px){.hall-qty-pair{grid-template-columns:minmax(0,1fr) 84px;gap:5px}}
 </style>
+<style id="warm-beige-ui-58140">
+/* Warm beige controls; no changes to technical calculations or export. */
+:root{--me-light:#f8f2e8;--me-blue-border:#dacdb9}
+body{background:#f5f2ed}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select{background:#f6f0e5;border-color:#d5c6af;color:#382f26}
+input:not([type="checkbox"]):focus,select:focus{border-color:#a58a64;box-shadow:0 0 0 2px #e8dac4}
+.spec-nav a{background:#f7f0e5;border-color:#dccdb8;color:#5f4c36}
+.spec-nav a:hover{background:#eee1ce;border-color:#bca380;color:#533e29}
+.section-heading,.dimension-group-title{background:#f5ece0;color:#493b2d;border-bottom-color:#dfcfb8}
+.dimension-group{border-color:#dfcfb8}
+.feature-tabs .btn.feature-tab{background:#f8f1e6;border-color:#dfd0ba;color:#5a4a38}
+.feature-tabs .btn.feature-tab-current:not(.feature-tab-selected){background:#f1e6d5;border-color:#cbb394;color:#4f3f2f}
+.feature-tabs .btn.feature-tab-selected,.feature-tabs .btn.feature-tab-selected.feature-tab-current{background:#e9d9bf;border-color:#b5966c;color:#49321b;box-shadow:inset 3px 0 0 #9d7650}
+.feature-line.feature-line-selected{background:#f7efe4;box-shadow:inset 3px 0 0 #ae8d66}
+.tech-export-choice{background:#f8f2e8;border-color:#e0d1ba;color:#4b3b2b}
+.spec-row.multi{background:#fcf8f2;border-color:#e9dfd1}
+.field .dirty{border-color:#b79b75}
+.ny40-tag,.ny40-desc,.ny40-choice.active{background:#f1e4d1;border-color:#c7ad8b;color:#60452c}
+.ny40-body .ny40-imagewrap{background:linear-gradient(#fbf7f0,#f3eadc)}
+input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important}
+</style>
+<style id="warm-features-58141">
+/* Features panel: neutral warm colors in every state, including selected groups.
+   This stylesheet is after responsive-ui.css and classic-selective-ui overrides. */
+.features-panel .feature-tabs .btn.feature-tab,
+.features-panel .feature-tabs .btn.feature-tab:not(.feature-tab-selected):not(.feature-tab-current){
+  background:#f9f3e9!important;border-color:#ded1be!important;
+  color:#604c36!important;box-shadow:none!important;
+}
+.features-panel .feature-tabs .btn.feature-tab:hover,
+.features-panel .feature-tabs .btn.feature-tab:focus-visible{
+  background:#efe3d2!important;border-color:#bfa686!important;
+  color:#483725!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-current:not(.feature-tab-selected){
+  background:#eadcc8!important;border-color:#b99b76!important;
+  color:#513b25!important;box-shadow:inset 3px 0 0 #a48562!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-selected:not(.feature-tab-current){
+  background:#e6d5b9!important;border-color:#b5946c!important;
+  color:#4b3622!important;box-shadow:inset 3px 0 0 #a17b50!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-selected.feature-tab-current{
+  background:#dec7a5!important;border-color:#a9875e!important;
+  color:#40301f!important;box-shadow:inset 3px 0 0 #8c663d!important;
+}
+.features-panel .feature-list{border-top-color:#e1d3c0!important}
+.features-panel .feature-line{border-bottom-color:#e5dacb!important}
+.features-panel .feature-line:not(.feature-line-selected){background:#fffdf9;box-shadow:none}
+.features-panel .feature-line.feature-line-selected,
+.features-panel .feature-line.feature-line-selected:nth-child(n){
+  background:#f4e7d6!important;box-shadow:inset 3px 0 0 #b28d5f!important;
+}
+.features-panel .feature-line input[type="checkbox"]{accent-color:#9d7650!important}
+@media (min-width:741px){
+ .features-panel .feature-line:nth-child(odd){border-right-color:#dbc7aa!important}
+ .features-panel .feature-line:nth-child(4n+3):not(.feature-line-selected),
+ .features-panel .feature-line:nth-child(4n+4):not(.feature-line-selected){background:#fbf5eb!important}
+}
+@media (max-width:740px){
+ .features-panel .feature-line{border-bottom-color:#e5dacb!important}
+}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
