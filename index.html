@@ -1200,6 +1200,30 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 }
 @media(max-width:380px){:root{--spec-label-ratio:40%;--spec-field-gap:7px}}
 </style>
+<style id="desktop-check-float-style">
+/* v5.8.173 — floating Check Spec action for both desktop models. */
+.desktop-check-float{display:none}
+@media (min-width:851px){
+ .desktop-check-float{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:75;display:flex;flex-direction:column;align-items:stretch;gap:5px;max-width:160px;padding:8px;border:1px solid #d4dce6;border-radius:12px;background:rgba(255,255,255,.97);box-shadow:0 5px 22px rgba(27,48,71,.18)}
+ .desktop-check-float button{font-family:inherit;font-size:13px;font-weight:700;line-height:1.25;min-height:45px;padding:9px 11px;color:white;background:#bc2330;border:1px solid #a81926;border-radius:8px;cursor:pointer;white-space:nowrap}
+ .desktop-check-float button:hover,.desktop-check-float button:focus-visible{background:#a71926;outline:2px solid #b5d9f7;outline-offset:2px}
+ .desktop-check-float-status{color:#596b7d;font-size:10px;font-weight:650;text-align:center;max-width:150px;line-height:1.3}
+}
+@media (max-width:850px){.desktop-check-float{display:none!important}}
+</style>
+<script id="mr-scroll-start-fix">
+// New initial opening starts at the top. Keep user-controlled scrolling on subsequent model changes.
+(function(){
+ if('scrollRestoration' in history)history.scrollRestoration='manual';
+ let userMoved=false,done=false;
+ const mark=()=>{userMoved=true};
+ ['wheel','touchstart','pointerdown','keydown'].forEach(type=>window.addEventListener(type,mark,{once:true,passive:true}));
+ const reset=()=>{if(!userMoved&&!done)window.scrollTo(0,0)};
+ reset();
+ document.addEventListener('DOMContentLoaded',reset,{once:true});
+ window.addEventListener('load',()=>{if(!userMoved){window.scrollTo(0,0);requestAnimationFrame(()=>{if(!userMoved)window.scrollTo(0,0)})}done=true},{once:true});
+})();
+</script>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
@@ -1214,6 +1238,10 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 <section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
 <div class="hidden-internal" aria-hidden="true"><span id="numfields"></span><span id="numvalid"></span><span id="numtables"></span><div id="formula-audit"></div></div>
 <div class="footer">MITSUBISHI ELECTRIC VIETNAM · SPEC ENGINEERING</div>
+<aside class="desktop-check-float" aria-label="Kiểm tra thông số nhanh / Floating Check Spec">
+ <button id="desktop-check-floating" type="button" aria-label="Chạy Check Spec">✓ Check Spec</button>
+ <span id="desktop-check-floating-status" class="desktop-check-float-status" aria-live="polite">Chưa kiểm tra</span>
+</aside>
 <div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div>
 </main>
 

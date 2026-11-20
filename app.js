@@ -2873,6 +2873,23 @@ $('reload-db').onclick=()=>{const model=$('model').value;if(Object.keys(changes)
 };
 
 $('check').addEventListener('click',runCheckSpec);
+// Desktop floating button delegates to the same Check Spec pipeline as the primary button.
+const desktopFloatingCheck=document.getElementById('desktop-check-floating');
+if(desktopFloatingCheck){
+ desktopFloatingCheck.addEventListener('click',()=>document.getElementById('check')?.click());
+ const floatingStatus=document.getElementById('desktop-check-floating-status');
+ const sourceStatus=document.getElementById('check-top');
+ if(sourceStatus&&floatingStatus&&typeof MutationObserver!=='undefined'){
+  const updateFloatingStatus=()=>{
+   const isFail=sourceStatus.classList.contains('fail');
+   const isPass=sourceStatus.classList.contains('pass')||sourceStatus.classList.contains('ok');
+   floatingStatus.textContent=isFail?'Không đạt – xem kết quả':isPass?'Đạt / PASS':sourceStatus.classList.contains('running')?'Đang kiểm tra…':'Check Spec';
+  };
+  new MutationObserver(updateFloatingStatus).observe(sourceStatus,{attributes:true,childList:true,characterData:true,subtree:true});
+  updateFloatingStatus();
+ }
+}
+
 $('working').onclick=exportWorking;
 $('final-xlsx').onclick=exportFinalExcel;
 $('final-pdf').onclick=exportFinalPdf;
