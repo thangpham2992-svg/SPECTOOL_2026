@@ -169,7 +169,7 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
 .feature-dependency-note{display:block;color:#8b521e;font-size:11px;margin-top:4px;font-weight:500}
 </style>
 <link rel="stylesheet" href="responsive-ui.css?v=5.8.45">
-<link rel="stylesheet" href="design-guide.css?v=5.8.107">
+<link rel="stylesheet" href="design-guide.css?v=5.8.150">
 
 <style id="classic-selective-ui-v5884">
 /* Restore classic colors; emphasize editable inputs and selected feature only. */
@@ -334,6 +334,24 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
  .features-panel .feature-line{border-bottom-color:#e5dacb!important}
 }
 </style>
+
+<style id="hall-card-alignment-58151">
+/* PIV/HBV dropdowns, images and quantity aligned across floor cards */
+.hall-floor-grid{align-items:stretch}
+.hall-choice-item>.hall-choice-label{min-height:17px;line-height:17px;margin:0}
+.hall-choice-item>.hall-qty-pair{display:grid!important;grid-template-columns:minmax(0,1fr) 104px!important;align-items:start!important;gap:8px!important;width:100%}
+.hall-qty-pair>.field{min-width:0;align-self:start!important}
+.hall-qty-pair .hall-qty-wrap{position:relative;display:flex;flex-direction:column;gap:0!important;align-self:start!important;padding:0!important}
+.hall-qty-pair .hall-qty-label{position:absolute;left:0;bottom:calc(100% + 8px);margin:0!important;line-height:17px;white-space:nowrap}
+.hall-qty-pair .hall-qty-wrap select{margin:0!important;height:39px!important;min-height:39px!important}
+.hall-choice-item .field.panel-preview-inline{display:grid!important;grid-template-columns:minmax(0,1fr) 58px!important;grid-template-rows:39px auto!important;align-items:start!important;column-gap:7px!important;row-gap:2px!important}
+.hall-choice-item .field.panel-preview-inline>select{grid-column:1!important;grid-row:1!important;height:39px!important;min-height:39px!important;margin:0!important}
+.hall-choice-item .field.panel-preview-inline>.panel-image-preview{display:contents!important}
+.hall-choice-item .field.panel-preview-inline .panel-preview-gallery{grid-column:2!important;grid-row:1 / span 2!important;align-self:start!important;justify-self:center!important;width:58px!important;min-height:39px!important;margin:0!important}
+.hall-choice-item .field.panel-preview-inline .panel-preview-gallery img{width:52px!important;height:49px!important;object-fit:contain}
+.hall-choice-item .field.panel-preview-inline .panel-preview-note{grid-column:1!important;grid-row:2!important;margin:0!important;line-height:1.2!important}
+@media(max-width:510px){.hall-choice-item>.hall-qty-pair{grid-template-columns:minmax(0,1fr) 84px!important;gap:5px!important}.hall-choice-item .field.panel-preview-inline{grid-template-columns:minmax(0,1fr) 46px!important;column-gap:4px!important}.hall-choice-item .field.panel-preview-inline .panel-preview-gallery{width:46px!important}.hall-choice-item .field.panel-preview-inline .panel-preview-gallery img{width:43px!important;height:43px!important}}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
@@ -474,7 +492,7 @@ window.SPEC_PROOFREAD = function(input){
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
-<script src="app.js?v=5.8.138"></script>
+<script src="app.js?v=5.8.148"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

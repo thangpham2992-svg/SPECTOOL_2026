@@ -275,3 +275,161 @@
  display:block;margin:0 0 9px 0;padding:9px 12px;color:#805400;background:#fff7e5;
  border-left:3px solid #d59a28;border-radius:4px;font-size:12px;line-height:1.5;
 }
+
+/* v5.8.149 — aligned ceiling model and color; compact, right-hand visual icons on PC + mobile. */
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"]{
+ align-items:center!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-material,
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-variants{
+ align-self:center!important;min-width:0;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline){
+ display:grid!important;grid-template-columns:minmax(0,1fr) 39px!important;
+ align-items:center!important;column-gap:5px!important;row-gap:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline)>select{
+ grid-column:1!important;grid-row:1!important;min-width:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field>.design-inline{
+ grid-column:2!important;grid-row:1!important;display:flex!important;
+ width:39px!important;height:33px!important;margin:0!important;padding:0!important;
+ align-items:center!important;justify-content:center!important;
+}
+#fields .car-design-line .design-icon-button{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ height:32px!important;min-height:32px!important;width:38px!important;
+ padding:1px!important;background:#f6f0e5!important;border:1px solid #d5c6af!important;
+ border-radius:5px!important;overflow:hidden!important;
+}
+#fields .car-design-line .design-icon-button .design-thumb{
+ display:block!important;width:34px!important;height:28px!important;
+ object-fit:contain!important;border:0!important;border-radius:3px!important;
+}
+#fields .car-design-line .design-inline .design-hint{display:none!important}
+/* Unify preview fields' heights and align thumbnails exactly beside selects. */
+#fields .spec-section[data-section="III"] .field.panel-preview-inline{
+ grid-template-columns:minmax(0,1fr) 42px!important;align-items:center!important;row-gap:0!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline>.panel-preview-gallery,
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-gallery{
+ grid-row:2!important;width:40px!important;min-height:30px!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-gallery img{
+ width:38px!important;height:30px!important;padding:1px!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-note{display:none!important}
+/* Braille illustration is informational, no added dropdown and no extra line. */
+#fields .spec-section[data-section="III"] .field.braille-preview-inline{
+ display:grid!important;grid-template-columns:minmax(0,1fr) 46px!important;
+ align-items:center!important;gap:4px!important;
+}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>.nm{grid-column:1/-1!important}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>select{grid-column:1!important;grid-row:2!important}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>.braille-preview-thumb{
+ grid-column:2!important;grid-row:2!important;
+ width:44px!important;height:32px!important;object-fit:contain!important;
+ border:1px solid #d5c6af;border-radius:4px;background:white;
+}
+@media(max-width:680px){
+ /* Ceiling and finish remain on the same horizontal line on phones. */
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"]{
+  grid-template-columns:minmax(78px,26%) minmax(0,1fr) minmax(0,1fr)!important;
+  gap:4px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-label{
+  grid-column:1!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-material{
+  grid-column:2!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-variants{
+  grid-column:3!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline){
+  grid-template-columns:minmax(0,1fr) 28px!important;column-gap:2px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line .field>.design-inline,
+ #fields .spec-section[data-section="III"] .car-design-line .design-icon-button{
+  width:27px!important;height:28px!important;min-height:28px!important;
+ }
+ #fields .car-design-line .design-icon-button .design-thumb{width:25px!important;height:24px!important}
+ #fields .spec-section[data-section="III"] .car-design-line .field select{font-size:10px!important;padding:2px 2px!important}
+ #fields .spec-section[data-section="III"] .field.braille-preview-inline{grid-template-columns:minmax(0,1fr) 38px!important}
+ #fields .spec-section[data-section="III"] .field.braille-preview-inline>.braille-preview-thumb{width:36px!important;height:29px!important}
+}
+
+/* v5.8.150 — MRL Version02: all Section III thumbnails stay beside their controls.
+   The .spec-row.multi .field display:block rule previously overrode the grid. */
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field.panel-preview-inline,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field:has(>.design-inline),
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline){
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 42px!important;
+  grid-template-rows:auto 32px!important;
+  gap:2px 5px!important;
+  align-items:center!important;
+  min-width:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >.nm,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>.nm{
+  grid-column:1/-1!important;grid-row:1!important;margin:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >select,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >input,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>select,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>input{
+  grid-column:1!important;grid-row:2!important;min-width:0!important;width:100%!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline>.panel-image-preview{
+  display:contents!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery{
+  grid-column:2!important;grid-row:2!important;
+  width:40px!important;height:32px!important;min-height:0!important;
+  margin:0!important;align-self:center!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery img{
+  width:38px!important;height:30px!important;padding:1px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-note{display:none!important}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field>.design-inline{
+  grid-column:2!important;grid-row:2!important;
+  display:flex!important;width:40px!important;height:32px!important;
+  align-items:center!important;justify-content:center!important;
+  margin:0!important;padding:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button{
+  width:38px!important;height:31px!important;min-height:31px!important;padding:1px!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:5px!important;border:1px solid #d5c6af!important;
+  background:#f6f0e5!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button .design-thumb{
+  width:34px!important;height:27px!important;object-fit:contain!important;
+  border:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-hint{display:none!important}
+@media(max-width:680px){
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field.panel-preview-inline,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field:has(>.design-inline),
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline){
+   grid-template-columns:minmax(0,1fr) 31px!important;
+   column-gap:3px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field>.design-inline{
+   width:30px!important;height:29px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery img{
+   width:29px!important;height:27px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button{
+   width:30px!important;height:28px!important;min-height:28px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button .design-thumb{
+   width:27px!important;height:24px!important;
+ }
+}

@@ -1009,7 +1009,11 @@ function renderDesignInline(box,kind){
  const note=document.createElement('span');note.className='design-hint';
  const button=document.createElement('button');button.className='btn design-inline-btn';button.type='button';button.textContent='Xem hình & mô tả';
  button.onclick=()=>openDesignGuide(kind);
- holder.append(img,note,button);box.append(holder);
+ // v5.8.149: the thumbnail itself opens the catalogue; keep one compact icon next to the select.
+ button.textContent='';button.classList.add('design-icon-button');
+ button.setAttribute('aria-label','Xem hình và mô tả / View design catalogue');
+ button.title='Xem hình và mô tả';button.append(img);
+ holder.append(button,note);box.append(holder);
  const item=selectedGuideItem(kind);if(item?.images?.[0]){img.src=item.images[0];img.alt=item.title}else img.hidden=true;
  note.textContent=kind==='mirror'?'':designSummaryFor(kind);note.hidden=kind==='mirror';
 }
@@ -1164,6 +1168,30 @@ function updateFinishPreviews(){
  }
 }
 
+// v5.8.147: default landing-door finish follows the car-door finish.
+// This is a one-way convenience default, never a lock or a validation rule.
+function syncLandingFinishFromCar(){
+ const car=current?.fields?.find(f=>f.name==='K24_CarDoorFinish');
+ if(!car)return;
+ const v=String(currentValue(car.cell)||'').trim();if(!v)return;
+ const family=/^Painted\b/i.test(v)?'Painted':/^SUS-HL\b/i.test(v)?'SUS-HL':'';
+ if(!family)return;
+ const windowSize=/W300xH1300|300x1300/i.test(v)?'300':/W200xH1300|200x1300/i.test(v)?'200':'';
+ const glass=/DSJ1/i.test(v)?'DSJ1':/\bDS1\b/i.test(v)?'DS1':/Large\s*window/i.test(v)?'Large':'';
+ for(const key of ['K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial']){
+  const f=current.fields.find(x=>x.name===key);if(!f)continue;
+  const values=workbookChoices(f).map(String);
+  let candidates=values.filter(x=>x.startsWith(family));
+  if(glass==='DSJ1')candidates=candidates.filter(x=>/DSJ1/i.test(x));
+  else if(glass==='DS1')candidates=candidates.filter(x=>/\bDS1\b/i.test(x)&&!/DSJ1/i.test(x));
+  else if(glass==='Large'){
+   candidates=candidates.filter(x=>/Large\s*window/i.test(x));
+   if(windowSize)candidates=candidates.filter(x=>new RegExp(windowSize+'x1300|'+windowSize+'xH1300','i').test(x));
+  }else candidates=candidates.filter(x=>!/DSJ1|\bDS1\b|Large\s*window/i.test(x));
+  if(candidates.length && String(currentValue(f.cell))!==candidates[0])applyValue(f.cell,candidates[0]);
+ }
+}
+
 function row(field,displayName='',compact=false){
  const box=document.createElement('div');box.className='field';
  box.dataset.sourceCell=field.cell;
@@ -1217,6 +1245,7 @@ function row(field,displayName='',compact=false){
      if(allowed&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
    }
    syncDropdownOptions();
+   if(field.name==='K24_CarDoorFinish')syncLandingFinishFromCar();
    if(/^K36_(?:PIV|HBV|PIH_PID)(?:TopFloor|MainFloor|OtherFloor)$/.test(field.name)){
     hallManualSelections.add(field.cell);hallAutoSelections.delete(field.cell);
     autoFillHallSiblingFields(field);
@@ -1281,6 +1310,13 @@ function row(field,displayName='',compact=false){
   box.classList.add('mrl-decoration-field');
   const hint=document.createElement('span');hint.className='mrl-decoration-maximum unavailable';
   hint.id='mrl-decor-maximum';hint.textContent='Maximum: —';box.append(hint);
+ }
+ if(field.name==='K31_BrailleLetter'){
+  box.classList.add('braille-preview-inline');
+  const image=document.createElement('img');image.className='braille-preview-thumb';
+  image.alt='Minh họa nút bấm có ký tự Braille không vít';image.title='Braille without screw';
+  image.src='data:image/jpeg;base64,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';image.loading='lazy';
+  box.append(image);
  }
  const guideKind=designKindFor(field);if(guideKind)renderDesignInline(box,guideKind);
  if($('model').value==='MRL' && field.name==='K35_Ventilation'){
@@ -2069,7 +2105,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();syncLandingFinishFromCar();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -2234,6 +2270,33 @@ function check(){
   }
   if(result.errors.length)result.status='FAIL';
  }
+ // v5.8.146: Landing-door glass-window finishes cannot be used with
+ // EN81-58(II). Check both main-floor and other-floor landing door fields;
+ // never use car-door finish for this landing-door restriction.
+ if(['MR','MRL'].includes(model)){
+  const byName=name=>current.fields.find(f=>f.name===name);
+  const fireField=byName('K36_FireproofDoor');
+  const fire=fireField?String(currentValue(fireField.cell)||''):'';
+  if(/EN81\s*[-–]?\s*58\s*\(II\)/i.test(fire)){
+   const landingDoorFields=[
+    ['K36_DoorFinishMainFloorMaterial','cửa tầng chính'],
+    ['K36_DoorFinishOtherFloorMaterial','cửa tầng khác']
+   ];
+   for(const [name,location] of landingDoorFields){
+    const f=byName(name);
+    if(!f)continue;
+    const finish=String(currentValue(f.cell)||'');
+    if(/DSJ1|LARGE\s*[- ]?\s*WINDOW/i.test(finish)){
+     result.errors.push({
+      id:'LandingDoor!WindowFireproof!'+name,
+      cell:f.cell,
+      message:'Không được kết hợp '+finish+' ở '+location+' với cửa chống cháy EN81-58(II). Hãy bỏ lựa chọn DSJ1/Large Window hoặc đổi điều kiện chống cháy. / DSJ1/Large Window landing door is incompatible with EN81-58(II).'
+     });
+     result.status='FAIL';
+    }
+   }
+  }
+ }
  if(['MR','MRL'].includes(model)&&window.SPEC_JAMB_DEPTH){
   const jdErrors=window.SPEC_JAMB_DEPTH.validate(model,currentValue);
   if(jdErrors.length){result.errors.push(...jdErrors);result.status='FAIL';}
@@ -2300,7 +2363,7 @@ function renderSourceCheck(result){
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')?10:(isDimension(cell)?dimensionPriority(err):0);
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{id:String(err.id),name,message,priority});
@@ -2316,6 +2379,19 @@ function renderSourceCheck(result){
    // Avoid repeating the same field name in title and explanation, without hiding the limit.
    detail=detail.replace(/^(?:Đỉnh hố thang \(OH\)|Chiều sâu hố PIT \(PD\)|Chiều rộng hố thang \(AH\)|Chiều sâu hố thang \(BH\))\s*/,'');
    explanation.textContent=detail;link.append(explanation);
+  }
+  // A limited allowable decoration weight can show as D57 (Decoration Weight)
+  // or D56 (Flooring Weight exceeding the same Technical Study allowance).
+  // Show the same counterweight suggestion for either case in MRL Version2.
+  if($('model').value==='MRL' && (
+      item.id==='MRL_V02_DECOR!Maximum' ||
+      item.id==='MRL_V02_DECOR!FlooringOverMaximum' ||
+      (cell==='D57' && /[Dd]ecoration [Ww]eight|khối lượng trang trí/i.test(item.message)) ||
+      (cell==='D56' && /Flooring Weight.*(?:vượt Maximum|exceeds)/i.test(item.message))
+     )){
+   const note=document.createElement('span');note.className='check-error-explanation';
+   note.textContent='Bạn có thể chuyển qua đối trọng 620E hoặc 720G để tăng khối lượng trang trí (lưu ý: AH có thể sẽ tăng).';
+   link.append(note);
   }
   if((($('model').value==='MR'&&cell==='D35')||($('model').value==='MRL'&&cell==='D34'))&&item.priority===10&&item.id!=='MRL!2G_BH_Exact'){
    const img=document.createElement('img');img.src='assets/mr_side_drop_bh_safety_5474.png';
