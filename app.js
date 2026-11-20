@@ -1985,7 +1985,7 @@ function mountHallQuantity(item,input,kind){
     group.value=g;
     p6c3Hint.textContent=g==='P6C3'?'P6C3 theo DataTable: CO · CWT Side · AA 1200 × BB 1100 · JJ 700 mm. HH = 2100 mm; khối lượng trang trí (gồm sàn) phụ thuộc trần, tốc độ và hoàn thiện. Các giới hạn AH/BH, OH/PD và chiều cao cabin được Check Spec theo dữ liệu gốc.':'';
     let rows=groupSourceRows(g);
-    const doorPref=isDeepGroup(g)?(prefs.door??(g==='P15D'?'2S':'CO')):(level===0?getDoor(base):prefs.door??door.value);
+    const doorPref=level===0?getDoor(base):(prefs.door??door.value);
     const doorVal=fill(door,vals(rows,getDoor),doorPref);rows=filter(rows,getDoor,doorVal);
     const cwtVal=fill(cwt,vals(rows,getCwt),isDeepGroup(g)||g==='P6C3'?'Side':(level===0?getCwt(base):prefs.cwt??cwt.value));rows=filter(rows,getCwt,cwtVal);
     const aaVal=fill(aa,vals(rows,r=>r.AA),level===0?base.AA:prefs.aa??aa.value);rows=filter(rows,r=>r.AA,aaVal);
