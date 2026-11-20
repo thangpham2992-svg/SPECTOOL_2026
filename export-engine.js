@@ -90,6 +90,31 @@
        else {cells[addr]='';unresolved.push({addr,formula:entry.f,error:result.error})}
      }else cells[addr]=entry?.v??entry??'';
    }
+   // v5.8.152: B750/B1000 special bed-lift handrail YH-56S (SUS304)
+   // is valid in Check Spec but absent from the legacy TblK32_Handrail lookup.
+   // Resolve only that known exception, leaving other #N/A errors visible.
+   if(model==='MR'){
+     const rail=String(eng.safe('SpecForm','D67').value??'').trim();
+     const car=String(eng.safe('SpecForm','D13').value??'');
+     const missing=unresolved.find(e=>e.addr==='C62'&&/VLOOKUP failed:\s*YH-56S/i.test(e.error));
+     if(missing&&/^B(?:750|1000)-2S\b/i.test(car)&&rail==='YH-56S (SUS304)'){
+       const location=String(eng.safe('SpecForm','D68').value??'').trim();
+       const loc={
+         '1 pc on rear wall':['1 tay vịn trên vách sau','1 pc on rear wall'],
+         '1 pc on right side wall':['1 tay vịn trên vách phải','1 pc on right side wall'],
+         '1 pc on left side wall':['1 tay vịn trên vách trái','1 pc on left side wall'],
+         '2 pcs on both side walls':['2 tay vịn trên hai vách bên','2 pcs on both side walls'],
+         '2 pcs on rear & right side wall':['2 tay vịn trên vách sau và vách phải','2 pcs on rear and right side walls'],
+         '2 pcs on rear & left side wall':['2 tay vịn trên vách sau và vách trái','2 pcs on rear and left side walls'],
+         '3 pcs on 3 walls':['3 tay vịn trên ba vách','3 pcs on three walls']
+       }[location];
+       if(loc){
+         cells.C62='Tay vịn inox SUS304, mã YH-56S, '+loc[0]+'.\n'+
+                   '(SUS304 stainless steel handrail, model YH-56S, '+loc[1]+').';
+         unresolved.splice(unresolved.indexOf(missing),1);
+       }
+     }
+   }
    // v5.8.125: use the same corrected bilingual label in MR/MRL Excel
    // and the PDF, which is generated from the same export worksheet.
    // Match the exact old heading only; do not rewrite technical fire options.
