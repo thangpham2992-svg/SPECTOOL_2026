@@ -1909,12 +1909,13 @@ function mountHallQuantity(item,input,kind){
   // UI-only stretcher/deep-car presets. Preserve original factory P-code in SpecForm.
   // D presets never create fictitious P17D/P20D factory codes: they filter existing valid rows.
   const baseGroups=[...new Set(source.map(groupName).filter(Boolean))];
-  const groups=baseGroups.flatMap(g=>(['P15','P17','P20'].includes(g)?[g,g+'D']:[g]));
+  const groups=baseGroups.flatMap(g=>g==='P6'?['P6','P6C3']:(['P15','P17','P20'].includes(g)?[g,g+'D']:[g]));
   if(!groups.length)return;
   const isDeepGroup=g=>['P15D','P17D','P20D'].includes(g);
   const groupSourceRows=g=>{
-   const base=g.replace(/D$/,'');
+   const base=g==='P6C3'?'P6':g.replace(/D$/,'');
    const rows=source.filter(r=>groupName(r)===base);
+   if(g==='P6C3')return rows.filter(r=>/^P6C3-CO\b/i.test(String(r.EleCapacityName)) && String(r['CWT-Position']).trim()==='Side' && Number(r.AA)===1200 && Number(r.BB)===1100 && Number(r.JJ)===700);
    return isDeepGroup(g)?rows.filter(r=>String(r['CWT-Position']).trim()==='Side' && Number(r.BB)>=1100 && Number(r.BB)>Number(r.AA)):rows;
   };
   const field=(name)=>current.fields.find(f=>f.name===name);
@@ -1947,6 +1948,7 @@ function mountHallQuantity(item,input,kind){
   const exactChoice=document.createElement('select');exactChoice.id='mr-source-choice';
   exact.append(exactLabel,exactChoice);parent.append(exact);
   const warning=document.createElement('small');warning.className='capacity-duplicate-warning';parent.append(warning);
+  const p6c3Hint=document.createElement('small');p6c3Hint.className='mr-p6c3-hint';parent.append(p6c3Hint);
   const getDoor=r=>String(r.DoorType||'').trim();const getCwt=r=>String(r['CWT-Position']||'').trim();
   const vals=(rows,fn)=>[...new Set(rows.map(fn).filter(v=>v!==''&&v!=null).map(String))];
   const filter=(rows,fn,v)=>rows.filter(r=>String(fn(r))===String(v));
@@ -1969,7 +1971,7 @@ function mountHallQuantity(item,input,kind){
    if(!available.length)continue;
    const r=available[0],op=document.createElement('option');
    op.value=g;
-   op.textContent=g+' — '+r.Capacity+' kg'+(isDeepGroup(g)?' · Cabin sâu / Tải cáng':'');
+   op.textContent=g+' — '+r.Capacity+' kg'+(g==='P6C3'?' · CO · Side · JJ 700':isDeepGroup(g)?' · Cabin sâu / Tải cáng':'');
    group.append(op);
   }
   let busy=false;
@@ -1979,12 +1981,13 @@ function mountHallQuantity(item,input,kind){
    try{
     const original=source.find(r=>String(r.EleCapacityName)===sourceVal());
     const base=original||source[0];
-    const g=groups.includes(prefs.group)?prefs.group:(level===0?groupName(base):group.value)||groups[0];
+    const g=groups.includes(prefs.group)?prefs.group:(level===0&&/^P6C3-CO\b/i.test(String(base.EleCapacityName))?'P6C3':level===0?groupName(base):group.value)||groups[0];
     group.value=g;
+    p6c3Hint.textContent=g==='P6C3'?'P6C3 theo DataTable: CO · CWT Side · AA 1200 × BB 1100 · JJ 700 mm. HH = 2100 mm; khối lượng trang trí (gồm sàn) phụ thuộc trần, tốc độ và hoàn thiện. Các giới hạn AH/BH, OH/PD và chiều cao cabin được Check Spec theo dữ liệu gốc.':'';
     let rows=groupSourceRows(g);
     const doorPref=isDeepGroup(g)?(prefs.door??(g==='P15D'?'2S':'CO')):(level===0?getDoor(base):prefs.door??door.value);
     const doorVal=fill(door,vals(rows,getDoor),doorPref);rows=filter(rows,getDoor,doorVal);
-    const cwtVal=fill(cwt,vals(rows,getCwt),isDeepGroup(g)?'Side':(level===0?getCwt(base):prefs.cwt??cwt.value));rows=filter(rows,getCwt,cwtVal);
+    const cwtVal=fill(cwt,vals(rows,getCwt),isDeepGroup(g)||g==='P6C3'?'Side':(level===0?getCwt(base):prefs.cwt??cwt.value));rows=filter(rows,getCwt,cwtVal);
     const aaVal=fill(aa,vals(rows,r=>r.AA),level===0?base.AA:prefs.aa??aa.value);rows=filter(rows,r=>r.AA,aaVal);
     const bbVal=fill(bb,vals(rows,r=>r.BB),level===0?base.BB:prefs.bb??bb.value);rows=filter(rows,r=>r.BB,bbVal);
     const jjVal=fill(jj,vals(rows,r=>r.JJ),level===0?base.JJ:prefs.jj??jj.value);rows=filter(rows,r=>r.JJ,jjVal);
@@ -2009,7 +2012,7 @@ function mountHallQuantity(item,input,kind){
   }
   group.addEventListener('change',()=>run(1,{group:group.value,
    door:isDeepGroup(group.value)?(group.value==='P15D'?'2S':'CO'):door.value,
-   cwt:isDeepGroup(group.value)?'Side':cwt.value}));
+   cwt:isDeepGroup(group.value)||group.value==='P6C3'?'Side':cwt.value}));
   door.addEventListener('change',()=>run(1,{door:door.value,cwt:cwt.value,aa:aa.value,bb:bb.value,jj:jj.value}));
   cwt.addEventListener('change',()=>run(1,{door:door.value,cwt:cwt.value,aa:aa.value,bb:bb.value,jj:jj.value}));
   aa.addEventListener('change',()=>run(1,{aa:aa.value,bb:bb.value,jj:jj.value}));
@@ -2499,6 +2502,19 @@ function check(){
      message:roomName+' phải ≥ '+shaftName+' ('+shaftValue+' mm). Giá trị hiện tại: '+roomValue+' mm / '+roomName+' must be at least '+shaftName+'.'});
     result.status='FAIL';
    }
+  }
+ }
+ if(model==='MR'&&/^P6C3-CO\b/i.test(String(currentValue('D13')||''))){
+  const expected=[['D14','CO','Loại cửa / Door Type'],['D29',1200,'AA'],['D30',1100,'BB'],['D32',700,'JJ']];
+  for(const [cell,value,label] of expected){
+   if(String(currentValue(cell)).trim()!==String(value)){
+    result.errors.push({id:'MR!P6C3-'+cell,cell,message:'P6C3: '+label+' phải là '+value+' theo DataTable / Factory P6C3 configuration requires '+value+'.'});
+    result.status='FAIL';
+   }
+  }
+  const position=String(currentValue('D13')||'');
+  if(!/CWT Side\b/i.test(position)){
+   result.errors.push({id:'MR!P6C3-CWT',cell:'D13',message:'P6C3 chỉ áp dụng đối trọng Side Drop / CWT Side.'});result.status='FAIL';
   }
  }
  if(model==='MR'&&Number(currentValue('D33'))!==2100){
