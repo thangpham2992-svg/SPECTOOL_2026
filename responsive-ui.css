@@ -256,3 +256,18 @@ body .workspace > .leadtime-check {background-color:#fff;}
 
 /* NEXIEZ-MR Side Drop BH limit safety reference */
 .bh-safety-illustration{display:block;width:min(100%,420px);height:auto;object-fit:contain;margin:10px 0 2px;border:1px solid #e7d5d5;border-radius:4px;background:#fff}
+
+/* v5.8.159: Selector visual status is determined by user choice, not the locked workbook cell.
+   Door Type is grey only when this Capacity group has a single valid door type. */
+.field .mr-selector-control select:not(:disabled),
+.field.locked .mr-selector-control select:not(:disabled),
+.field.cf-locked .mr-selector-control select:not(:disabled){
+  background:#eaf5ff!important; border:1px solid #b5d2f0!important;
+  color:#163454!important; opacity:1!important; cursor:pointer!important;
+  -webkit-text-fill-color:#163454!important;
+}
+.field .mr-selector-control.single-option select:disabled{
+  background:#f0f2f4!important; border:1px solid #dee3e9!important;
+  color:#7d8894!important; -webkit-text-fill-color:#7d8894!important;
+  opacity:1!important; cursor:not-allowed!important;
+}

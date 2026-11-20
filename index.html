@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.127-xlsx-recovery-layout">
+<meta name="specweb-build" content="5.8.157-capacity-group-cwt-order">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <!-- Browser icon / Home screen icon -->
@@ -174,8 +174,29 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
 .feature-visual-caption{display:block!important;font-size:10.5px;color:#7a6853;font-weight:600;margin-top:0!important}
 @media(max-width:530px){.feature-visual-thumb{max-width:58px;max-height:72px}.feature-visual-caption{font-size:10px}}
 
+
+/* v5.8.158 – source-linked capacity grouping. Original SpecForm dimension fields remain in Section II. */
+.capacity-group-choice{display:grid;gap:5px;margin-bottom:12px;padding:11px 12px;border:1px solid #d8e5f1;background:#f4f9ff;border-radius:7px}
+.capacity-group-choice label{font-weight:700;font-size:12px;color:#26415b}
+.capacity-group-choice select{background:#fff}
+.capacity-group-hint{display:block;font-size:11px;color:#5d7185;line-height:1.5}
+.mr-capacity-source>.nm{font-size:12px}
+.capacity-duplicate-warning{display:block;color:#a05b1d;font-size:11px;line-height:1.5;margin-top:7px}
+.capacity-duplicate-warning:empty{display:none}
+.mr-door-group-selector{margin-top:2px;background:#eaf5ff!important;opacity:1!important;cursor:pointer!important}
+
+/* v5.8.158 – editing controls in their original Sections I/II, source values remain hidden. */
+.mr-original-internal{display:none!important}
+.mr-selector-control{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mr-selector-label{font-size:12px;font-weight:700;color:#244466}
+.mr-selector-control select{width:100%;min-height:40px;background:#eaf5ff!important;border:1px solid #b5d2f0!important;color:#163454!important;opacity:1!important;cursor:pointer}
+.mr-selector-control select:disabled{background:#f0f6fc!important;color:#234567!important;opacity:1!important;-webkit-text-fill-color:#234567!important;cursor:default}
+.mr-exact-selector{display:grid;gap:5px;margin-top:8px;padding:8px 10px;border:1px solid #e8c5a3;border-radius:7px;background:#fff9ee}
+.mr-exact-selector[hidden]{display:none!important}
+.mr-exact-selector label{font-size:12px;font-weight:700;color:#76512a}
+.mr-capacity-source .field{min-width:0}
 </style>
-<link rel="stylesheet" href="responsive-ui.css?v=5.8.45">
+<link rel="stylesheet" href="responsive-ui.css?v=5.8.159">
 <link rel="stylesheet" href="design-guide.css?v=5.8.150">
 
 <style id="classic-selective-ui-v5884">
@@ -570,7 +591,7 @@ window.SPEC_PROOFREAD = function(input){
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
-<script src="app.js?v=5.8.148"></script>
+<script src="app.js?v=5.8.159"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

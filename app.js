@@ -948,6 +948,8 @@ function syncDropdownOptions(){
  const engine=new window.SpecExcelSourceEngine.SourceEngine(workbook,changes);
  for(const f of current.fields){
   const el=activeInput(f.cell);if(!el||el.tagName!=='SELECT')continue;
+  // v5.8.157: the group selector owns the filtered MR D13 options.
+  if($('model').value==='MR'&&f.name==='K5_Capacity'&&document.getElementById('mr-capacity-group'))continue;
   // Side-drop filtering is handled separately and must retain its capacity limits.
   if(f.cell==='D23'&&$('model').value==='MRL')continue;
   let opts=workbookChoices(f,engine),old=String(currentValue(f.cell)??'');
@@ -1477,6 +1479,16 @@ function capacityUpdate(capacity){
   const v=String(row[tableCol]);if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v)){let op=document.createElement('option');op.value=v;op.textContent=v;el.append(op)}
   el.value=v;changes[f.cell]=v;el.classList.add('dirty');
  }
+  // v5.8.157: capacity and counterweight are one source-backed configuration.
+  if($('model').value==='MR'){
+    const cwtField=current.fields.find(f=>f.name==='K14_CWTLocation');
+    const pos=String(row['CWT-Position']||'');
+    if(cwtField && ['Rear','Side'].includes(pos)){
+      const opts=workbookChoices(cwtField).map(String);
+      const v=opts.find(x=>pos==='Rear'?/Rear drop|Phía sau/i.test(x):/Side drop|Bên hông/i.test(x));
+      if(v)applyValue(cwtField.cell,v);
+    }
+  }
  applyMRBedDefaults(capacity);
 }
 function allowedObservationCodes(){
@@ -1871,6 +1883,107 @@ function mountHallQuantity(item,input,kind){
  input.addEventListener('change',()=>{hallManualQuantities.delete(HALL_QTY_KEY(input.dataset.cell));refreshHallQuantities();});
  refreshHallQuantities();
 }
+ // v5.8.157 – Group the MR source capacity rows without rewriting SpecForm or Excel rules.
+ // D13, D14 and CWT retain their ORIGINAL nodes/cell addresses for Check Spec and Export.
+ // v5.8.158: one-way controlled selection: P > Door > CWT > AA/BB > JJ > exact source row.
+ // Original workbook-backed cells remain present (hidden only where a separate filter controls them).
+ function mountMRCapacitySelector(root){
+  if($('model').value!=='MR')return;
+  const capacity=current.fields.find(f=>f.name==='K5_Capacity');
+  if(!capacity)return;
+  const native=activeInput(capacity.cell),parent=native?.closest('.field');
+  if(!native||!parent)return;
+  const source=current.capacity.filter(r=>String(r.EleCapacityName||'').trim());
+  const groupName=r=>{const m=String(r.EleCapacityName||'').match(/^P0?(6|8|9|10|11|13|15|17|20)(?=[A-Z0-9-]|\b)/i);return m?'P'+m[1]:''};
+  const groups=[...new Set(source.map(groupName).filter(Boolean))];if(!groups.length)return;
+  const field=(name)=>current.fields.find(f=>f.name===name);
+  const doorNative=activeInput(field('K7_DoorType')?.cell),cwtNative=activeInput(field('K14_CWTLocation')?.cell);
+  const aaNative=activeInput(field('K17_CarW')?.cell),bbNative=activeInput(field('K17_CarD')?.cell),jjNative=activeInput(field('K18_CarJJ')?.cell);
+  if(!doorNative||!cwtNative||!aaNative||!bbNative||!jjNative)return;
+  const makeSelect=(id,host,label)=>{
+   const box=document.createElement('div');box.className='mr-selector-control';
+   const title=document.createElement('label');title.className='mr-selector-label';title.htmlFor=id;title.textContent=label;
+   const el=document.createElement('select');el.id=id;el.setAttribute('aria-label',label);box.append(title,el);host.append(box);return el;
+  };
+  const group=makeSelect('mr-capacity-group',parent,'Nhóm tải trọng P / Capacity group');
+  // Keep Section I fields and original workbook cells; only hide duplicate internal controls.
+  const door=makeSelect('mr-door-choice',doorNative.closest('.field'),'Door Type / Loại cửa');
+  const cwt=makeSelect('mr-cwt-choice',cwtNative.closest('.field'),'CWT Position / Vị trí đối trọng');
+  const aa=makeSelect('mr-aa-choice',aaNative.closest('.field'),'AA – Width (mm)');
+  const bb=makeSelect('mr-bb-choice',bbNative.closest('.field'),'BB – Depth (mm)');
+  const jj=makeSelect('mr-jj-choice',jjNative.closest('.field'),'JJ – Door width (mm)');
+  for(const el of [native,doorNative,cwtNative,aaNative,bbNative,jjNative]){
+   el.classList.add('mr-original-internal');el.setAttribute('aria-hidden','true');el.tabIndex=-1;
+   const oldLabel=el.closest('.field')?.querySelector(':scope > label.nm');if(oldLabel)oldLabel.classList.add('mr-original-internal');
+  }
+  // Capacity source code is only requested for ambiguous, physically identical configurations.
+  const exact=document.createElement('div');exact.className='mr-exact-selector';exact.hidden=true;
+  const exactLabel=document.createElement('label');exactLabel.textContent='Mã P trùng cấu hình / Source code';
+  const exactChoice=document.createElement('select');exactChoice.id='mr-source-choice';
+  exact.append(exactLabel,exactChoice);parent.append(exact);
+  const warning=document.createElement('small');warning.className='capacity-duplicate-warning';parent.append(warning);
+  const getDoor=r=>String(r.DoorType||'').trim();const getCwt=r=>String(r['CWT-Position']||'').trim();
+  const vals=(rows,fn)=>[...new Set(rows.map(fn).filter(v=>v!==''&&v!=null).map(String))];
+  const filter=(rows,fn,v)=>rows.filter(r=>String(fn(r))===String(v));
+  const fill=(el,options,preferred,labels={})=>{
+   const opts=options.map(String);const prior=String(el.value||'');
+   el.replaceChildren();for(const v of opts){const op=document.createElement('option');op.value=v;op.textContent=labels[v]||v;el.append(op)}
+   const chosen=opts.includes(String(preferred))?String(preferred):opts.includes(prior)?prior:opts[0]||'';
+   el.value=chosen;
+   // Only Door Type uses grey/disabled styling for a single permitted option.
+   // CWT, AA, BB and JJ remain visually active (blue) even when the
+   // currently filtered configuration produces one candidate value.
+   const singleDoor=(el===door && opts.length===1);
+   el.disabled=singleDoor || opts.length===0;
+   el.closest('.mr-selector-control')?.classList.toggle('single-option',singleDoor);
+   el.closest('.mr-selector-control')?.classList.toggle('is-selectable',!el.disabled);
+   return chosen;
+  };
+  for(const g of groups){const r=source.find(x=>groupName(x)===g);const op=document.createElement('option');op.value=g;op.textContent=g+' — '+r.Capacity+' kg';group.append(op)}
+  let busy=false;
+  const sourceVal=()=>String(currentValue(capacity.cell)||native.value);
+  function run(level=0,prefs={}){
+   if(busy)return;busy=true;
+   try{
+    const original=source.find(r=>String(r.EleCapacityName)===sourceVal());
+    const base=original||source[0];
+    const g=groups.includes(prefs.group)?prefs.group:(level===0?groupName(base):group.value)||groups[0];
+    group.value=g;
+    let rows=source.filter(r=>groupName(r)===g);
+    const doorVal=fill(door,vals(rows,getDoor),level===0?getDoor(base):prefs.door??door.value);rows=filter(rows,getDoor,doorVal);
+    const cwtVal=fill(cwt,vals(rows,getCwt),level===0?getCwt(base):prefs.cwt??cwt.value);rows=filter(rows,getCwt,cwtVal);
+    const aaVal=fill(aa,vals(rows,r=>r.AA),level===0?base.AA:prefs.aa??aa.value);rows=filter(rows,r=>r.AA,aaVal);
+    const bbVal=fill(bb,vals(rows,r=>r.BB),level===0?base.BB:prefs.bb??bb.value);rows=filter(rows,r=>r.BB,bbVal);
+    const jjVal=fill(jj,vals(rows,r=>r.JJ),level===0?base.JJ:prefs.jj??jj.value);rows=filter(rows,r=>r.JJ,jjVal);
+    if(!rows.length){warning.textContent='Không tìm thấy mã P ứng với cấu hình.';return}
+    exact.hidden=rows.length===1;
+    const last=sourceVal();const preferred=rows.find(r=>String(r.EleCapacityName)===String(prefs.code))||rows.find(r=>String(r.EleCapacityName)===last)||rows[0];
+    exactChoice.replaceChildren();for(const r of rows){const op=document.createElement('option');op.value=String(r.EleCapacityName);op.textContent=String(r.EleCapacityName).split(' (')[0];exactChoice.append(op)}
+    exactChoice.value=String(preferred.EleCapacityName);
+    warning.textContent=rows.length>1?'⚠ Có '+rows.length+' mã P cùng cấu hình. Chọn mã gốc để đảm bảo Check Spec chính xác.':'';
+    if(String(preferred.EleCapacityName)!==last){
+      // Fire the ORIGINAL change listener: this updates all formulas, dependent specs and export changes.
+      native.value=String(preferred.EleCapacityName);
+      // If the capacity option is not present, add the selected exact code.
+      if(native.value!==String(preferred.EleCapacityName)){
+       const op=document.createElement('option');op.value=String(preferred.EleCapacityName);op.textContent=String(preferred.EleCapacityName);native.append(op);native.value=op.value;
+      }
+      native.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    // Explicitly synchronize row lookup when the exact code did not change.
+    door.value=getDoor(preferred);cwt.value=getCwt(preferred);aa.value=String(preferred.AA);bb.value=String(preferred.BB);jj.value=String(preferred.JJ);
+   }finally{busy=false}
+  }
+  group.addEventListener('change',()=>run(1,{group:group.value,door:door.value,cwt:cwt.value}));
+  door.addEventListener('change',()=>run(1,{door:door.value,cwt:cwt.value,aa:aa.value,bb:bb.value,jj:jj.value}));
+  cwt.addEventListener('change',()=>run(1,{door:door.value,cwt:cwt.value,aa:aa.value,bb:bb.value,jj:jj.value}));
+  aa.addEventListener('change',()=>run(1,{aa:aa.value,bb:bb.value,jj:jj.value}));
+  bb.addEventListener('change',()=>run(1,{aa:aa.value,bb:bb.value,jj:jj.value}));
+  jj.addEventListener('change',()=>run(1,{jj:jj.value}));
+  exactChoice.addEventListener('change',()=>run(1,{code:exactChoice.value}));
+  native.addEventListener('change',()=>{if(!busy)queueMicrotask(()=>run(0))});
+  run(0);
+ }
 function renderAllSpecRows(){
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
@@ -1908,7 +2021,16 @@ function renderAllSpecRows(){
   }
   sectionRow.append(text,area);sectionRows.append(sectionRow);
  }
- buildCarDesignLines();
+  // Preserve original field node and bindings; move the CWT row just below Door Type.
+  {
+    const model=$('model').value;
+    const sectionI=root.querySelector('.spec-section[data-section="I"] .section-fields');
+    const doorRow=sectionI?.querySelector('.spec-row[data-row="'+(model==='MR'?'14':'15')+'"]');
+    const cwtRow=sectionI?.querySelector('.spec-row[data-row="'+(model==='MR'?'22':'23')+'"]');
+    if(doorRow&&cwtRow)doorRow.after(cwtRow);
+  }
+  mountMRCapacitySelector(root);
+  buildCarDesignLines();
  // v5.8.16: Arrange both models in wide, independently editable dimension groups.
  // Move the existing input nodes (never clone them) so Check Spec / Export bindings stay unchanged.
  {
