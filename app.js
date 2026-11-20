@@ -11,6 +11,15 @@ let models={MR:structuredClone(window.SPEC_EMBEDDED.MR),MRL:structuredClone(wind
 let layouts=structuredClone(window.SPEC_LAYOUT);
 for(const k of ['MR','MRL']) models[k].fields.push(...structuredClone(window.SPEC_EXTRAS[k]));
 let sourceFiles={},current=null,changes={};
+let mrlVerticalBufferCap='No';
+// Regulation is already selected in the original MRL SpecForm D26; never keep a separate default-EN81 state.
+function mrlG11Regulation(){
+ const raw=String(currentValue('D26')??'').trim();
+ if(/EN\s*81\s*[-–]?\s*20/i.test(raw))return 'EN81-20';
+ if(/MITSUBISHI|MELCO/i.test(raw))return 'MELCO std.';
+ return '';
+}
+
 function status(message,cls=''){$('status').className=cls;$('status').textContent=window.SPEC_PROOFREAD?.(message)??message}
 function bytesFromB64(b64){const raw=atob(b64),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes}
 const colnum=col=>Array.from(col).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
@@ -254,6 +263,29 @@ const finishDependents=[
 ];
 const paintedMaterial=v=>/^Painted(?:\b|\s|\-)/i.test(String(v||'').trim());
 const patternedMaterial=v=>/^(?:Pattern-printed steel sheet PPS|PPS|Laminated steel sheet)(?:\b|\s|\-)/i.test(String(v||'').trim());
+// G11L1 panel-layout Min. Travel selections; independent of SpecForm workbook.
+let mrlTravelEN8172='No';
+function currentMRLTravelMinimum(){
+ if($('model').value!=='MRL')return null;
+ const selected=sourceFeatureRows().filter(f=>featureIsSelected(f)).map(f=>window.SPEC_V52_FEATURES?.canonical(f.code)||f.code);
+ const capacity=window.SPEC_ALPHA_5865?.mrlV02CapacityKg(currentValue('D13'));
+ return window.SPEC_MRL_MIN_TRAVEL?.calculate({capacity,speed:currentValue('D17'),travel:currentValue('D35'),
+  operation:currentValue('D22'),entrance:currentValue('D16'),features:selected,
+  en8172:mrlTravelEN8172==='Yes'});
+}
+// Wording only: preserve workbook values for calculations / exports.
+function refreshMRLControlLabels(){
+ if($('model')?.value!=='MRL')return;
+ const sel=document.querySelector('select[data-cell="D22"]');
+ if(!sel)return;
+ for(const opt of sel.options){
+  const value=String(opt.value||'').trim().toUpperCase();
+  if(/^3C(?:-|$)/.test(value))opt.textContent='3C-Sigma2200';
+  if(/^4C(?:-|$)/.test(value))opt.textContent='4C-Sigma2200';
+ }
+}
+// Minimum Travel errors are shown only by Check Spec, not beside TR.
+function refreshMRLTravelMinimum(){refreshMRLControlLabels();}
 function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell===addr)?.value??''}
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
 // v5.8.68: Inline 11,000 mm warning for exactly two stops on BOTH models.
@@ -756,6 +788,7 @@ function renderFeatures(){
    if(f.code==='FE-C30'&&chk.checked)changes.A93='0';
    if(f.code==='FE'&&chk.checked)changes.FE_C30='0';
    if($('model').value==='MRL'&&f.cell==='A157')refreshMRLOverheadMinimum(true);
+   if($('model').value==='MRL' && code==='PCNV')queueMicrotask(refreshMRLTravelMinimum);
    if(code==='MBS')renderFeatures();
   if(['FE','FE-C30','ITP','ITV','AECC','AECH','AIL'].includes(code)){
      if(code==='ITP'&&!chk.checked)delete changes[itpCell()];renderFeatures();
@@ -1339,7 +1372,7 @@ function row(field,displayName='',compact=false){
   input.setAttribute('aria-describedby',hint.id);
   box.append(hint);
   // Travel is a free-text input: warn while typing, not only when leaving the cell.
-  input.addEventListener('input',refreshTwoStopTravelWarning);
+  input.addEventListener('input',()=>{refreshTwoStopTravelWarning();refreshMRLTravelMinimum()});
  }
  if(field.name==='K28_FlooringWeight'){
   const btn=document.createElement('button');btn.type='button';btn.className='btn btn-small';
@@ -1412,27 +1445,77 @@ function refreshMRLShaftMinimum(){
   }
  }
 }
+// v5.8.179 — factory Technical Study G11L1 Version 2 OH/PD; independent from catalogue DataTable.
+function mrlVerticalInput(){
+ const source=String(currentValue('D13')||'');
+ const capacity=Number(source.match(/\((\d+)\s*KG\)/i)?.[1]);
+ const setsFeature=sourceFeatureRows().find(f=>(window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)==='SETS-L');
+ const setsL=setsFeature?['1','TRUE','YES','V','✓'].includes(String(changes[setsFeature.cell]??setsFeature.apply??0).trim().toUpperCase()):false;
+ const cwt=String(currentValue('D23')||'');
+ const ventilation=String(currentValue('D68')||'');
+ const entrance=String(currentValue('D16')||'1D-1G');
+ return {code:source,capacity,speed:currentValue('D17'),travel:currentValue('D35'),hl:currentValue('D30'),ceiling:currentValue('D41'),regulation:mrlG11Regulation(),cwtType:cwt,setsL,shortOH:mrlVerticalBufferCap==='Yes',plasmaWithTwoEntrances:/2G/.test(entrance)&&/plasma quad/i.test(ventilation)};
+}
+function getMRLVerticalResult(){if($('model').value!=='MRL')return null;return window.SPEC_G11L1_VERTICAL_V02?.calculate(mrlVerticalInput())||{state:'unavailable',reason:'Chưa tải bộ tính G11L1'};}
+function mountMRLVerticalOptions(root){
+ if($('model').value!=='MRL')return;
+ const section=[...root.querySelectorAll('.spec-section')].find(el=>el.dataset.section==='II');
+ const card=section?.querySelector('.dimension-hoistway');if(!card)return;
+ const panel=document.createElement('div');panel.className='mrl-ts-settings';
+ const select=(id,text,items,value)=>{
+  const holder=document.createElement('div');holder.className='mrl-ts-control';
+  const label=document.createElement('label');label.htmlFor=id;label.textContent=text;
+  const el=document.createElement('select');el.id=id;for(const [val,name] of items){const opt=document.createElement('option');opt.value=val;opt.textContent=name;el.append(opt)}el.value=value;holder.append(label,el);panel.append(holder);return el;
+ };
+ // Regulation comes from the existing SpecForm D26 selection; display it, don't duplicate it.
+ const cap=select('mrl-g11-buffercap','Short OH with Buffer Cap',[['No','No'],['Yes','Yes']],mrlVerticalBufferCap);
+ const details=document.createElement('small');details.className='mrl-ts-details';panel.append(details);
+ const output=document.createElement('div');output.className='mrl-ts-output';output.id='mrl-g11-result';panel.append(output);
+ cap.onchange=()=>{mrlVerticalBufferCap=cap.value;refreshMRLOverheadMinimum(false);invalidateCheck();};
+ const first=card.querySelector('.dimension-entry');if(first)card.insertBefore(panel,first);else card.append(panel);
+ window.__mrlG11PanelRefresh=()=>{
+  const currentReg=mrlG11Regulation();
+  if(currentReg!=='EN81-20'&&mrlVerticalBufferCap==='Yes'){mrlVerticalBufferCap='No';cap.value='No';}
+  const yes=cap.querySelector('option[value="Yes"]');if(yes)yes.disabled=currentReg!=='EN81-20';
+  details.textContent='Technical Study G11L1 v2.6.0.0 · Hoisting Beam Remain · '+(currentReg==='EN81-20'?'EN81-20 · HARH 1100 mm':currentReg==='MELCO std.'?'Mitsubishi Standard · HARH 700 mm':'Chưa xác định Regulation từ D26');
+  const r=getMRLVerticalResult();output.classList.toggle('mrl-ts-unavailable',r?.state!=='ready');
+  output.textContent=r?.state==='ready'?`OH ≥ ${r.remain} mm · Sau khi tháo dầm = ${r.removed} mm · PD ≥ ${r.pd} mm`:'Chưa xác minh OH/PD: '+(r?.reason||'Không xác định');
+ };
+ window.__mrlG11PanelRefresh();
+}
+
 // MRL OH/PD source-of-truth: normalized DataTable!DA5:DL164.
 // Minima come from the same SpecForm F36/F37 formulas as exported workbook.
 // Auto-raise on source configuration change only; never overwrite a larger manual value.
 function refreshMRLOverheadMinimum(adjustIfBelow=false){
  if($('model').value!=='MRL')return;
- const db=workbookEngineData();const Engine=window.SpecExcelSourceEngine?.SourceEngine;
- if(!db||!Engine)return;
- const calc=new Engine(db,changes);
- const setsAlternative=window.SPEC_MRL_SETSL_SUGGESTION?.compare(db,changes);
- for(const [cell,source,label] of [['D36','F36','PD'],['D37','F37','OH']]){
+ const r=getMRLVerticalResult();window.__mrlG11PanelRefresh?.();
+ // OH is different with/without hoisting beam; PD is independent of beam removal.
+ for(const [cell,kind,label] of [['D37','remain','OH'],['D36','pd','PD']]){
   const el=activeInput(cell);if(!el)continue;
-  const r=calc.safe('SpecForm',source),numeric=r.ok?Number(r.value):NaN;
-  const minimum=typeof r.value==='number'&&Number.isFinite(numeric)&&numeric>0?numeric:null;
-  let hint=el.closest('.field')?.querySelector('.oh-minimum-hint');
-  if(!hint){hint=document.createElement('div');hint.className='oh-minimum-hint';hint.style.cssText='font-size:11px;color:#526a82;line-height:1.4;margin-top:2px';el.closest('.field')?.append(hint);}
-  if(minimum===null){hint.textContent=`${label}: CHECK LAYOUT — không có giá trị cho tổ hợp Capacity / Speed / TR hiện tại.`;hint.style.color='#a32832';continue;}
-  const actual=Number(currentValue(cell));
-  const advice=window.SPEC_MRL_SETSL_SUGGESTION?.advise(label,actual,setsAlternative)||'';
-  hint.textContent=`${label} tối thiểu theo DataTable: ${minimum} mm (có thể nhập lớn hơn)`+(advice?' · '+advice:'');
-  hint.style.color=advice?'#8b521e':'#526a82';
-  if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<minimum){el.value=String(minimum);changes[cell]=String(minimum);el.classList.add('dirty');}}
+  const field=el.closest('.field');if(!field)continue;
+  let hint=field.querySelector('.oh-minimum-hint');
+  if(!hint){hint=document.createElement('div');hint.className='oh-minimum-hint';field.append(hint);}
+  hint.classList.add('mrl-ts-two-minima');hint.replaceChildren();
+  if(r?.state!=='ready'){
+   const warning=document.createElement('small');warning.className='mrl-ts-minimum-unavailable';
+   warning.textContent=`${label}: Chưa xác minh — ${r?.reason||'thiếu dữ liệu'}`;
+   hint.append(warning);continue;
+  }
+  const addLine=(name,value)=>{
+   const line=document.createElement('div');line.className='mrl-ts-minimum-line';
+   const title=document.createElement('span');title.textContent=name+': ';
+   const number=document.createElement('strong');number.textContent=Number(value).toLocaleString('en-US')+' mm';
+   line.append(title,number);hint.append(line);
+  };
+  if(kind==='remain'){
+   addLine('Min (With Hoisting Beam)',r.remain);
+   addLine('Min (Without Hoisting Beam)',r.removed);
+  }else{
+   // Pit depth is independent of the hoisting beam status.
+   addLine('Min. PD',r.pd);
+  }
+  if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<r[kind]){el.value=String(r[kind]);changes[cell]=String(r[kind]);el.classList.add('dirty');}}
  }
 }
 // v5.8.75: factory-requested defaults for NEXIEZ-MR hospital-bed models.
@@ -2170,8 +2253,25 @@ function renderAllSpecRows(){
        shaft.append(content,figure);shaft.classList.add('mr-shaft-with-figure');
      }
    }
+   if(model==='MRL'){
+    const hoistway=grouped.querySelector('.dimension-hoistway');
+    if(hoistway){
+     const choices=document.createElement('div');choices.className='mrl-travel-panel-options';
+     const make=(id,label,value,callback)=>{
+      const wrapper=document.createElement('label');wrapper.className='mrl-travel-panel-option';wrapper.textContent=label;
+      const sel=document.createElement('select');sel.id=id;
+      for(const v of ['No','Yes']){const o=document.createElement('option');o.value=v;o.textContent=v;sel.append(o)}
+      sel.value=value;
+      sel.addEventListener('change',()=>{callback(sel.value);refreshMRLTravelMinimum();invalidateCheck();});
+      wrapper.append(sel);choices.append(wrapper);
+     };
+     make('mrl-travel-en8172','EN81-72 (Travel table)',mrlTravelEN8172,v=>{mrlTravelEN8172=v});
+     hoistway.append(choices);
+    }
+   }
    dimensionGrid.classList.add('dimension-section-fields');
    dimensionGrid.prepend(grouped);
+   if(model==='MRL')mountMRLVerticalOptions(dimensionSection);
   }
  }
  // Consolidate hall call / indicator fields by floor, rather than by Excel source row.
@@ -2360,7 +2460,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
-function load(){clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();if(model==='MR')applyValue('D33','2100');setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();syncLandingFinishFromCar();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
+function load(){mrlTravelEN8172='No';mrlVerticalBufferCap='No';clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();if(model==='MR')applyValue('D33','2100');setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();refreshMRLTravelMinimum();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();syncLandingFinishFromCar();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLTravelMinimum();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){
  const m=/^([A-Z]{1,3}\d+):\s*(.*)$/.exec(raw);
@@ -2503,6 +2603,15 @@ function refreshMRLDecorationMaximum(){
  hint.classList.toggle('overlimit',!!r?.overweightFlooring||!!r?.errors?.some(x=>x.id==='MRL_V02_DECOR!Maximum'));
  hint.title=r?.reason||'Chưa xác định được kết quả theo Technical Study G11L1';
 }
+// G11L1 MRL Version 2: removal of the hoisting beam is an acceptable
+// conditional design outcome, not an OH failure. Keep any independent
+// PD, travel, and other technical checks intact.
+function classifyMRLHoistingBeamOH(actual,remain,removed){
+ if(!Number.isFinite(actual)||!Number.isFinite(remain)||!Number.isFinite(removed))return 'fail';
+ if(actual>=remain)return 'remain';
+ if(actual>=removed)return 'remove';
+ return 'fail';
+}
 function check(){
  const model=$('model').value;
  const engineData=workbookEngineData();
@@ -2540,10 +2649,58 @@ function check(){
   result.status='FAIL';
  }
  if(model==='MRL'){
+  // Replace catalogue OH/PD check (DataTable D523) with the actual G11L1 VerticalStudy result.
+  // This must NOT silently turn a failed geometry/other source check into PASS.
+  const vertical=getMRLVerticalResult();
+  result.errors=result.errors.filter(err=>!/^DataTable!D523(?:$|\/)/.test(String(err.id)));
+  if(vertical?.state==='ready'){
+   const actualOH=Number(currentValue('D37'));
+   const actualPD=Number(currentValue('D36'));
+   const beamOHStatus=classifyMRLHoistingBeamOH(actualOH,vertical.remain,vertical.removed);
+   if(beamOHStatus==='fail'){
+    result.errors.push({id:'G11L1!OH',cell:'D37',
+     message:'OH tối thiểu khi tháo dầm kéo máy: '+vertical.removed+' mm; hiện tại '+(Number.isFinite(actualOH)?actualOH:'—')+' mm.'});
+   }else if(beamOHStatus==='remove'){
+    result.ohBeamNotice='Lưu ý: Tháo dầm kéo máy sau khi lắp đặt.';
+   }
+   if(!Number.isFinite(actualPD)||actualPD<vertical.pd){
+    result.errors.push({id:'G11L1!PD',cell:'D36',
+     message:'PD tối thiểu theo Technical Study G11L1: '+vertical.pd+' mm; hiện tại '+(Number.isFinite(actualPD)?actualPD:'—')+' mm.'});
+   }
+   result.verified.push('G11L1 v2.6.0.0: OH Remain '+vertical.remain+' mm, Removed '+vertical.removed+' mm, PD '+vertical.pd+' mm');
+   // The higher PD branch is a valid conservative pass/fail threshold.
+   // Do not downgrade every supported speed to INCOMPLETE just because
+   // the lower, non-conservative balance-weight branch is undetermined.
+   result.ohpdG11L1={state:'ready',remain:vertical.remain,removed:vertical.removed,
+    pd:vertical.pd,actualOH,actualPD,beamOHStatus,
+    pdConservative:Boolean(vertical.pdConservative)};
+  }else{
+   result.ohpdG11L1={state:'unavailable',reason:vertical?.reason||'chưa hỗ trợ tổ hợp'};
+   result.unverified.push('Technical Study OH/PD NEXIEZ-MRL Version 2: '+(vertical?.reason||'chưa hỗ trợ tổ hợp'));
+  }
+  if(result.errors.length)result.status='FAIL';
+  else if(result.unverified.length||result.status==='INCOMPLETE')result.status='INCOMPLETE';
+  else result.status='PASS';
+ }
+ if(model==='MRL'){
+  const minimumTravel=currentMRLTravelMinimum();
+  if(minimumTravel?.state==='ready'){
+    if(minimumTravel.travel<minimumTravel.minimum){
+      result.errors.push({id:'G11L1!MinTravelPanels',cell:'D35',
+       message:'Hành trình nhỏ hơn Travel min '+minimumTravel.minimum.toLocaleString('vi-VN')+' mm (TR hiện tại: '+minimumTravel.travel.toLocaleString('vi-VN')+' mm).'});
+      result.status='FAIL';
+    }
+    result.verified.push('G11L1 panel layout: Min. Travel '+minimumTravel.minimum+' mm / '+minimumTravel.table);
+  }else{
+    result.unverified.push('G11L1 Minimum Travel: '+(minimumTravel?.reason||'Không đủ dữ liệu'));
+    if(result.status==='PASS')result.status='INCOMPLETE';
+  }
+ }
+ if(model==='MRL'){
   const decor=evaluateMRLDecoration();
   if(decor){
    result.errors.push(...decor.errors);
-   if(decor.state==='unavailable')result.unverified.push('Decoration Weight Maximum NEXIEZ-MRL Version2: '+decor.reason);
+   if(decor.state==='unavailable')result.unverified.push('Decoration Weight Maximum NEXIEZ-MRL Version2 (độc lập với OH/PD): '+decor.reason);
    if(decor.errors.length)result.status='FAIL';
    else if(decor.state==='unavailable'&&result.status==='PASS')result.status='INCOMPLETE';
    if(decor.state==='ready')result.verified.push('Technical Study G11L1 v2.5.0.0: '+decor.max+' kg excluding flooring');
@@ -2626,17 +2783,45 @@ function vietnameseFieldName(label){
 function renderSourceCheck(result){
  const top=$('check-top'),wrap=$('check-issues');
  const failed=result.status==='FAIL',incomplete=result.status==='INCOMPLETE';
- if(top){top.textContent=failed?'Không đạt':incomplete?'Chưa xác minh':'Đạt';
-  top.className='check-top '+(failed?'fail':incomplete?'partial':'source-pass')}
+ if(top){
+  // Keep the *overall* partial status without falsely labeling a completed G11L1
+  // OH/PD calculation as unverified. Other source checks remain independent.
+  const vertical=result.ohpdG11L1;
+  const verticalOK=vertical?.state==='ready'&&
+   Number.isFinite(vertical.actualOH)&&Number.isFinite(vertical.actualPD)&&
+   vertical.actualOH>=vertical.removed&&vertical.actualPD>=vertical.pd;
+  top.textContent=failed?'Không đạt':incomplete?
+   (verticalOK?'OH/PD đạt — còn điều kiện khác chưa xác minh':'Chưa xác minh — xem chi tiết'):'Đạt';
+  top.className='check-top '+(failed?'fail':incomplete?'partial':'source-pass');
+ }
  if(!wrap)return;
  wrap.replaceChildren();
+ // Show the conditional beam-removal notice in Check Spec for PASS, PARTIAL,
+ // and FAIL caused by independent checks. It is never counted as an error.
+ if(result.ohBeamNotice){
+  const notice=document.createElement('div');notice.className='check-hoisting-beam-notice';
+  notice.setAttribute('role','note');notice.textContent=result.ohBeamNotice;
+  wrap.append(notice);
+ }
 
  if(!failed){
+  // For partial checks, show the actual remaining blockers. A successful
+  // G11L1 OH/PD calculation must not be confused with workbook conditions
+  // still requiring verification; nor may those conditions be silently passed.
+  if(incomplete && (result.unverified||[]).length){
+   const pending=document.createElement('div');pending.className='check-error-row';
+   pending.style.cssText='display:block;white-space:normal;cursor:default';
+   const list=(result.unverified||[]).filter(Boolean);
+   const intro=document.createElement('strong');intro.textContent='Điều kiện còn chưa xác minh ('+list.length+'):';
+   const summary=document.createElement('div');summary.style.cssText='margin-top:4px;font-weight:normal;line-height:1.5';
+   summary.textContent=list.slice(0,5).map((x,i)=>(i+1)+'. '+x).join(' | ')+(list.length>5?' | … và '+(list.length-5)+' điều kiện khác':'');
+   pending.append(intro,summary);wrap.append(pending);
+  }
   // When the Version02 mass table is incomplete, show a direct link at D57
   // without pretending this is an incorrect user input.
   if(incomplete && $('model').value==='MRL' && (result.unverified||[]).some(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2/.test(String(x)))){
    const notice=document.createElement('button');notice.type='button';notice.className='check-error-row';
-   notice.textContent='Chưa xác minh Maximum Decoration Weight (D57) — '+(result.unverified||[]).filter(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2/.test(String(x))).map(x=>String(x).replace(/^Decoration Weight Maximum NEXIEZ-MRL Version2:\s*/, '')).join('; ');
+   notice.textContent='Chưa xác minh khối lượng trang trí (D57), không phải lỗi OH/PD — '+(result.unverified||[]).filter(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2/.test(String(x))).map(x=>String(x).replace(/^Decoration Weight Maximum NEXIEZ-MRL Version2:\s*/, '')).join('; ');
    // Observation wall MethodDef 69 can be unsupported for the selected COP.
    // Link to the actual incompatible COP selection instead of only to D57.
    const relatedToCop=(result.unverified||[]).some(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2:.*không có nhánh tính khối lượng vách.*COP/i.test(String(x)));
@@ -2948,3 +3133,10 @@ load();
 // v5.8.77: Avoid silent database replacement on GitHub Pages.
 // Use the embedded workbook in both file:// and https:// contexts.
 // Reload Database remains available only through an explicit user action.
+
+// Update MRL Min. Travel after the native dropdown or feature listeners mutate changes.
+document.addEventListener('change',function(event){
+ if($('model')?.value==='MRL' && (event.target?.closest?.('#fields,#features,.mrl-travel-panel-options'))){
+  queueMicrotask(refreshMRLTravelMinimum);
+ }
+});

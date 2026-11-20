@@ -23,6 +23,6 @@
   d.TractionMachine=(V>=200&&V<=240)?row['T/M type (200V)']:(V>=380&&V<=480)?row['T/M type (400V)']:null;
   return {candidates:a.length,row};
  }
- function maxMin(d){const a=candidates(d);if(!a.length)throw Error('No maxMin candidates');d.MinCarMass=+a[0]['Lower car mass [kg]'];d.MaxCarMass=+a[a.length-1]['Upper car mass [kg]'];return a;}
+ function maxMin(d){const a=candidates(d);if(!a.length)throw Error('Traction1: chưa có dữ liệu ứng với Capacity '+d.Capacity+' kg, Speed '+d.Speed+' m/min, Travel '+d.TRxm+' mm, SETS-L '+d.SetsL+'. Không dùng kết quả này để kết luận OH/PD.');d.MinCarMass=+a[0]['Lower car mass [kg]'];d.MaxCarMass=+a[a.length-1]['Upper car mass [kg]'];return a;}
  root.G11L1_TRACTION_SOURCE={maxMin,select,candidates};
 })(typeof window!=='undefined'?window:globalThis);

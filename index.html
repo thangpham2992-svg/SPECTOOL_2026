@@ -221,6 +221,17 @@ input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba
  .mr-plan-box img{max-height:220px}
 }
 .mr-p6c3-hint{display:block;margin-top:4px;font-size:11px;line-height:1.45;color:#356179;font-weight:550}
+
+/* v5.8.182: source-based OH and PD minima next to the original MRL inputs. */
+.workspace .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.mrl-ts-two-minima){grid-template-columns:minmax(102px,.72fr) minmax(100px,.85fr) minmax(185px,1.2fr)}
+.workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint.mrl-ts-two-minima{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;grid-column:3!important;margin:0!important;font-size:10.5px!important;line-height:1.35!important;overflow-wrap:normal!important}
+.mrl-ts-minimum-line{white-space:normal;color:#304f6a}
+.mrl-ts-minimum-line strong{color:#123451;white-space:nowrap}
+.mrl-ts-minimum-unavailable{color:#a32832;font-size:10px}
+@media(max-width:580px){
+ .workspace .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.mrl-ts-two-minima){grid-template-columns:minmax(95px,.8fr) minmax(0,1fr)}
+ .workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint.mrl-ts-two-minima{grid-column:2!important;grid-row:auto!important;align-items:flex-start;margin-top:2px!important}
+}
 </style>
 <style>
 /* SpecWebTool responsive presentation layer. Technical engines remain unchanged. */
@@ -733,7 +744,7 @@ body .workspace > .leadtime-check {background-color:#fff;}
 
 /* v5.8.28 — concise mobile UI, validation remains in Check Spec. */
 /* Hide descriptive notes, keep image previews, controls, validation and error messages. */
-#fields .cwt-minimum-hint,#fields .oh-minimum-hint,
+#fields .cwt-minimum-hint,
 #fields .technical-material-hint,#fields .design-hint,
 #fields .finish-preview-caption{display:none!important}
 /* Remove placeholder dash; rows without a dependent choice take one grid row. */
@@ -1225,6 +1236,42 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
  window.addEventListener('load',()=>{if(!userMoved){window.scrollTo(0,0);requestAnimationFrame(()=>{if(!userMoved)window.scrollTo(0,0)})}done=true},{once:true});
 })();
 </script>
+<style id="mrl-v02-g11l1-vertical-css">
+/* NEXIEZ-MRL Version 2 — Technical Study controls */
+.mrl-ts-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 12px;padding:10px;border:1px solid #dbe5ed;border-radius:8px;background:#f8fbfd}
+.mrl-ts-control{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mrl-ts-control label{font-size:11px;font-weight:700;color:#294664}
+.mrl-ts-control select{width:100%;background:#eaf5ff;border:1px solid #b5d2f0;color:#163454;min-height:36px;border-radius:5px;padding:4px 7px}
+.mrl-ts-details{grid-column:1/-1;font-size:11px;color:#586a7c;line-height:1.4}
+.mrl-ts-output{grid-column:1/-1;font-size:12px;color:#233e58;font-weight:650;line-height:1.4}
+.mrl-ts-output.mrl-ts-unavailable{color:#975629}
+.workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline}
+.mrl-ts-removed-note{font-size:11px;color:#294c74;font-weight:700}
+@media(max-width:520px){.mrl-ts-settings{grid-template-columns:1fr}.mrl-ts-settings>*{grid-column:1}}
+
+/* v5.8.184: MRL Technical Study OH/PD minima must remain visible.
+   Legacy note hiding excluded oh-minimum-hint; display beside value on PC. */
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry .oh-minimum-hint.mrl-ts-two-minima{display:flex!important;flex-direction:column!important;gap:3px!important;visibility:visible!important;grid-column:3!important;align-self:center;min-width:0;line-height:1.4!important}
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.oh-minimum-hint.mrl-ts-two-minima) > .spec-row-title{grid-column:1!important}
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.oh-minimum-hint.mrl-ts-two-minima) input{grid-column:2!important}
+@media(max-width:580px){
+ #fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry .oh-minimum-hint.mrl-ts-two-minima{grid-column:2!important;grid-row:auto!important;margin-top:3px!important}
+}
+</style>
+<style id="mrl-g11l1-min-travel-186">
+/* Separate G11L1 minimum TR; do not hide the existing two-stop/max-travel advice. */
+ display:block!important;grid-column:3!important;font-size:11px;font-weight:700;color:#29577c;line-height:1.35;min-width:0;white-space:normal
+}
+.mrl-travel-panel-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 12px;background:#f9fbfd}
+.mrl-travel-panel-option{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#294664;font-weight:700}
+.mrl-travel-panel-option select{font-size:12px;max-width:100%;padding:5px;min-height:34px;background:#eaf5ff;border:1px solid #b5d2f0;border-radius:5px;color:#163454}
+@media(max-width:650px){
+ .mrl-travel-panel-options{grid-template-columns:1fr}
+}
+</style>
+<style id="mrl-beam-removal-notice-v192">
+#check-issues .check-hoisting-beam-notice{grid-column:1/-1;display:block;padding:9px 12px;border:1px solid #e1d4ae;border-left:3px solid #a88a3c;border-radius:5px;background:#fffdf5;color:#594c2d;font-size:13px;line-height:1.5;font-weight:600}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
@@ -1450,7 +1497,7 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
 <script src="g11l1-source-machine-il.js?v=5.8.79"></script>
 <script src="g11l1-source-machine.js?v=5.8.79"></script>
 <script src="g11l1-source-cage.js?v=5.8.99"></script>
-<script src="g11l1-source-traction.js?v=5.8.79"></script>
+<script src="g11l1-source-traction.js?v=5.8.182"></script>
 <script src="g11l1-source-duty.js?v=5.8.79"></script>
 <script src="g11l1-source-engine.js?v=5.8.79"></script>
 <script src="mrl-decoration-v02.js?v=5.8.99"></script>
@@ -1462,7 +1509,9 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
-<script src="app.js?v=5.8.160"></script>
+<script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
+<script src="mrl-v02-min-travel.js?v=5.8.191"></script>
+<script src="app.js?v=5.8.192"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
