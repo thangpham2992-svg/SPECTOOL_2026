@@ -157,7 +157,7 @@
    const bilingualUpper=new Set(),bilingualLower=new Set();
    const hasVietnamese=s=>/[À-ỹ]/.test(String(s||''));
    const isEnglish=s=>/^\s*\(?[A-Za-z]/.test(String(s||''))&&!hasVietnamese(s);
-   const looksFeature=s=>/^\s*\([A-Z][A-Z0-9-]{1,12}\)/.test(String(s||''));
+   // Feature names may be plain English (Multi - Beam) or parenthesized with spaces (SDE - One Side).
    for(let rn=1;rn<end;rn++){
      if(!visibleRows.has(rn)||!visibleRows.has(rn+1))continue;
      const upper=String(cells.get('C'+rn)?.value||'').trim();
@@ -170,7 +170,7 @@
      const vnThenEn=hasVietnamese(upper)&&isEnglish(lower)&&/^\(/.test(lower)
        &&!nextLabel&&!String(cells.get('B'+(rn+1))?.value||'').trim();
      const enThenVn=isEnglish(upper)&&hasVietnamese(lower)
-       &&looksFeature(label)&&hasVietnamese(nextLabel);
+       &&isEnglish(label)&&hasVietnamese(nextLabel);
      if(vnThenEn||enThenVn){bilingualUpper.add(rn);bilingualLower.add(rn+1)}
    }
    // Prelude ends at the first real specification section (different row in
