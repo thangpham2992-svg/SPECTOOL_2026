@@ -271,3 +271,15 @@ body .workspace > .leadtime-check {background-color:#fff;}
   color:#7d8894!important; -webkit-text-fill-color:#7d8894!important;
   opacity:1!important; cursor:not-allowed!important;
 }
+
+/* v5.8.160: Section I MR selectors use the existing left-hand row title.
+   Keep their one-line height aligned with Speed, Quantity, and Use on desktop/mobile. */
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact{
+  display:flex!important;flex-direction:column;justify-content:center;
+  gap:0!important;margin:0!important;padding:0!important;width:100%;min-width:0;
+}
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact select{
+  width:100%;height:40px!important;min-height:40px!important;
+  margin:0!important;box-sizing:border-box;
+}
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact .mr-selector-label{display:none!important}

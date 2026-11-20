@@ -1902,8 +1902,12 @@ function mountHallQuantity(item,input,kind){
   if(!doorNative||!cwtNative||!aaNative||!bbNative||!jjNative)return;
   const makeSelect=(id,host,label)=>{
    const box=document.createElement('div');box.className='mr-selector-control';
-   const title=document.createElement('label');title.className='mr-selector-label';title.htmlFor=id;title.textContent=label;
-   const el=document.createElement('select');el.id=id;el.setAttribute('aria-label',label);box.append(title,el);host.append(box);return el;
+   // The existing row label already identifies the three Section I inputs.
+   // Do not repeat a second label above their dropdowns (mobile compact layout).
+   const compact=['mr-capacity-group','mr-door-choice','mr-cwt-choice'].includes(id);
+   if(compact)box.classList.add('mr-selector-compact');
+   if(!compact){const title=document.createElement('label');title.className='mr-selector-label';title.htmlFor=id;title.textContent=label;box.append(title)}
+   const el=document.createElement('select');el.id=id;el.setAttribute('aria-label',label);box.append(el);host.append(box);return el;
   };
   const group=makeSelect('mr-capacity-group',parent,'Nhóm tải trọng P / Capacity group');
   // Keep Section I fields and original workbook cells; only hide duplicate internal controls.
