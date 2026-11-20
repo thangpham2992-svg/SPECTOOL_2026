@@ -2014,7 +2014,7 @@ function mountHallQuantity(item,input,kind){
     // Source-specific guidance follows the selected factory code, not a separate UI group.
     p6c3Hint.textContent=/^P6C3-CO\b/i.test(String(preferred.EleCapacityName))?
      'P6C3 theo DataTable: CO · CWT Side · AA 1200 × BB 1100 · JJ 700 mm. HH = 2100 mm; khối lượng trang trí (gồm sàn) phụ thuộc trần, tốc độ và hoàn thiện. Các giới hạn AH/BH, OH/PD và chiều cao cabin được Check Spec theo dữ liệu gốc.':'';
-    warning.textContent=[corrections.length?'⚠ Cấu hình không tương thích; đã hiệu chỉnh từ dưới lên / phải sang trái: '+corrections.slice().reverse().join('; ')+'.':'',rows.length>1?'⚠ Có '+rows.length+' mã P cùng cấu hình. Chọn mã gốc để đảm bảo Check Spec chính xác.':''].filter(Boolean).join(' ');
+    warning.textContent=rows.length>1?'⚠ Có '+rows.length+' mã P cùng cấu hình. Chọn mã gốc để đảm bảo Check Spec chính xác.':'';
     if(String(preferred.EleCapacityName)!==last){
       // Fire the ORIGINAL change listener: this updates all formulas, dependent specs and export changes.
       native.value=String(preferred.EleCapacityName);
