@@ -496,7 +496,10 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
    const name=String(db.sheets.DataTable[ref[1]+r]??'').trim();if(name)names.push(name);
   }
   const isBEDHandrail=model==='MR'&&tab==='TblK32_Handrail'&&/^B(?:750|1000)-2S\b/.test(String(value('SpecForm','D13').value||''))&&String(selected.value).trim()==='YH-56S (SUS304)';
-  if(!names.includes(String(selected.value??'').trim())&&!isBEDHandrail)issue('Source!'+tab,field,
+  const twoGateWithoutRail=model==='MRL'&&field==='D65'
+    &&String(value('SpecForm','D64').value||'').trim()==='Not supplied'
+    &&String(selected.value||'').trim()==='No';
+  if(!names.includes(String(selected.value??'').trim())&&!isBEDHandrail&&!twoGateWithoutRail)issue('Source!'+tab,field,
    tab==='TblK32_Handrail'?'Mã tay vịn chưa được cho phép trong Excel nguồn.':'Vị trí tay vịn không hợp lệ trong Excel nguồn.');
   else verified.push('SpecForm!'+field+' — '+tab);
  }

@@ -936,7 +936,9 @@ function workbookChoices(field,engine=null){
  }
  if(!field.validation&& !supplementalListSources[field.name])list=technicalOptions(field);
  if(field.cell==='D23'&&$('model').value==='MRL')list=eligibleSideDrops();
- if(field.cell==='D65'&&$('model').value==='MRL'&&ny40PositionChoices())list=ny40PositionChoices();
+ if(field.cell==='D65'&&$('model').value==='MRL'){
+   list=window.SPEC_NY40_RULES?.allowedForSpec(currentValue('D14'),currentValue('D16'),currentValue('D64'))||['No','3 pcs on 3 walls','2 pcs on both side walls','1 pc on rear wall'];
+ }
  // v5.8.65: MRL Version02 only. Limit visible choices but NEVER overwrite an
  // existing selection; Check Spec flags incompatible saved/imported values.
  if($('model').value==='MRL'&&field.cell==='D62'&&String(currentValue('D60')).trim()==='Side')list=['No'];
@@ -1272,7 +1274,9 @@ function row(field,displayName='',compact=false){
  if(input.tagName==='SELECT'){
   const options=[...choices.map(String)];if(value&&!choices.includes(value)&&!field.validation&&!supplementalListSources[field.name])options.unshift(value);
   if(!options.length)options.push('');
-  for(const option of [...new Set(options)]){const opt=document.createElement('option');opt.value=option;opt.textContent=window.SPEC_PROOFREAD?.(option||'— Chọn / Select —')??(option||'— Chọn / Select —');input.append(opt)}
+  for(const option of [...new Set(options)]){const opt=document.createElement('option');opt.value=option;
+   const mrlHandrailNames={'No':'No','3 pcs on 3 walls':'Three side walls','2 pcs on both side walls':'Both side walls','1 pc on rear wall':'Rear wall'};
+   opt.textContent=$('model').value==='MRL'&&field.cell==='D65'?(mrlHandrailNames[option]||option):(window.SPEC_PROOFREAD?.(option||'— Chọn / Select —')??(option||'— Chọn / Select —'));input.append(opt)}
  }else input.placeholder='';
  // MR Alpha Package Rev.AM: entrance/door height HH is fixed at 2100 mm.
  // Preserve the same SpecForm input for Check Spec and exports; never offer freetext.
@@ -1288,6 +1292,16 @@ function row(field,displayName='',compact=false){
  input.value=value;
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
+   // Version 2 popup No denotes an unsupplied handrail, not a fourth mounting position.
+   if($('model').value==='MRL'&&field.cell==='D65'&&input.value==='No'&&String(currentValue('D64')).trim()!=='Not supplied')applyValue('D64','Not supplied');
+   if($('model').value==='MRL'&&field.cell==='D65'&&input.value!=='No'&&String(currentValue('D64')).trim()==='Not supplied')applyValue('D64','YH-100SL (SUS304)');
+   if($('model').value==='MRL'&&field.cell==='D64'){
+     if(input.value==='Not supplied')applyValue('D65','No');
+     else if(String(currentValue('D65')).trim()==='No'){
+       const allowed=window.SPEC_NY40_RULES?.allowedForSpec(currentValue('D14'),currentValue('D16'),input.value)||[];
+       applyValue('D65',allowed.find(v=>v!=='No')||'1 pc on rear wall');
+     }
+   }
    if(['MR','MRL'].includes($('model').value))refreshTwoStopTravelWarning();
    if(field.name==='K5_Capacity')capacityUpdate(input.value);
    if($('model').value==='MRL'&&['D13','D16'].includes(field.cell)){
@@ -1321,8 +1335,8 @@ function row(field,displayName='',compact=false){
     }
    }
    if($('model').value==='MRL'&&field.cell==='D14'&&window.SPEC_NY40_RULES){
-     const allowed=window.SPEC_NY40_RULES.allowedLocations(input.value);
-     if(allowed&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
+     const allowed=window.SPEC_NY40_RULES.allowedForSpec(input.value,currentValue('D16'),currentValue('D64'));
+     if(allowed?.length&&!allowed.includes(String(currentValue('D65'))))applyValue('D65',allowed[0]);
    }
    syncDropdownOptions();
    if(field.name==='K24_CarDoorFinish')syncLandingFinishFromCar();
@@ -1457,6 +1471,48 @@ function mrlVerticalInput(){
  return {code:source,capacity,speed:currentValue('D17'),travel:currentValue('D35'),hl:currentValue('D30'),ceiling:currentValue('D41'),regulation:mrlG11Regulation(),cwtType:cwt,setsL,shortOH:mrlVerticalBufferCap==='Yes',plasmaWithTwoEntrances:/2G/.test(entrance)&&/plasma quad/i.test(ventilation)};
 }
 function getMRLVerticalResult(){if($('model').value!=='MRL')return null;return window.SPEC_G11L1_VERTICAL_V02?.calculate(mrlVerticalInput())||{state:'unavailable',reason:'Chưa tải bộ tính G11L1'};}
+// Advisory calculation only: use actual G11L1 values with SETS-L selected.
+// Never auto-select SETS-L or claim a reduction for unsupported combinations.
+function mrlSETSSavingAdvice(){
+ if($('model')?.value!=='MRL')return null;
+ const input=mrlVerticalInput();
+ if(input.setsL||Number(input.speed)===60)return null;
+ const original=window.SPEC_G11L1_VERTICAL_V02?.calculate(input);
+ const proposed=window.SPEC_G11L1_VERTICAL_V02?.calculate({...input,setsL:true});
+ if(original?.state!=='ready'||proposed?.state!=='ready')return null;
+ const oh=Number(currentValue('D37')),pd=Number(currentValue('D36'));
+ if(!Number.isFinite(oh)||!Number.isFinite(pd))return null;
+ // Only advise on eligible dimensions when both current entered dimensions comply.
+ if(oh<original.removed||pd<original.pd)return null;
+ const savingOH=proposed.remain<original.remain||proposed.removed<original.removed;
+ const savingPD=proposed.pd<original.pd;
+ if(!savingOH&&!savingPD)return null;
+ return {original,proposed,savingOH,savingPD};
+}
+
+// A corrective SETS-L suggestion is offered ONLY when the user's current
+// OH/PD is insufficient without SETS-L but satisfies BOTH minima with SETS-L.
+// The new proposal is a preview; selecting the feature remains a user action.
+function mrlSETSLCorrectiveAdvice(){
+ if($('model')?.value!=='MRL')return null;
+ const input=mrlVerticalInput();
+ if(input.setsL||Number(input.speed)===60)return null;
+ const solver=window.SPEC_G11L1_VERTICAL_V02;
+ const original=solver?.calculate(input);
+ const proposed=solver?.calculate({...input,setsL:true});
+ if(original?.state!=='ready'||proposed?.state!=='ready')return null;
+ const oh=Number(currentValue('D37')),pd=Number(currentValue('D36'));
+ if(!Number.isFinite(oh)||!Number.isFinite(pd))return null;
+ const missingOH=oh<original.removed;
+ const missingPD=pd<original.pd;
+ if(!missingOH&&!missingPD)return null;
+ if(oh<proposed.removed||pd<proposed.pd)return null;
+ // The factory's basic SETS-L eligibility must remain independently valid.
+ const feature=sourceFeatureRows().find(f=>(window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)==='SETS-L');
+ if(!feature)return null;
+ return {original,proposed,missingOH,missingPD,featureCell:feature.cell};
+}
+
 function mountMRLVerticalOptions(root){
  if($('model').value!=='MRL')return;
  const section=[...root.querySelectorAll('.spec-section')].find(el=>el.dataset.section==='II');
@@ -1468,15 +1524,16 @@ function mountMRLVerticalOptions(root){
   const el=document.createElement('select');el.id=id;for(const [val,name] of items){const opt=document.createElement('option');opt.value=val;opt.textContent=name;el.append(opt)}el.value=value;holder.append(label,el);panel.append(holder);return el;
  };
  // Regulation comes from the existing SpecForm D26 selection; display it, don't duplicate it.
- const cap=select('mrl-g11-buffercap','Short OH with Buffer Cap',[['No','No'],['Yes','Yes']],mrlVerticalBufferCap);
+ // Buffer Cap selection is placed directly below EN81-72 in the hoistway options.
  const details=document.createElement('small');details.className='mrl-ts-details';panel.append(details);
  const output=document.createElement('div');output.className='mrl-ts-output';output.id='mrl-g11-result';panel.append(output);
- cap.onchange=()=>{mrlVerticalBufferCap=cap.value;refreshMRLOverheadMinimum(false);invalidateCheck();};
+
  const first=card.querySelector('.dimension-entry');if(first)card.insertBefore(panel,first);else card.append(panel);
  window.__mrlG11PanelRefresh=()=>{
   const currentReg=mrlG11Regulation();
-  if(currentReg!=='EN81-20'&&mrlVerticalBufferCap==='Yes'){mrlVerticalBufferCap='No';cap.value='No';}
-  const yes=cap.querySelector('option[value="Yes"]');if(yes)yes.disabled=currentReg!=='EN81-20';
+  const cap=document.getElementById('mrl-g11-buffercap');
+  if(currentReg!=='EN81-20'&&mrlVerticalBufferCap==='Yes')mrlVerticalBufferCap='No';
+  if(cap){cap.value=mrlVerticalBufferCap;const yes=cap.querySelector('option[value="Yes"]');if(yes)yes.disabled=currentReg!=='EN81-20';}
   details.textContent='Technical Study G11L1 v2.6.0.0 · Hoisting Beam Remain · '+(currentReg==='EN81-20'?'EN81-20 · HARH 1100 mm':currentReg==='MELCO std.'?'Mitsubishi Standard · HARH 700 mm':'Chưa xác định Regulation từ D26');
   const r=getMRLVerticalResult();output.classList.toggle('mrl-ts-unavailable',r?.state!=='ready');
   output.textContent=r?.state==='ready'?`OH ≥ ${r.remain} mm · Sau khi tháo dầm = ${r.removed} mm · PD ≥ ${r.pd} mm`:'Chưa xác minh OH/PD: '+(r?.reason||'Không xác định');
@@ -1516,6 +1573,8 @@ function refreshMRLOverheadMinimum(adjustIfBelow=false){
    addLine('Min. PD',r.pd);
   }
   if(adjustIfBelow){const actual=Number(currentValue(cell));if(!Number.isFinite(actual)||actual<r[kind]){el.value=String(r[kind]);changes[cell]=String(r[kind]);el.classList.add('dirty');}}
+
+
  }
 }
 // v5.8.75: factory-requested defaults for NEXIEZ-MR hospital-bed models.
@@ -1603,21 +1662,21 @@ function allowedObservationCodes(){
 }
 function ny40PositionChoices(){
  if($('model').value!=='MRL')return null;
- return window.SPEC_NY40_RULES?.allowedLocations(String(currentValue('D14')))||null;
+ return window.SPEC_NY40_RULES?.allowedForSpec(currentValue('D14'),currentValue('D16'),currentValue('D64'))??null;
 }
 function technicalOptions(field){
  if($('model').value!=='MRL')return field.options||[];
  const cap=String(currentValue('D13')),entrance=String(currentValue('D16'));
  if(field.cell==='D16')return /^(P08|P11|P13|P17D|P21D)/.test(cap)?['1D-1G','1D-2G']:['1D-1G'];
  if(field.cell==='D14')return ['No',...allowedObservationCodes()];
- if(field.cell==='D65'&&ny40PositionChoices())return ny40PositionChoices();
+ if(field.cell==='D65')return ny40PositionChoices()||['No','3 pcs on 3 walls','2 pcs on both side walls','1 pc on rear wall'];
  return field.options||[];
 }
 function updateConditional(){
  for(let cell of ['D16','D14','D65']){
   const f=current.fields.find(x=>x.cell===cell),el=activeInput(cell);if(!f||!el)continue;
   const opts=technicalOptions(f);if(el.tagName!=='SELECT')continue;
-  const old=String(currentValue(cell));el.replaceChildren();for(let value of opts){let op=document.createElement('option');op.value=value;op.textContent=value;el.append(op)}
+  const old=String(currentValue(cell));el.replaceChildren();for(let value of opts){let op=document.createElement('option');op.value=value;op.textContent=cell==='D65'?({'No':'No','3 pcs on 3 walls':'Three side walls','2 pcs on both side walls':'Both side walls','1 pc on rear wall':'Rear wall'}[value]||value):value;el.append(op)}
   const next=opts.includes(old)?old:opts[0]||'';el.value=next;if(next!==old)changes[cell]=next;
  }
 }
@@ -1987,8 +2046,18 @@ function mountHallQuantity(item,input,kind){
   if(!capacity)return;
   const native=activeInput(capacity.cell),parent=native?.closest('.field');
   if(!native||!parent)return;
+  // Reapply is idempotent and protects MR bed choices when switching models.
+  window.SPEC_MR_BED_5871?.patchEmbedded(current);
   const source=current.capacity.filter(r=>String(r.EleCapacityName||'').trim());
-  const groupName=r=>{const m=String(r.EleCapacityName||'').match(/^P0?(6|8|9|10|11|13|15|17|20)(?=[A-Z0-9-]|\b)/i);return m?'P'+m[1]:''};
+  const groupName=r=>{
+   const name=String(r.EleCapacityName||'').trim();
+   // Hospital-bed B750/B1000 are real NEXIEZ-MR capacity rows supplied by
+   // SPEC_MR_BED_5871; do not filter them out of the grouped capacity selector.
+   const bed=name.match(/^(B750|B1000)(?=-|\s|\(|$)/i);
+   if(bed)return bed[1].toUpperCase();
+   const p=name.match(/^P0?(6|8|9|10|11|13|15|17|20)(?=[A-Z0-9-]|\b)/i);
+   return p?'P'+p[1]:'';
+  };
   // UI-only stretcher/deep-car presets. Preserve original factory P-code in SpecForm.
   // D presets never create fictitious P17D/P20D factory codes: they filter existing valid rows.
   const baseGroups=[...new Set(source.map(groupName).filter(Boolean))];
@@ -2265,8 +2334,10 @@ function renderAllSpecRows(){
       sel.addEventListener('change',()=>{callback(sel.value);refreshMRLTravelMinimum();invalidateCheck();});
       wrapper.append(sel);choices.append(wrapper);
      };
-     make('mrl-travel-en8172','EN81-72 (Travel table)',mrlTravelEN8172,v=>{mrlTravelEN8172=v});
-     hoistway.append(choices);
+     // Temporary: EN81-72 and BufferCap controls are hidden by request.
+     // Keep their internal variables and factory calculation logic intact.
+     // No controls are mounted while they are hidden.
+
     }
    }
    dimensionGrid.classList.add('dimension-section-fields');
@@ -2652,7 +2723,10 @@ function check(){
   // Replace catalogue OH/PD check (DataTable D523) with the actual G11L1 VerticalStudy result.
   // This must NOT silently turn a failed geometry/other source check into PASS.
   const vertical=getMRLVerticalResult();
-  result.errors=result.errors.filter(err=>!/^DataTable!D523(?:$|\/)/.test(String(err.id)));
+  result.errors=result.errors.filter(err=>
+   !/^DataTable!D523(?:$|\/)/.test(String(err.id)) &&
+   !(String(err.id)==='SpecForm!B209'&&/OH\/PD|pit.*min|overhead.*min/i.test(String(err.message||'')))
+  );
   if(vertical?.state==='ready'){
    const actualOH=Number(currentValue('D37'));
    const actualPD=Number(currentValue('D36'));
@@ -2667,6 +2741,9 @@ function check(){
     result.errors.push({id:'G11L1!PD',cell:'D36',
      message:'PD tối thiểu theo Technical Study G11L1: '+vertical.pd+' mm; hiện tại '+(Number.isFinite(actualPD)?actualPD:'—')+' mm.'});
    }
+   // Check whether explicitly selecting SETS-L would solve undersized OH/PD.
+   // No error is suppressed until the user actually selects the feature.
+   result.setsLCorrectiveAdvice=mrlSETSLCorrectiveAdvice();
    result.verified.push('G11L1 v2.6.0.0: OH Remain '+vertical.remain+' mm, Removed '+vertical.removed+' mm, PD '+vertical.pd+' mm');
    // The higher PD branch is a valid conservative pass/fail threshold.
    // Do not downgrade every supported speed to INCOMPLETE just because
@@ -2796,6 +2873,17 @@ function renderSourceCheck(result){
  }
  if(!wrap)return;
  wrap.replaceChildren();
+ const deferredSetsNotices=[];
+ // Restore SETS-L size-reduction notice when entered OH/PD already meet minima.
+ const setsAdvice=mrlSETSSavingAdvice();
+ if(setsAdvice){
+  const note=document.createElement('div');note.className='check-sets-l-notice';note.setAttribute('role','note');
+  const parts=[];
+  if(setsAdvice.savingOH)parts.push('OH: '+setsAdvice.proposed.remain.toLocaleString('vi-VN')+' mm (With Hoisting Beam), '+setsAdvice.proposed.removed.toLocaleString('vi-VN')+' mm (Without Hoisting Beam)');
+  if(setsAdvice.savingPD)parts.push('PD: '+setsAdvice.proposed.pd.toLocaleString('vi-VN')+' mm');
+  note.textContent='Gợi ý sử dụng SETS-L để giảm kích thước tối thiểu về '+parts.join('; ')+'.';
+  deferredSetsNotices.push(note);
+ }
  // Show the conditional beam-removal notice in Check Spec for PASS, PARTIAL,
  // and FAIL caused by independent checks. It is never counted as an error.
  if(result.ohBeamNotice){
@@ -2804,6 +2892,19 @@ function renderSourceCheck(result){
   wrap.append(notice);
  }
 
+ // An OH/PD fault that can be resolved by SETS-L gets a concrete
+ // recommendation linked to the actual Feature checkbox, not an auto-change.
+ if(result.setsLCorrectiveAdvice){
+  const advice=result.setsLCorrectiveAdvice;
+  const nav=document.createElement('button');nav.type='button';
+  nav.className='check-sets-l-notice check-sets-l-fix';
+  const improvements=[];
+  if(advice.missingOH)improvements.push('OH min '+advice.proposed.removed.toLocaleString('vi-VN')+' mm (Without Hoisting Beam)');
+  if(advice.missingPD)improvements.push('PD min '+advice.proposed.pd.toLocaleString('vi-VN')+' mm');
+  nav.textContent='Gợi ý: Chọn SETS-L để đáp ứng kích thước hiện tại — '+improvements.join('; ')+'. Nhấn để đến tính năng SETS-L.';
+  nav.onclick=()=>focusIssue(advice.featureCell);
+  deferredSetsNotices.push(nav);
+ }
  if(!failed){
   // For partial checks, show the actual remaining blockers. A successful
   // G11L1 OH/PD calculation must not be confused with workbook conditions
@@ -2827,6 +2928,7 @@ function renderSourceCheck(result){
    const relatedToCop=(result.unverified||[]).some(x=>/Decoration Weight Maximum NEXIEZ-MRL Version2:.*không có nhánh tính khối lượng vách.*COP/i.test(String(x)));
    notice.onclick=()=>focusIssue(relatedToCop?'D61':'D57');wrap.append(notice);
   }
+  wrap.append(...deferredSetsNotices);
   return;
  }
  const aggregates=/^(?:DataTable!D512|DataTable!D527|SpecForm!B210|SpecForm!B206|SpecForm!B208)$/;
@@ -2844,7 +2946,8 @@ function renderSourceCheck(result){
  const fields=new Map(),features=sourceFeatureRows();
  const sizeLabel={D33:'Chiều rộng hố thang (AH)',D34:'Chiều sâu hố thang (BH)',D36:'Chiều sâu hố PIT (PD)',D37:'Đỉnh hố thang (OH)',D40:'Chiều sâu hố PIT (PD)',D41:'Đỉnh hố thang (OH)',D35:'Chiều sâu hố thang (BH)'};
  const isDimension=cell=>$('model').value==='MRL'?['D33','D34','D36','D37'].includes(cell):['D34','D35','D40','D41'].includes(cell);
- const dimensionPriority=err=>/^(?:DataTable!D52[23]\/|DataTable!AP2[45]$)/.test(String(err.id))?3:err.id==='Tool.exe CheckSpecStep1'?2:1;
+ const dimensionPriority=err=>/^G11L1!(?:OH|PD)$/.test(String(err.id))?10:
+  /^(?:DataTable!D52[23]\/|DataTable!AP2[45]$)/.test(String(err.id))?3:err.id==='Tool.exe CheckSpecStep1'?2:1;
  for(const err of issues){
   const cell=String(err.cell||'').trim();if(!cell)continue;
   const f=current.fields.find(x=>x.cell===cell),feature=features.find(x=>x.cell===cell);
@@ -2854,18 +2957,19 @@ function renderSourceCheck(result){
   if(String(err.id)==='MR!DecorationWeightMaximum')name=String(err.message||'');
   // MR: show an actionable COP position error for Front -> Side.
   if($('model').value==='MR'&&cell==='D64'&&String(currentValue('D64')).trim().toLowerCase()==='front')name='Lỗi vị trí bảng điều khiển, cần chuyển từ Front → Side';
+  if($('model').value==='MRL'&&cell==='D65')name='Tay vịn – Số lượng / Vị trí';
   if(String(err.id)==='ITP!Required')name='Vui lòng chọn loại ITP';
   if(String(err.id).startsWith('ITP!')&&String(err.id)!=='ITP!Required')name=String(err.message||'Loại ITP không hợp lệ');
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=(cell==='D65' || isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')?10:(isDimension(cell)?dimensionPriority(err):0);
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{id:String(err.id),name,message,priority});
  }
  if(top&&failed)top.textContent=`Không đạt — ${fields.size||1} lỗi`;
- if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);return}
+ if(!fields.size){const row=document.createElement('div');row.className='check-error-row';row.textContent='Có lỗi kỹ thuật cần kiểm tra';wrap.append(row);wrap.append(...deferredSetsNotices);return}
  let index=0;
  for(const [cell,item] of fields){
   const link=document.createElement('button');link.type='button';link.className='check-error-row';
@@ -2898,6 +3002,8 @@ function renderSourceCheck(result){
   link.onclick=()=>focusIssue(cell);
   wrap.append(link);
  }
+ // Place actionable SETS-L guidance after all Check Spec errors.
+ wrap.append(...deferredSetsNotices);
 }
 
 function download(bytes,name,type){

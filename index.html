@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="specweb-build" content="5.8.157-capacity-group-cwt-order">
+<meta name="specweb-build" content="5.8.198-mrl-handrail-three-positions">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spec Engineering | Mitsubishi Electric</title>
 <!-- Browser icon / Home screen icon -->
@@ -1272,6 +1272,11 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 <style id="mrl-beam-removal-notice-v192">
 #check-issues .check-hoisting-beam-notice{grid-column:1/-1;display:block;padding:9px 12px;border:1px solid #e1d4ae;border-left:3px solid #a88a3c;border-radius:5px;background:#fffdf5;color:#594c2d;font-size:13px;line-height:1.5;font-weight:600}
 </style>
+
+<style id="mrl-sets-l-notice-v194">
+#fields .dimension-groups[data-model="MRL"] .oh-minimum-hint .mrl-sets-l-advice{display:block!important;margin-top:5px;font-size:10.5px;line-height:1.4;color:#395b74;font-weight:500;max-width:300px}
+#check-issues .check-sets-l-notice{grid-column:1/-1;display:block;padding:9px 12px;border:1px solid #b9d8c9;border-left:3px solid #508971;border-radius:5px;background:#f5fbf8;color:#265741;font-size:12.5px;line-height:1.5;font-weight:600}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
@@ -1469,7 +1474,7 @@ window.SPEC_CF_CHECK=function(model,changes,db,engine){
 })();
 
 </script>
-<script src="ny40-rules.js?v=5.8.99"></script>
+<script src="ny40-rules.js?v=5.8.198"></script>
 <script>
 'use strict';
 // Required EVRC-C for special COPs when any of four features is selected.
@@ -1489,8 +1494,8 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
 
 </script>
 <script src="mr-bed-capacity.js?v=5.8.79"></script>
-<script src="alpha-technical-rules.js?v=5.8.79"></script>
-<script src="source-check.js?v=5.8.101"></script>
+<script src="alpha-technical-rules.js?v=5.8.198"></script>
+<script src="source-check.js?v=5.8.198"></script>
 <script src="g11l1-ts-alpha-tables.js?v=5.8.79"></script>
 <script src="g11l1-ts-il-data.js?v=5.8.79"></script>
 <script src="g11l1-ts-il-runtime.js?v=5.8.79"></script>
@@ -1511,9 +1516,11 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
 <script src="material-finish.js?v=5.8.79"></script>
 <script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=5.8.192"></script>
+<script src="app.js?v=5.8.198"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>
 </body></html>
+
+<!-- 5.8.195: EN81-72 and BufferCap remain hidden until re-enabled. -->

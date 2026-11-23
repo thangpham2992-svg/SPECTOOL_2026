@@ -6,14 +6,38 @@ window.SPEC_NY40_RULES=Object.freeze({
     'NY-40A':['3 pcs on 3 walls'],
     'NY-40B':['1 pc on rear wall','3 pcs on 3 walls'],
     'NY-40C':['2 pcs on both side walls','3 pcs on 3 walls'],
-    'NY-40D':['2 pcs on rear & left side wall','3 pcs on 3 walls'],
-    'NY-40E':['2 pcs on rear & right side wall','3 pcs on 3 walls']
+    'NY-40D':['3 pcs on 3 walls'],
+    'NY-40E':['3 pcs on 3 walls']
   }),
+  // Only the three installed positions in the G11L1 Version 2 popup, plus No.
+  standardChoices:Object.freeze(['No','3 pcs on 3 walls','2 pcs on both side walls','1 pc on rear wall']),
   isGlassDoor:function(s){return /(?:DSJ1|DS1|\bDS\b|Large\s*window)/i.test(String(s||''));},
   allowedLocations:function(obs){return this.positionChoices[String(obs||'').trim()]||null;},
+  // G11L1 Version02: 1D-2G offers no handrail or handrails on BOTH side walls.
+  // 'No' belongs to the Handrail Type (D64: Not supplied), not D65 source list.
+  allowedForSpec:function(obs,entrance,rail){
+    const noRail=/^(?:Not supplied|No)$/i.test(String(rail||'').trim());
+    if(String(entrance||'').trim()==='1D-2G')return noRail?['No']:['No','2 pcs on both side walls'];
+    if(noRail)return ['No'];
+    return this.allowedLocations(obs)||this.standardChoices;
+  },
   validate:function(get){
     const errors=[],obs=String(get('D14')||'').trim(),allowed=this.allowedLocations(obs);
-    if(!allowed)return errors;
+    const twoGate=String(get('D16')||'').trim()==='1D-2G';
+    if(twoGate&&!allowed){
+      const rail=String(get('D64')||'').trim(),loc=String(get('D65')||'').trim();
+      if(rail!=='Not supplied' && (loc!=='2 pcs on both side walls'||!rail))
+        errors.push({cell:!rail?'D64':'D65',id:'MRL!TwoGateHandrailLocation',message:'1D-2G: chọn Handrail = Not supplied hoặc vị trí 2 pcs on both side walls.'});
+    }
+    if(!allowed){
+      const loc=String(get('D65')||'').trim(),rail=String(get('D64')||'').trim();
+      const permitted=this.allowedForSpec(obs,String(get('D16')||''),rail);
+      if(!permitted.includes(loc))errors.push({cell:'D65',id:'MRL!HandrailPosition',
+        message:'Vị trí tay vịn không hợp lệ. Chỉ dùng No / Three side walls / Both side walls / Rear wall; 1D-2G chỉ No hoặc Both side walls.'});
+      if((loc==='No')!==/^(?:Not supplied|No)$/i.test(rail))errors.push({cell:'D64',id:'MRL!HandrailNoneSync',
+        message:'Khi Handrail Location = No thì loại tay vịn phải là Not supplied (và ngược lại).'});
+      return errors;
+    }
     // Design guide: every NY-40 observation car requires SUS-HL for all
     // three front/trim finishes. Keep these checks independent from the
     // original workbook formulas and never silently normalize user selections.
@@ -37,11 +61,13 @@ window.SPEC_NY40_RULES=Object.freeze({
       errors.push({cell:'D62',id:'NY40!AuxiliaryWheelchairCOP',
         message:obs+': không được sử dụng Auxiliary COP hoặc Wheelchair COP. Chọn No / Not supplied. / Auxiliary and wheelchair COP are not permitted for NY-40.'});
     const loc=String(get('D65')||'').trim(),rail=String(get('D64')||'').trim();
-    if(!rail||/^not supplied$/i.test(rail))errors.push({cell:'D64',id:'NY40!Handrail',message:obs+' có vách kính nên phải cung cấp tay vịn / Handrail required on glass walls.'});
-    else if(!allowed.includes(loc))errors.push({cell:'D65',id:'NY40!HandrailLocation',message:obs+': vị trí tay vịn phải là '+allowed.join(' hoặc ')+' / Wrong handrail position for observation glass.'});
-    // Source R14 is the authority for special two-gate COP Front; we do not
-    // invent a side restriction for one-gate or an unrecorded COP left/right side.
+    if(!rail||/^not supplied$/i.test(rail))errors.push({cell:'D64',id:'NY40!Handrail',message:obs+' là cabin quan sát: phải chọn YH-100SL (SUS304), không được Not supplied.'});
+    else if(rail!=='YH-100SL (SUS304)')errors.push({cell:'D64',id:'NY40!HandrailType',message:obs+': cabin quan sát chỉ sử dụng tay vịn YH-100SL (SUS304).'});
+    if(!allowed.includes(loc))errors.push({cell:'D65',id:'NY40!HandrailLocation',message:obs+': vị trí tay vịn phải là '+allowed.join(' hoặc ')+' / Wrong handrail position for observation glass.'});
+    // Source R14 is the authority for special two-gate COP Front.
     const entrance=String(get('D16')||''),cop=String(get('D60')||'');
+    if(entrance==='1D-2G' && rail!=='Not supplied' && loc!=='2 pcs on both side walls')
+      errors.push({cell:'D65',id:'MRL!TwoGateHandrailLocation',message:'1D-2G: chỉ cho phép Not supplied hoặc 2 pcs on both side walls.'});
     const cap=String(get('D13')||'');
     if(entrance==='1D-2G'){
       if(obs!=='NY-40C'||! /^(?:P11-CO|P13W-CO)(?:\s|\(|$)/i.test(cap))

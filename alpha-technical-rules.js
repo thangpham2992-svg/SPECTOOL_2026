@@ -75,12 +75,8 @@ window.SPEC_ALPHA_5865 = Object.freeze({
         errors.push({id:'MRL_V02!WheelchairCOPLocation',cell:'D62',
           message:'Wheelchair COP chỉ được chọn khi COP Location = Front. Với COP Location = Side, Wheelchair COP phải chọn No / Wheelchair COP requires Front location.'});
       }
-      const handrail=value('D64'),quantity=value('D65');
-      const obs=value('D14');
-      if((!/^NY-40[A-E]$/i.test(obs)) && handrail && !/^not supplied$/i.test(handrail) && quantity!=='1 pc on rear wall'){
-        errors.push({id:'MRL_V02!HandrailQuantity',cell:'D65',
-          message:'Khi có tay vịn, Quantity / Location chỉ được chọn "1 pc on rear wall" / Only one handrail on the rear wall is permitted.'});
-      }
+      // D65 positions are validated against the Version 2 popup in ny40-rules.js.
+      // Do NOT import the older single rear-handrail restriction.
     }
     return errors;
   }
