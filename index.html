@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="specweb-build" content="5.8.198-mrl-handrail-three-positions">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spec Engineering | Mitsubishi Electric</title>
+<!-- Browser icon / Home screen icon -->
+<link rel="icon" type="image/png" sizes="256x256" href="assets/specweb-icon.png">
+<link rel="shortcut icon" href="assets/specweb-icon.png">
+<link rel="apple-touch-icon" sizes="256x256" href="assets/specweb-icon.png">
+<meta name="theme-color" content="#f7f8fa">
+<!-- Social sharing metadata (the final og:image URL is resolved in JavaScript for browsers;
+     static preview crawlers may require an absolute deployed GitHub Pages URL) -->
+<meta name="description" content="SpecWebTool – Elevator specification tool for NEXIEZ-MR and NEXIEZ-MRL Version2.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SpecWebTool | NEXIEZ-MR &amp; NEXIEZ-MRL V02">
+<meta property="og:description" content="Elevator specification and technical check webtool.">
+<meta property="og:image" content="assets/specweb-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SpecWebTool | NEXIEZ-MR &amp; NEXIEZ-MRL V02">
+<meta name="twitter:image" content="assets/specweb-share.jpg">
+
+<style>
+:root{font-family:"Segoe UI",Arial,sans-serif;color:#243142;background:#f7f8fa;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;line-height:1.45}button,input,select{font:inherit}
+button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.48}
+.site-header{height:68px;background:white;border-bottom:1px solid #e6e9ee;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 max(24px,calc((100vw - 1160px)/2));}
+.brand{display:flex;align-items:center;gap:14px}.brand-bar{width:4px;height:32px;background:#d02228}.brand-text{font-size:16px;letter-spacing:.3px;font-weight:760;color:#18283b}.brand-sub{display:block;font-size:11px;font-weight:500;color:#718092;letter-spacing:.6px;margin-top:2px}.brand-side{font-size:12px;color:#718092;white-space:nowrap}
+.workspace{max-width:1190px;margin:0 auto;padding:30px 20px 70px}
+.intro{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:22px;flex-wrap:wrap}.intro-title{margin:0;font-size:27px;letter-spacing:-.5px;font-weight:740;color:#1a2c43}.intro-caption{font-size:13px;color:#738094;margin:4px 0 0}.model-control{min-width:min(100%,370px);width:400px}.label-top{display:block;font-size:12px;letter-spacing:.1px;font-weight:720;color:#49566a;margin-bottom:8px}
+input,select{width:100%;min-width:0;height:41px;border:1px solid #c9dbea;border-radius:5px;background:#eaf5ff;color:#19334b;padding:9px 12px;outline:none;transition:border-color .12s,box-shadow .12s}
+select{cursor:pointer}input:focus,select:focus{border-color:#3886c4;box-shadow:0 0 0 2px #d6eafa}
+input:disabled,select:disabled{background:#f0f2f4;color:#7d8894;border-color:#e0e5ea;box-shadow:none;cursor:not-allowed}
+input[type="file"]{height:auto;background:white;border-color:#d6dde5;cursor:pointer;font-size:12px;padding:8px}
+.database-options{margin-bottom:24px;border-bottom:1px solid #e4e8ed;padding-bottom:14px}.database-options summary{font-size:12px;color:#66778b;cursor:pointer;display:inline-flex;align-items:center;gap:7px;user-select:none}.database-options summary:hover{color:#c3282e}.database-content{margin-top:15px;background:#fff;border:1px solid #e9edf2;padding:14px;max-width:740px;border-radius:6px}.database-meta{font-size:12px;color:#576878;margin-bottom:9px}.database-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.btn{border:1px solid #dbe2e9;border-radius:5px;background:#fff;padding:10px 15px;color:#334355;font-weight:630;font-size:13px;line-height:1.3;min-height:40px}.btn:hover:not(:disabled){background:#f6f8fa;border-color:#b7c3cf}.btn-primary{background:#ba2028;border-color:#ba2028;color:white}.btn-primary:hover:not(:disabled){background:#a91e25;border-color:#a91e25}.btn-secondary{background:#fff;color:#273c53;border:1px solid #cad6e1}.btn-small{min-height:34px;padding:7px 11px;font-size:12px}.red{background:#ba2028;border-color:#ba2028;color:#fff}
+.project-box{background:white;border:1px solid #e4e9f0;border-radius:7px;padding:21px 24px;margin-bottom:18px}.project-heading{font-size:15px;font-weight:720;margin:0 0 18px;color:#26394e}.project-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 24px}.project-grid .field{min-width:0}
+.action-panel{background:white;border:1px solid #e4e9f0;border-radius:7px;padding:16px 20px;margin-bottom:24px}.tech-export-choice{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:9px 12px;border:1px solid #d5e1ef;border-radius:7px;background:#f7f9fc;color:#163458;cursor:pointer;max-width:720px}.tech-export-choice input{width:18px;height:18px;flex:none;accent-color:#b5262e}.tech-export-choice span{display:flex;flex-direction:column;gap:2px}.tech-export-choice strong{font-size:13px}.tech-export-choice small{font-size:11px;color:#62758d}.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.toolbar-sep{width:1px;height:28px;background:#e2e7ed;margin:0 2px}.export-buttons{display:flex;gap:9px;flex-wrap:wrap}
+.check-top{margin-top:13px;padding:11px 14px;background:#f4f6f8;color:#657386;border-radius:5px;font-size:13px;font-weight:600;scroll-margin-top:18px;border:1px solid #e7ebf0}.check-top.source-pass{color:#21643d;background:#eaf7ee;border-color:#bee4ca}.check-top.fail{color:#a62430;background:#fff1f2;border-color:#edc1c6}.check-top.partial{color:#805f20;background:#fff9ec;border-color:#e9dbba}.check-top.running{color:#215d88;background:#eaf4ff;border-color:#c5dff1}
+#check-issues:empty{display:none}#check-issues{margin-top:14px}.check-summary{font-size:14px;font-weight:700;padding:11px 12px;border-radius:4px}.check-fail{background:#fff0f0;color:#a8242c}.check-pass{background:#ecf7ef;color:#176638}.issue-card{border:1px solid #e4e9ed;border-left:3px solid #cf343e;border-radius:4px;background:#fff;padding:12px 14px;margin:9px 0;font-size:13px;line-height:1.65}.issue-card strong{display:block;font-size:14px;color:#26384c}.issue-warning{border-left-color:#d19b34}.issue-jump{font-size:12px;margin-top:9px;padding:7px 12px;min-height:32px}.issue-focus{outline:2px solid #d2222d!important;outline-offset:-2px;background:#fff0f1!important}.issue-input-focus{border-color:#d2222d!important;box-shadow:0 0 0 2px rgba(210,34,45,.22)!important}
+.spec-section{background:white;border:1px solid #e4e9f0;border-radius:7px;margin:0 0 21px;padding:0 24px 20px}.section-heading{display:flex;align-items:center;gap:13px;border-bottom:1px solid #e5ebf0;margin:0 -24px 18px;padding:21px 24px 17px;font-size:20px;line-height:1.28;color:#1d3048;font-weight:750;letter-spacing:-.35px}.section-heading:before{content:"";display:block;background:#c72a32;height:23px;width:4px;flex-shrink:0}.section-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 23px}
+.spec-row{display:flex;flex-direction:column;min-width:0;gap:6px}.spec-row.span-full{grid-column:1/-1}.spec-row-title{font-size:13px;font-weight:640;color:#34465c;line-height:1.45;min-height:20px}.spec-row-title .sub{font-weight:500;color:#61758a}.spec-row-inputs{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.spec-row.multi .spec-row-inputs{grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}.spec-row.multi{padding:14px 16px;border:1px solid #e6edf4;border-radius:5px;background:#fafbfd}.spec-row.multi .spec-row-title{font-size:14px;font-weight:690}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}.field .nm{font-size:12px;color:#475d73;font-weight:590;line-height:1.35}.spec-row:not(.multi) .field .nm{display:none}.project-grid .field .nm{display:block;font-size:13px;font-weight:650}.field input,.field select{font-size:13px}.field .addr,.field .kind{display:none!important}.field.locked input,.field.locked select,.field.cf-locked input,.field.cf-locked select{background:#eff1f3;color:#78838e;border-color:#dce2e7}.field .dirty{border-color:#6aa9d4}.readonly-value{display:flex;align-items:center;min-height:41px;border:1px solid #e5e8ed;border-radius:5px;background:#f7f8fa;color:#697686;padding:9px 12px;font-size:13px}
+.features-panel{background:white;border:1px solid #e4e9f0;border-radius:7px;padding:0 24px 24px}.feature-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:17px 0 13px}.feature-tabs .btn{border:1px solid #e1e8ee;border-radius:4px;min-height:36px;padding:9px 13px;font-size:12px;color:#5a6a7c}.feature-tabs .btn.red{background:#bd2730;border-color:#bd2730;color:#fff}.feature-list{border-top:1px solid #e8edf2}.feature-line{display:grid;grid-template-columns:100px minmax(0,1fr) 44px;gap:16px;align-items:center;padding:13px 8px;border-bottom:1px solid #ebeff3;min-height:65px}.feature-line:last-child{border-bottom:0}.feature-line .addr,.feature-line .option,.feature-line .suggest{display:none!important}.feature-line .fcode{font-size:12px;color:#233b55;font-weight:740}.feature-line .fdesc{font-size:13px;color:#32465a;font-weight:590}.feature-line .fdesc small{display:block;font-size:12px;color:#7c8a98;font-weight:450;margin-top:3px}.feature-line input[type="checkbox"]{width:19px;height:19px;accent-color:#b9202b;justify-self:center;cursor:pointer}.feature-line.x{opacity:.5}.feature-line input:disabled{cursor:not-allowed}
+.status-message{display:none;max-width:740px;font-size:12px;margin:8px 0;padding:9px 11px}.status-message.error{display:block;border:1px solid #ecc5c9;background:#fff1f2;color:#a0272f}
+.hidden-internal{display:none!important}.footer{padding:22px 0 0;text-align:center;font-size:11px;color:#a2acb8}
+@media(max-width:850px){.workspace{padding:23px 14px 42px}.site-header{padding:0 16px}.intro-title{font-size:22px}.model-control{width:100%;min-width:0}.section-fields{grid-template-columns:1fr}.spec-section,.features-panel,.project-box{padding-left:16px;padding-right:16px}.section-heading{margin-left:-16px;margin-right:-16px;padding:18px 16px;font-size:18px}.project-grid{grid-template-columns:1fr}.action-panel{padding:14px}.toolbar{align-items:stretch}.toolbar>.btn,.export-buttons{flex:1}.export-buttons .btn{flex:1}.feature-line{grid-template-columns:74px 1fr 28px;gap:8px}.brand-side{display:none}}
+@media(max-width:530px){.toolbar-sep{display:none}.export-buttons{width:100%}.export-buttons .btn{font-size:12px;padding:9px 7px}.spec-row.multi .spec-row-inputs{grid-template-columns:1fr}.feature-line .fdesc{font-size:12px}}
+
+.obs-inline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.obs-preview-btn{white-space:nowrap;background:#fff;color:#245b8f;border-color:#bdd2e7}
+.obs-preview-btn:disabled{opacity:.55}
+
+.group-control-preview{margin-top:8px;padding:8px;border:1px solid #d7e0eb;border-radius:8px;background:#fff;max-width:380px;box-sizing:border-box}
+.group-control-preview-thumb{display:block;max-width:100%;width:auto;max-height:320px;height:auto;margin:0 auto;object-fit:contain}
+.group-control-preview-note{display:block;margin-top:6px;color:#5b6c7c;font-size:11px;line-height:1.35;text-align:center}
+.group-preview-inline{align-items:stretch}
+
+#ny40-popup{position:fixed;inset:0;z-index:70;background:rgba(10,26,45,.55);display:none;align-items:center;justify-content:center;padding:16px}
+#ny40-popup.show{display:flex}
+.ny40-dialog{width:min(760px,100%);max-height:94vh;overflow:auto;background:#fff;border:1px solid #dbe6ef;border-radius:12px;box-shadow:0 22px 70px rgba(16,35,58,.28)}
+.ny40-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid #e7edf3}
+.ny40-tag{display:inline-block;background:#eaf4ff;color:#235f98;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:6px}
+.ny40-head h3{margin:0;color:#18314a;font-size:20px}.ny40-close{border:0;background:#f0f4f8;border-radius:8px;width:34px;height:34px;font-size:22px;line-height:1}
+.ny40-body{padding:18px 20px}.ny40-imagewrap{display:flex;justify-content:center;align-items:center;min-height:280px;border:1px solid #e2eaf1;border-radius:10px;background:linear-gradient(#f9fcff,#edf4fa)}
+.ny40-imagewrap img{max-width:96%;max-height:250px;object-fit:contain}
+.ny40-desc{margin-top:14px;border:1px solid #deebf6;background:#eef6ff;border-radius:10px;padding:12px 14px}
+.ny40-desc strong{display:block;color:#17324c;font-size:15px}.ny40-desc span{display:block;color:#577089;font-size:13px;margin-top:4px}
+.ny40-choices{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:16px}.ny40-choice{border:1px solid #dce7f0;background:#fff;border-radius:10px;padding:7px;min-width:0}.ny40-choice.active{border:2px solid #2d6da8;background:#eaf4ff;padding:6px}.ny40-choice img{width:100%;height:82px;object-fit:contain}.ny40-choice b{display:block;font-size:12px;color:#20384f;margin-top:4px}.ny40-foot{display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #e7edf3}
+@media(max-width:850px){.obs-inline{grid-template-columns:1fr}.obs-preview-btn{width:100%}.ny40-choices{grid-template-columns:repeat(3,minmax(0,1fr))}.ny40-imagewrap{min-height:230px}.ny40-imagewrap img{max-height:205px}}
+@media(max-width:530px){.ny40-head,.ny40-body,.ny40-foot{padding:14px}.ny40-head h3{font-size:18px}.ny40-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.ny40-choice img{height:72px}}
+
+
+/* v3.9: dimension errors are concise, with actual values and workbook-derived limits. */
+.check-error-row{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left}
+.check-error-row strong{font-size:13px;line-height:1.4;font-weight:650}
+.check-error-explanation{display:block;color:#a32d34;font-size:12px;line-height:1.55;font-weight:500;white-space:normal}
+
+/* v5.8.21: full-width, balanced dimension groups for MR and MRL. */
+.dimension-section-fields{display:block!important;width:100%;min-width:0}
+.dimension-groups{display:grid!important;grid-template-columns:minmax(0,.94fr) minmax(0,1.16fr);gap:16px;width:100%;grid-column:1/-1;align-items:start}
+.dimension-group{border:1px solid #d6e5f3;border-radius:9px;overflow:hidden;min-width:0;background:#fff}
+.dimension-group-title{margin:0;padding:13px 16px;background:#eaf4ff;color:#173c61;font-size:14px;font-weight:750;border-bottom:1px solid #d6e5f3;min-height:46px}
+.dimension-entry{display:grid!important;grid-template-columns:minmax(112px,.85fr) minmax(135px,1fr);column-gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid #e5ecf4;min-height:62px}
+.dimension-hoistway .dimension-entry{grid-template-columns:minmax(105px,.78fr) minmax(110px,.84fr) minmax(125px,1fr)}
+.dimension-entry:last-child{border-bottom:0}
+.dimension-entry .spec-row-title{font-size:12px;line-height:1.4;min-height:0;overflow-wrap:break-word}
+/* Make input and its dynamic AH/BH/OH/PD hint siblings in the layout without changing their DOM ownership. */
+.dimension-entry .spec-row-inputs,.dimension-entry .field{display:contents!important}
+.dimension-entry input,.dimension-entry select{display:block;width:100%;min-width:0;max-width:100%;height:40px}
+.dimension-entry .cwt-minimum-hint,.dimension-entry .oh-minimum-hint{font-size:11px!important;line-height:1.4!important;margin:0!important;overflow-wrap:anywhere;min-width:0}
+.dimension-car .dimension-entry .cwt-minimum-hint,.dimension-car .dimension-entry .oh-minimum-hint{grid-column:2}
+.dimension-hoistway .dimension-entry .cwt-minimum-hint,.dimension-hoistway .dimension-entry .oh-minimum-hint{grid-column:3}
+.dimension-hoistway .dimension-entry:not(:has(.cwt-minimum-hint,.oh-minimum-hint)) input,
+.dimension-hoistway .dimension-entry:not(:has(.cwt-minimum-hint,.oh-minimum-hint)) select{grid-column:2}
+.dimension-entry .readonly-value{min-width:0}
+@media(max-width:1000px){
+ .dimension-groups{grid-template-columns:1fr!important;gap:14px}
+ .dimension-entry{grid-template-columns:minmax(120px,.8fr) minmax(0,1fr)}
+ .dimension-hoistway .dimension-entry{grid-template-columns:minmax(120px,.8fr) minmax(130px,.9fr) minmax(120px,1.1fr)}
+}
+@media(max-width:580px){
+ .dimension-entry,.dimension-hoistway .dimension-entry{grid-template-columns:minmax(105px,.82fr) minmax(0,1fr);gap:8px;padding:9px 11px}
+ .dimension-entry .cwt-minimum-hint,.dimension-entry .oh-minimum-hint,
+ .dimension-hoistway .dimension-entry .cwt-minimum-hint,.dimension-hoistway .dimension-entry .oh-minimum-hint{grid-column:2;grid-row:auto;margin-top:-2px!important}
+ .dimension-group-title{padding:12px}
+}
+.leadtime-check{background:#fff;border:1px solid #d7e3ef;border-radius:7px;padding:11px 16px;margin:-7px 0 15px}.leadtime-label{font-size:13px;font-weight:750;color:#254564}.leadtime-label span{font-size:11px;color:#697a8c;font-weight:500}.leadtime-main{display:flex;align-items:center;gap:14px;margin-top:5px}.leadtime-main strong{font-size:21px;color:#a22c34;white-space:nowrap}.leadtime-reasons{font-size:12px;line-height:1.45;color:#465c70}.leadtime-reasons div+div{margin-top:3px}@media(max-width:580px){.leadtime-check{padding:9px 11px;margin:0 0 10px}.leadtime-main{gap:10px}.leadtime-main strong{font-size:18px}.leadtime-label span{display:block;font-size:10px}}
+
+/* Version02: only a maximum hint beside existing Decoration Weight input. */
+.field.mrl-decoration-field{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:9px;align-items:center}
+.field.mrl-decoration-field .nm{grid-column:1/-1}
+.field.mrl-decoration-field input{grid-column:1;min-width:0}
+.mrl-decoration-maximum{grid-column:2;white-space:nowrap;font-weight:650;font-size:12px;color:#48637f}
+.mrl-decoration-maximum.unavailable{color:#7b8796}
+.mrl-decoration-maximum.overlimit{color:#b42530}
+.mrl-decoration-maximum:has(.mrl-flooring-overlimit-note){white-space:normal;max-width:340px;line-height:1.45}
+.mrl-flooring-overlimit-note{font-weight:600;color:#b42530}
+@media(max-width:520px){.field.mrl-decoration-field{grid-template-columns:minmax(0,1fr)}.mrl-decoration-maximum{grid-column:1}}
+
+/* v5.8.68: two-stop Travel warning is display-only, scoped to MR/MRL Travel input. */
+.travel-limit-hint{display:block;font-size:11px;line-height:1.45;color:#a62430;font-weight:650;margin-top:5px;overflow-wrap:anywhere}
+.travel-limit-hint[hidden]{display:none!important}
+input.travel-over-limit{border-color:#ca303a!important;box-shadow:0 0 0 1px rgba(202,48,58,.10);background:#fff2f3!important}
+.dimension-hoistway .dimension-entry .travel-limit-hint{grid-column:3;min-width:0;margin:0!important}
+.dimension-hoistway .dimension-entry:has(.travel-limit-hint) input{grid-column:2}
+@media(max-width:580px){.dimension-hoistway .dimension-entry .travel-limit-hint{grid-column:2;grid-row:auto;margin-top:-2px!important}}
+
+/* v5.8.79: Structural narrowing guidance appears to the right of MR BED AH/BH. */
+.mr-bed-shaft-note{color:#a35a13;font-size:11px;line-height:1.4;overflow-wrap:anywhere;min-width:0}
+.mr-bed-shaft-note[hidden]{display:none!important}
+.dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) .mr-bed-shaft-note{grid-column:3}
+.dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) input{grid-column:2}
+.dimension-entry input.mr-bed-over-max{border-color:#d38a35;background:#fff9ed}
+
+/* MR only – permanently visible MH maintenance headroom guidance (display only). */
+.dimension-hoistway .dimension-entry .mr-mh-maintenance-note{
+  grid-column:3;display:block;min-width:0;margin:0;
+  color:#65788a;font-size:11px;font-style:italic;font-weight:400;
+  line-height:1.5;overflow-wrap:break-word;
+}
+.dimension-hoistway .dimension-entry:has(.mr-mh-maintenance-note) input{grid-column:2}
+@media(max-width:580px){
+ .dimension-hoistway .dimension-entry .mr-mh-maintenance-note{
+  grid-column:2;grid-row:auto;font-size:10.5px;margin-top:-2px;
+ }
+}
+
+/* Mobile: full-width structural note below AH/BH rather than squeezed into the input column. */
+@media(max-width:740px){
+ .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])){align-items:start;row-gap:6px}
+ .dimension-hoistway .dimension-entry .mr-bed-shaft-note:not([hidden]){
+  display:block!important;grid-column:1 / -1!important;grid-row:auto!important;
+  width:100%;box-sizing:border-box;padding:9px 11px;margin:2px 0 3px;
+  border:1px solid #e3bb77;border-left:3px solid #c17c21;border-radius:5px;
+  background:#fff7e8;color:#8e4a0e;font-size:12px;line-height:1.55;
+  white-space:normal;overflow-wrap:anywhere;word-break:normal;
+ }
+ .dimension-hoistway .dimension-entry:has(.mr-bed-shaft-note:not([hidden])) input{grid-column:2;min-width:0}
+ #check-issues .check-error-row{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+ #check-issues .check-error-explanation{display:block;white-space:normal;overflow-wrap:anywhere}
+}
+
+.ny40-cop-hint{display:block;margin-top:5px;color:#8b521e;font-size:11px;line-height:1.4}
+.ny40-cop-hint[hidden]{display:none!important}
+.feature-dependency-note{display:block;color:#8b521e;font-size:11px;margin-top:4px;font-weight:500}
+
+/* v5.8.154: inline preview thumbnails for selected feature codes. */
+.feature-visual-inline{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.feature-visual-thumb{display:block;width:auto;height:auto;max-width:72px;max-height:84px;border:1px solid #d8cfbf;border-radius:6px;background:#fff;padding:2px;object-fit:contain}
+.feature-visual-caption{display:block!important;font-size:10.5px;color:#7a6853;font-weight:600;margin-top:0!important}
+@media(max-width:530px){.feature-visual-thumb{max-width:58px;max-height:72px}.feature-visual-caption{font-size:10px}}
+
+
+/* v5.8.158 – source-linked capacity grouping. Original SpecForm dimension fields remain in Section II. */
+.capacity-group-choice{display:grid;gap:5px;margin-bottom:12px;padding:11px 12px;border:1px solid #d8e5f1;background:#f4f9ff;border-radius:7px}
+.capacity-group-choice label{font-weight:700;font-size:12px;color:#26415b}
+.capacity-group-choice select{background:#fff}
+.capacity-group-hint{display:block;font-size:11px;color:#5d7185;line-height:1.5}
+.mr-capacity-source>.nm{font-size:12px}
+.capacity-duplicate-warning{display:block;color:#a05b1d;font-size:11px;line-height:1.5;margin-top:7px}
+.capacity-duplicate-warning:empty{display:none}
+.mr-door-group-selector{margin-top:2px;background:#eaf5ff!important;opacity:1!important;cursor:pointer!important}
+
+/* v5.8.158 – editing controls in their original Sections I/II, source values remain hidden. */
+.mr-original-internal{display:none!important}
+.mr-selector-control{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mr-selector-label{font-size:12px;font-weight:700;color:#244466}
+.mr-selector-control select{width:100%;min-height:40px;background:#eaf5ff!important;border:1px solid #b5d2f0!important;color:#163454!important;opacity:1!important;cursor:pointer}
+.mr-selector-control select:disabled{background:#f0f6fc!important;color:#234567!important;opacity:1!important;-webkit-text-fill-color:#234567!important;cursor:default}
+.mr-exact-selector{display:grid;gap:5px;margin-top:8px;padding:8px 10px;border:1px solid #e8c5a3;border-radius:7px;background:#fff9ee}
+.mr-exact-selector[hidden]{display:none!important}
+.mr-exact-selector label{font-size:12px;font-weight:700;color:#76512a}
+.mr-capacity-source .field{min-width:0}
+
+/* v5.8.166: original user-supplied drawings, compact dimension rows (NEXIEZ-MR). */
+.workspace .dimension-groups[data-model="MR"] .dimension-car .dimension-entry{padding:5px 10px!important;min-height:46px!important;row-gap:3px!important}
+.workspace .dimension-groups[data-model="MR"] .dimension-entry input,
+.workspace .dimension-groups[data-model="MR"] .dimension-entry select{height:34px!important;min-height:34px!important;padding-top:4px;padding-bottom:4px}
+.workspace .dimension-groups[data-model="MR"] .dimension-entry .spec-row-title{font-size:11px;line-height:1.28!important}
+.mr-plan-room-figure{margin:8px 10px 12px;padding:10px 8px;border:1px solid #e0e8ef;border-radius:6px;background:#fff;display:flex;flex-direction:column;gap:6px}.mr-plan-room-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start}.mr-plan-box{margin:0;display:flex;flex-direction:column;align-items:center;min-width:0}.mr-plan-box img{width:100%;height:auto;max-height:245px;object-fit:contain;display:block}.mr-plan-caption,.mr-shaft-figure figcaption{font-size:10px;font-weight:650;text-align:center;color:#586879;margin-top:5px}.mr-plan-room-note{font-size:10px;font-weight:650;text-align:center;color:#586879}
+.workspace .dimension-groups[data-model="MR"] .mr-shaft-with-figure{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(145px,.75fr);grid-template-rows:auto 1fr;align-items:stretch}
+.mr-shaft-with-figure>.dimension-group-title{grid-column:1/-1;grid-row:1}
+.mr-shaft-content{min-width:0;grid-column:1;grid-row:2}
+.workspace .dimension-groups[data-model="MR"] .mr-shaft-content .dimension-entry{grid-template-columns:minmax(93px,.85fr) minmax(85px,1fr)!important;padding:5px 7px!important;min-height:50px!important;column-gap:6px!important;row-gap:3px!important}
+.workspace .mr-shaft-content .dimension-entry .cwt-minimum-hint,
+.workspace .mr-shaft-content .dimension-entry .oh-minimum-hint,
+.workspace .mr-shaft-content .dimension-entry .travel-limit-hint,
+.workspace .mr-shaft-content .dimension-entry .mr-mh-maintenance-note,
+.workspace .mr-shaft-content .dimension-entry .mr-bed-shaft-note:not([hidden]){grid-column:2!important;font-size:9px!important;line-height:1.25!important}
+.mr-shaft-figure{grid-column:2;grid-row:2;margin:5px 5px 7px 0;padding:4px 0;border-left:1px solid #e4eaf0;display:flex;align-items:center;justify-content:space-between;flex-direction:column;min-width:0}
+.mr-shaft-figure img{display:block;width:100%;height:100%;max-height:550px;min-height:270px;object-fit:contain}
+@media(max-width:600px){
+ .workspace .dimension-groups[data-model="MR"] .mr-shaft-with-figure{grid-template-columns:minmax(0,1.13fr) minmax(102px,.72fr)}
+ .workspace .dimension-groups[data-model="MR"] .mr-shaft-content .dimension-entry{grid-template-columns:minmax(65px,.78fr) minmax(75px,1fr)!important;padding:5px!important}
+ .workspace .dimension-groups[data-model="MR"] .dimension-entry .spec-row-title{font-size:10px!important}
+ .mr-shaft-figure img{min-height:280px}
+ .mr-plan-box img{max-height:220px}
+}
+.mr-p6c3-hint{display:block;margin-top:4px;font-size:11px;line-height:1.45;color:#356179;font-weight:550}
+
+/* v5.8.182: source-based OH and PD minima next to the original MRL inputs. */
+.workspace .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.mrl-ts-two-minima){grid-template-columns:minmax(102px,.72fr) minmax(100px,.85fr) minmax(185px,1.2fr)}
+.workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint.mrl-ts-two-minima{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;grid-column:3!important;margin:0!important;font-size:10.5px!important;line-height:1.35!important;overflow-wrap:normal!important}
+.mrl-ts-minimum-line{white-space:normal;color:#304f6a}
+.mrl-ts-minimum-line strong{color:#123451;white-space:nowrap}
+.mrl-ts-minimum-unavailable{color:#a32832;font-size:10px}
+@media(max-width:580px){
+ .workspace .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.mrl-ts-two-minima){grid-template-columns:minmax(95px,.8fr) minmax(0,1fr)}
+ .workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint.mrl-ts-two-minima{grid-column:2!important;grid-row:auto!important;align-items:flex-start;margin-top:2px!important}
+}
+</style>
+<style>
+/* SpecWebTool responsive presentation layer. Technical engines remain unchanged. */
+:root{--me-red:#bd222d;--me-ink:#15263a;--me-muted:#65768a;--me-border:#e2e8ef;--me-light:#eff7ff;--me-blue-border:#c9dff4;--me-grey:#f1f3f5;color-scheme:light}
+body{background:#f3f5f8;color:var(--me-ink);font-size:14px;-webkit-font-smoothing:antialiased}
+.site-header{height:66px;padding:0 max(22px,calc((100vw - 1310px)/2));border-bottom:1px solid #dce3eb;background:white;position:relative;z-index:2}
+.brand-bar{background:var(--me-red);height:30px;width:5px;border-radius:2px}
+.brand-text{font-weight:800;letter-spacing:.1px;font-size:15px;color:#17283b}
+.brand-sub{font-size:10px;letter-spacing:1px;color:#718092}
+.brand-side{background:#f4f6f8;border:1px solid #e5e9ef;padding:8px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.4px;color:#596a7f}
+.workspace{max-width:1324px;padding:26px 24px 100px}
+.intro{background:white;border:1px solid var(--me-border);border-radius:12px;padding:22px 25px;margin-bottom:16px;align-items:center;box-shadow:0 2px 12px #182b4110}
+.intro-title{font-size:28px;letter-spacing:-.75px;line-height:1.18;color:#1a2c42}
+.intro-caption{font-size:12px;margin:8px 0 0;letter-spacing:.8px;font-weight:700;color:var(--me-red)}
+.model-control{width:410px;min-width:min(100%,360px)}.label-top{font-size:11px;text-transform:uppercase;letter-spacing:.75px;color:#526579}
+.model-control select{font-size:15px;font-weight:750;height:48px;border-color:#c9d6e2;box-shadow:0 2px 6px #12263c06}
+.database-options{margin:0 2px 20px;border:0;padding:0}.database-options summary{font-size:12px;color:#78889a}.database-content{box-shadow:0 5px 18px #152a3912;border-radius:9px;border:1px solid var(--me-border)}
+.project-box,.action-panel,.spec-section,.features-panel{box-shadow:0 2px 11px #16324a08;border:1px solid var(--me-border);border-radius:10px}
+.project-box{padding:20px 24px 24px;margin-bottom:14px;border-top:3px solid var(--me-red)}
+.project-heading{font-size:16px;font-weight:800;margin-bottom:15px;color:#1d2f44;letter-spacing:-.2px}
+.project-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px 24px}
+.action-panel{padding:15px 20px;margin-bottom:15px}
+.toolbar{gap:10px}.toolbar .btn{min-height:40px;border-radius:7px}
+.btn-primary{background:var(--me-red);border-color:var(--me-red);font-weight:750;box-shadow:0 2px 6px #bb202827}
+.btn-primary:hover:not(:disabled){background:#a71e29;border-color:#a71e29}
+.btn-secondary{background:#fff;font-weight:700;color:#243a50}.btn-secondary:hover:not(:disabled){background:#f6f9fc}
+.check-top{border-radius:6px;margin-top:13px;font-size:13px;padding:10px 13px}
+.spec-nav{display:flex;gap:8px;overflow-x:auto;padding:3px 0 15px;scrollbar-width:thin;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.spec-nav a{display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none;font-size:12px;color:#52657b;font-weight:700;border:1px solid #dce4eb;background:#fff;border-radius:7px;min-height:35px;padding:7px 12px;transition:all .15s}
+.spec-nav a:hover{color:var(--me-red);border-color:#e5aeb2;background:#fff8f8}
+.spec-nav a b{color:var(--me-red);font-weight:850}
+.spec-section{padding:0 22px 12px;margin-bottom:15px;background:#fff;overflow:hidden;scroll-margin-top:12px}
+.section-heading{margin:0 -22px 8px;padding:19px 22px 18px;border-bottom:1px solid #e2e8ef;background:linear-gradient(90deg,#fcfcfd,#fff);font-size:19px;color:#172c44;letter-spacing:-.3px}
+.section-heading:before{background:var(--me-red);width:4px;height:25px;border-radius:2px}
+.section-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 32px}
+.spec-row{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:11px;align-items:center;border-bottom:1px solid #edf0f4;padding:9px 0;min-height:56px}
+.spec-row:nth-last-child(1),.spec-row:nth-last-child(2){border-bottom-color:#edf0f4}
+.spec-row-title{font-size:12.5px;color:#34495e;font-weight:680;min-height:0;line-height:1.38;overflow-wrap:anywhere}
+.spec-row-inputs{display:block;min-width:0}
+.spec-row:not(.multi) .field .nm{display:none}
+.field{min-width:0;gap:5px}
+.field input,.field select{height:40px;font-size:12.8px;border-radius:6px;background:#edf7ff;border:1px solid #cce0f1;color:#152f4b;font-weight:580;padding:7px 10px;max-width:100%}
+.field input:focus,.field select:focus{outline:0;border-color:#548cbb;box-shadow:0 0 0 3px #b9dfff5e;background:#f6fbff}
+.field input:disabled,.field select:disabled,.field.locked input,.field.locked select,.field.cf-locked input,.field.cf-locked select{background:#f0f2f4;color:#7a8592;border-color:#e2e6eb}
+.spec-row.multi{grid-column:1/-1;display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px;background:#fafcfe;border:1px solid #e6edf4;padding:13px 16px;border-radius:7px;margin:8px 0}
+.spec-row.multi .spec-row-title{font-size:13px;font-weight:760;line-height:1.55}
+.spec-row.multi .spec-row-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:12px}
+.spec-row.multi .field .nm{display:block;font-size:11.5px;line-height:1.3;color:#556c82;font-weight:680}
+.readonly-value{background:#f0f2f4;border:1px solid #e1e6ed;font-size:12.5px;color:#66788a;min-height:40px;padding:9px 12px}
+.features-panel{padding:0 22px 23px;overflow:hidden;margin-top:6px;scroll-margin-top:12px}
+.features-panel .section-heading{margin:0 -22px 16px;padding:19px 22px 18px}
+.feature-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:thin;white-space:nowrap;gap:7px}
+.feature-tabs .btn{flex:0 0 auto;border-radius:6px!important;background:#f7f9fc;color:#52657c;font-weight:700;min-height:38px}
+.feature-tabs .btn.red{background:#c12733!important;border-color:#c12733!important;color:#fff!important}
+.feature-list{display:grid;grid-template-columns:1fr 1fr;column-gap:20px}
+.feature-line{grid-template-columns:minmax(56px,76px) minmax(0,1fr) 34px;gap:9px;padding:11px 5px;min-height:62px}
+.feature-line .fcode{font-size:12px;letter-spacing:.1px;font-weight:820}
+.feature-line .fdesc{font-weight:650;color:#2c4055;line-height:1.35;font-size:12px}
+.feature-line .fdesc small{font-weight:500;font-size:11.5px;color:#74869a}
+.feature-line input[type=checkbox]{accent-color:var(--me-red);width:21px;height:21px}
+.footer{font-size:10px;letter-spacing:.5px;padding-top:25px}
+.mobile-actions{display:none}
+@media(max-width:1080px){.section-fields{grid-template-columns:1fr}.spec-row{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}.feature-list{grid-template-columns:1fr 1fr}.workspace{padding:22px 16px 80px}}
+@media(max-width:740px){
+ .site-header{height:58px;padding:0 15px}.brand-text{font-size:12.6px}.brand-sub{font-size:9px}.brand-side{display:none}
+ .workspace{padding:14px 11px 112px}.intro{padding:16px 16px 18px;gap:12px;margin-bottom:12px;align-items:start;border-radius:9px}
+ .intro-title{font-size:21px;line-height:1.3}.intro-caption{font-size:10px;margin-top:4px}
+ .model-control{width:100%;min-width:0}.label-top{margin-bottom:6px}
+ .database-options{margin-bottom:13px;padding:0 5px}.database-content{padding:12px}
+ .project-box,.action-panel,.spec-section,.features-panel{border-radius:8px;margin-bottom:12px}
+ .project-box{padding:15px 14px}.project-heading{font-size:14px;margin-bottom:8px}.project-grid{grid-template-columns:1fr;gap:0}
+ .project-grid .field{display:grid;grid-template-columns:minmax(0,43fr) minmax(0,57fr);gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid #edf1f5}
+ .project-grid .field:last-child{border:0}.project-grid .field .nm{font-size:12px}
+ .project-grid input{font-size:13px}
+ .action-panel{padding:12px 14px}.action-panel>.toolbar{display:none}.check-top{margin:0;font-size:12px;padding:10px 11px}
+ .spec-nav{gap:6px;padding:0 0 11px}.spec-nav a{font-size:11px;padding:7px 10px;min-height:33px}
+ .spec-section{padding:0 13px 10px;overflow:hidden}.section-heading{margin:0 -13px 6px;padding:15px 13px;border-radius:0;font-size:16px}
+ .section-heading:before{height:21px}
+ .section-fields{display:grid;grid-template-columns:1fr;gap:0}
+ .spec-row{grid-template-columns:minmax(0,43fr) minmax(0,57fr);gap:9px;min-height:52px;padding:7px 0;border-bottom:1px solid #eef1f4}
+ .spec-row-title{font-size:12px;line-height:1.36;font-weight:650}
+ .field input,.field select,.readonly-value{height:auto;min-height:36px;font-size:12px;padding:7px 8px}
+ .spec-row.multi{display:block;margin:7px 0;padding:9px 10px;border-radius:6px}
+ .spec-row.multi .spec-row-title{font-size:12px;margin-bottom:7px}
+ .spec-row.multi .spec-row-inputs{display:grid;grid-template-columns:1fr;gap:0}
+ .spec-row.multi .field{display:grid;grid-template-columns:minmax(0,43fr) minmax(0,57fr);gap:9px;align-items:center;padding:6px 0;border-top:1px solid #e7edf3}
+ .spec-row.multi .field .nm{font-size:11.5px}
+ .features-panel{padding:0 13px 12px}.features-panel .section-heading{margin:0 -13px 12px;padding:15px 13px}
+ .feature-list{display:block}.feature-line{grid-template-columns:minmax(0,58px) minmax(0,1fr) 28px;min-height:56px;padding:9px 0;gap:8px}
+ .feature-line .fdesc{font-size:11.6px}.feature-line .fdesc small{font-size:10.6px}
+ .mobile-actions{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);gap:7px;position:fixed;bottom:0;left:0;right:0;padding:10px 11px calc(10px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #dbe2ea;box-shadow:0 -6px 25px #152c4920;z-index:50}
+ .mobile-actions button{border:1px solid #d3dde7;background:#f5f8fb;color:#2b4056;border-radius:7px;padding:10px 6px;font-weight:750;font-size:11px;min-height:44px;line-height:1.26}
+ .mobile-actions button:first-child{background:var(--me-red);border-color:var(--me-red);color:white;font-size:12px}
+ .footer{padding:20px 0;color:#94a1af}
+}
+@media(max-width:360px){.brand-text{font-size:11.5px}.spec-row-title{font-size:11.5px}.field input,.field select{font-size:11.4px}.spec-row{grid-template-columns:minmax(0,42fr) minmax(0,58fr)}}
+
+/* Compact Check Spec: show only the status and linked rows with errors. */
+#check-issues{margin-top:7px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:7px}
+.check-error-row{display:block;text-align:left;width:100%;border:1px solid #e8c4c7;border-radius:5px;background:#fff6f6;color:#a4262e;padding:9px 11px;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer}
+.check-error-row:hover,.check-error-row:focus-visible{background:#ffe9eb;outline:2px solid #dc9299;outline-offset:1px}
+@media(max-width:530px){#check-issues{grid-template-columns:1fr}.check-error-row{padding:9px 10px;font-size:12px}}
+
+/* v2.4 compact engineering presentation: pale blue highlights and uniform borders */
+:root{--me-light:#edf6ff;--me-border:#dbe5ef;--me-blue-border:#ccdfee}
+.intro,.project-box,.action-panel,.spec-section,.features-panel{border-color:#d9e4ef;box-shadow:0 2px 8px #193b5a08}
+.project-box{border-top-color:#b7d9f4}
+.project-heading{background:#eef6fe;border:1px solid #d7e7f6;border-radius:5px;padding:11px 13px;margin:-4px 0 10px}
+.section-heading,.features-panel .section-heading{background:#edf6ff!important;border-bottom:1px solid #d2e3f3!important;color:#214769!important}
+.section-heading:before{background:#9dc9e9!important;width:4px!important}
+.section-fields{column-gap:0;row-gap:0;border-top:1px solid #dce6f0;border-left:1px solid #dce6f0;background:#fff}
+.spec-row{border-right:1px solid #dce6f0!important;border-bottom:1px solid #dce6f0!important;padding:10px 12px!important;margin:0!important;min-height:58px;background:#fff}
+.spec-row:nth-child(4n+3),.spec-row:nth-child(4n+4){background:#fbfdff}
+.spec-row.multi{grid-column:1/-1;border:1px solid #dce6f0;margin:-1px 0 0 -1px!important;border-radius:0;background:#f7fbff;padding:12px 14px!important}
+.feature-tabs .btn.red{background:#e9f4ff!important;color:#214e74!important;border-color:#a9d0ee!important}
+.feature-line{border-bottom:1px solid #dce6f0;min-height:64px}
+.features-panel .feature-list{border-top:1px solid #dce6f0}
+.feature-line input[type=checkbox]{accent-color:#337cb5}
+.field input:not(:disabled),.field select:not(:disabled),.model-control select{background:#eaf5ff!important;border-color:#bfd9f0!important}
+.field input:disabled,.field select:disabled{background:#f1f3f5!important;border-color:#dee3e9!important}
+#check-issues{margin-top:7px;gap:6px}
+.check-error-row{border-color:#edd5d8;border-left:3px solid #c94a59;border-radius:4px;background:#fffafa;color:#9d2934;padding:9px 11px}
+.check-error-row:hover{background:#ffeff1}
+@media(max-width:1080px){.section-fields{grid-template-columns:1fr}}
+@media(max-width:740px){
+ .project-heading{margin:-2px 0 8px;font-size:14px}
+ .spec-row{padding:8px 9px!important;min-height:51px}
+ .spec-row.multi{padding:9px 10px!important;margin:-1px 0 0 -1px!important}
+ .section-fields{border-top:1px solid #dce6f0}
+ .spec-section{padding-bottom:12px}
+ .section-heading,.features-panel .section-heading{background:#edf6ff!important}
+}
+
+/* Service floor advisory: information only, does not affect PASS/FAIL or Export. */
+#check-issues .check-led-warning{grid-column:1/-1;background:#edf6ff;border:1px solid #cbdff0;border-left:3px solid #4d90bb;border-radius:5px;color:#245878;padding:10px 12px;font-size:13px;line-height:1.5;font-weight:600}
+
+/* ITP is a required dependent input, never an independent feature. */
+.feature-itp-config{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;min-width:0;margin:7px 0 2px 0;padding:12px 14px;background:#f2f8fe;border:1px solid #d3e5f7;border-left:3px solid #ba2028;border-radius:6px}
+.feature-itp-config label{font-size:12px;font-weight:650;color:#26465f}
+.feature-itp-config select{width:100%;max-width:620px;min-height:38px;font-size:13px}
+.feature-itp-config small{font-size:11px;color:#586f87}
+
+.fan-guidance{display:block;color:#577088;font-size:11px;line-height:1.4;margin-top:4px}
+
+/* CWT-specific minimum checks, displayed immediately below AH/BH */
+.cwt-minimum-hint{display:block;font-size:11px;line-height:1.5;color:#45667d;margin-top:4px}
+.cwt-minimum-error{color:#a62929;font-weight:650}
+.cwt-below-minimum{outline:2px solid #bd3838;outline-offset:1px}
+
+/* v5.1 – Hall indicator fields regrouped in floor-specific cards. */
+.hall-choice-panel{grid-column:1/-1;min-width:0;padding:18px;background:#f8fbfe;border:1px solid #cfddeb;border-radius:9px;margin:12px 0;}
+.hall-choice-title{font-size:14px;color:#254864;font-weight:800;margin:0 0 13px;}
+.hall-floor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,265px),1fr));gap:12px;align-items:start}
+.hall-floor-card{min-width:0;border:1px solid #d5e3f1;border-radius:8px;background:#fff;overflow:hidden}
+.hall-floor-title{margin:0;background:#eaf4ff;color:#245172;font-size:13px;line-height:1.4;padding:11px 13px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #d7e6f3}
+.hall-floor-marker{background:#fff;border:1px solid #d2e2f0;color:#53799d;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:750}
+.hall-floor-options{display:flex;flex-direction:column;gap:0;padding:4px 13px 8px}
+.hall-choice-item{min-width:0;padding:9px 0 11px;border-bottom:1px solid #e9eff5;display:grid;gap:5px}
+.hall-choice-item:last-child{border-bottom:0}
+.hall-choice-label{font-size:11.7px;line-height:1.45;font-weight:650;color:#415a72}
+.hall-choice-item .field{display:block;min-width:0;width:100%}
+.hall-choice-item .field .nm{display:none!important}
+.hall-choice-item .field input,.hall-choice-item .field select{width:100%;min-width:0}
+@media(max-width:740px){.hall-choice-panel{padding:12px 10px}.hall-floor-grid{grid-template-columns:1fr}.hall-choice-title{font-size:13px}.hall-floor-options{padding:3px 12px 7px}}
+
+
+/* v5.6 — hall lantern catalog, independent per-floor selections */
+.hall-lantern-choice{padding-top:12px}
+.hall-lantern-select{width:100%;border:1px solid #b9d5f3;background:#eaf4ff;border-radius:6px;padding:11px;color:#173957;font:inherit}
+.hall-lantern-controls{display:flex;align-items:center;gap:12px;min-height:48px}
+.hall-lantern-thumb{max-width:45px;max-height:68px;object-fit:contain;background:#f4f8fb;border-radius:3px;padding:2px}
+.hall-lantern-view{font-size:11px;padding:7px 11px;border:1px solid #b8d1ea!important;color:#235179!important;background:#f7fbff!important}
+.hall-lantern-overlay{position:fixed;inset:0;background:rgba(10,25,44,.67);display:flex;align-items:center;justify-content:center;z-index:21000;padding:18px}
+.hall-lantern-modal{width:min(950px,100%);max-height:92vh;overflow:auto;border-radius:10px;background:white;box-shadow:0 25px 85px #0004}
+.hall-lantern-header{position:sticky;top:0;z-index:2;background:#eaf3fa;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 19px;border-bottom:1px solid #cedcea}
+.hall-lantern-header h3{margin:0;font-size:16px;color:#1c4262}
+.hall-lantern-gallery{padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.hall-lantern-card{border:1px solid #d7e2ed;background:white;border-radius:8px;padding:12px 8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;flex-direction:column;gap:12px;color:#1d476b;min-height:180px}
+.hall-lantern-card:hover,.hall-lantern-card.is-current{border-color:#528ac3;background:#edf6fe}
+.hall-lantern-card img{max-height:144px;max-width:100%;object-fit:contain}
+.hall-lantern-card strong{font-size:12px}
+@media(max-width:500px){.hall-lantern-gallery{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px}.hall-lantern-header h3{font-size:13px}}
+
+/* v5.8.42 – Features: aligned two-column desktop table with clear separation. */
+@media (min-width:741px) {
+  .features-panel .feature-list {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:0;
+    row-gap:0;
+    border:1px solid #d6e4f0;
+    border-bottom:0;
+    border-radius:5px;
+    overflow:hidden;
+    background:#fff;
+    align-items:stretch;
+  }
+  .features-panel .feature-line {
+    min-width:0;
+    min-height:60px;
+    margin:0;
+    padding:10px 13px;
+    border-bottom:1px solid #d6e4f0;
+    display:grid;
+    grid-template-columns:minmax(55px,75px) minmax(0,1fr) 30px;
+    gap:9px;
+    align-items:center;
+  }
+  .features-panel .feature-line:nth-child(odd) {
+    border-right:2px solid #a8c9e5;
+  }
+  .features-panel .feature-line:nth-child(4n+3),
+  .features-panel .feature-line:nth-child(4n+4) {
+    background:#f7fbff;
+  }
+  .features-panel .feature-line .fdesc {overflow-wrap:anywhere}
+  .features-panel .feature-line input[type="checkbox"] {justify-self:center}
+}
+@media (max-width:740px) {
+  .features-panel .feature-list {display:block;border-top:1px solid #dce6f0}
+  .features-panel .feature-line {border-right:0!important;border-bottom:1px solid #dce6f0}
+}
+
+
+/* v5.8.45: brochure watermark deliberately removed for a clean, readable UI. */
+body::before {content:none!important;background-image:none!important;}
+body > .site-header, body > main.workspace {position:relative;z-index:auto;}
+body .workspace > .project-box,
+body .workspace > .action-panel,
+body .workspace > .fields-root .spec-section,
+body .workspace > .features-panel,
+body .workspace > .leadtime-check {background-color:#fff;}
+
+
+/* v5.8.56: compact mobile header / controls, preserved DOM and export behavior */
+.database-options {display:none!important}
+.leadtime-label span,.tech-export-choice small {display:none!important}
+.leadtime-reasons:empty {display:none}
+@media(max-width:740px){
+ .workspace>.project-box{padding:11px 12px 8px;margin-bottom:8px}
+ .workspace>.project-box .project-heading{margin:0 0 5px;font-size:13px}
+ .workspace .project-grid{gap:0}
+ .workspace .project-grid .field{grid-template-columns:minmax(0,29fr) minmax(0,71fr);gap:7px;padding:4px 0;min-height:42px}
+ .workspace .project-grid .field .nm{font-size:11.5px;line-height:1.24}
+ .workspace .project-grid .field input{height:35px;min-height:35px;padding:5px 9px;font-size:13px;width:100%}
+ .workspace>.leadtime-check{margin:0 0 8px;padding:8px 12px;border-radius:7px}
+ .workspace>.leadtime-check .leadtime-label{font-size:12px;line-height:1.25}
+ .workspace>.leadtime-check .leadtime-main{margin:2px 0 0;gap:9px;align-items:baseline}
+ .workspace>.leadtime-check .leadtime-main strong{font-size:19px;line-height:1.3}
+ .workspace>.leadtime-check .leadtime-reasons{font-size:10.5px;line-height:1.25}
+ .workspace>.action-panel{padding:7px 10px;margin-bottom:9px}
+ .workspace>.action-panel .tech-export-choice{min-height:41px;max-width:none;padding:6px 9px;margin:0 0 6px;gap:9px;border-radius:6px}
+ .workspace>.action-panel .tech-export-choice input{width:19px;height:19px;margin:0}
+ .workspace>.action-panel .tech-export-choice strong{font-size:12px;line-height:1.25}
+ .workspace>.action-panel .check-top{padding:7px 9px}
+}
+@media(max-width:380px){.workspace .project-grid .field{grid-template-columns:minmax(0,32fr) minmax(0,68fr)}}
+
+/* NEXIEZ-MR Side Drop BH limit safety reference */
+.bh-safety-illustration{display:block;width:min(100%,420px);height:auto;object-fit:contain;margin:10px 0 2px;border:1px solid #e7d5d5;border-radius:4px;background:#fff}
+
+/* v5.8.159: Selector visual status is determined by user choice, not the locked workbook cell.
+   Door Type is grey only when this Capacity group has a single valid door type. */
+.field .mr-selector-control select:not(:disabled),
+.field.locked .mr-selector-control select:not(:disabled),
+.field.cf-locked .mr-selector-control select:not(:disabled){
+  background:#eaf5ff!important; border:1px solid #b5d2f0!important;
+  color:#163454!important; opacity:1!important; cursor:pointer!important;
+  -webkit-text-fill-color:#163454!important;
+}
+.field .mr-selector-control.single-option select:disabled{
+  background:#f0f2f4!important; border:1px solid #dee3e9!important;
+  color:#7d8894!important; -webkit-text-fill-color:#7d8894!important;
+  opacity:1!important; cursor:not-allowed!important;
+}
+
+/* v5.8.160: Section I MR selectors use the existing left-hand row title.
+   Keep their one-line height aligned with Speed, Quantity, and Use on desktop/mobile. */
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact{
+  display:flex!important;flex-direction:column;justify-content:center;
+  gap:0!important;margin:0!important;padding:0!important;width:100%;min-width:0;
+}
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact select{
+  width:100%;height:40px!important;min-height:40px!important;
+  margin:0!important;box-sizing:border-box;
+}
+.workspace #fields .spec-section[data-section="I"] .mr-selector-compact .mr-selector-label{display:none!important}
+
+</style>
+<style>
+/* Design-reference UI — screenshots are cropped to one item per tile. */
+.design-inline{margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.design-inline-btn{height:auto;min-height:31px;padding:6px 10px;font-size:11px;color:#1c5e8a;background:#f4f9fe;border-color:#c4daeb}
+.design-inline-btn:hover{background:#eaf4ff}
+.design-thumb{width:54px;height:44px;object-fit:cover;border:1px solid #e2e8ef;border-radius:5px;background:#fafafa;flex-shrink:0}
+.design-hint{font-size:11px;color:#5f7588;line-height:1.45;flex:1;min-width:140px}
+.design-hint b{color:#25445f}.design-hint.warn{color:#a13735}
+.design-popup{position:fixed;inset:0;z-index:85;background:rgba(18,32,48,.67);padding:18px;display:none;align-items:center;justify-content:center}
+.design-popup.show{display:flex}
+.design-dialog{width:min(1010px,100%);max-height:94vh;overflow:auto;border-radius:12px;background:white;box-shadow:0 24px 70px rgba(0,0,0,.25)}
+.design-header{padding:18px 22px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid #e6eaf0}
+.design-eyebrow{font-size:10px;font-weight:780;letter-spacing:1.1px;color:#bc2933}
+.design-header h3{margin:3px 0 4px;font-size:20px;color:#23394e}.design-header p{margin:0;font-size:12px;color:#698095}
+.design-close{border:0;border-radius:7px;background:#f0f3f7;color:#32485f;font-size:22px;width:35px;height:35px;flex-shrink:0}
+.design-content{padding:19px 22px 23px}
+.design-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:13px}
+.design-card{border:1px solid #dce5ed;border-radius:9px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.design-card.is-current{border-color:#5ba1d0;box-shadow:0 0 0 1px #5ba1d0}
+.design-card-images{display:flex;gap:3px;align-items:stretch;background:#edf2f6;min-height:128px}
+.design-card-images img{width:100%;height:148px;object-fit:contain;min-width:0;flex:1;background:#f7f9fa}
+.design-card-images.double img{width:50%}
+.design-card-text{padding:11px 13px;display:flex;flex-direction:column;gap:6px;flex:1}
+.design-card-name{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.design-card-name strong{font-size:14px;color:#21374b}
+.design-card-sub{font-size:12px;font-weight:650;color:#425e77}
+.design-card-desc{font-size:12px;line-height:1.5;color:#536a7c}
+.design-card-warning{color:#a52d30;font-size:11px;font-weight:700;padding:6px 8px;background:#fff1ef;border-radius:4px}
+.design-current{font-size:10px;border-radius:14px;padding:3px 7px;color:#1b679b;background:#e9f4ff;font-weight:700}
+.design-card-footer{padding:0 13px 12px;margin-top:auto}
+.design-apply{padding:6px 10px;min-height:31px;font-size:11px}
+.design-unavailable{font-size:11px;color:#8b6975}
+.design-footnote{margin:18px 0 0;color:#718194;font-size:11px;line-height:1.6}
+@media(max-width:570px){.design-popup{padding:9px}.design-header,.design-content{padding:14px}.design-cards{grid-template-columns:1fr}.design-card-images img{height:142px}}
+/* v5.8.24 — compact display thumbnails, right of selected code; notes do not add new UI rows. */
+.field.panel-preview-inline,
+.hall-choice-item .field.panel-preview-inline,
+.spec-row.multi .field.panel-preview-inline{
+ display:grid!important;
+ grid-template-columns:minmax(0,1fr) 68px!important;
+ grid-template-rows:auto auto;
+ column-gap:9px;
+ row-gap:3px;
+ align-items:center;
+ min-width:0;
+}
+.field.panel-preview-inline>.nm{
+ grid-column:1/-1;
+}
+.field.panel-preview-inline>select,
+.field.panel-preview-inline>input{
+ grid-column:1;
+ grid-row:auto;
+ width:100%;min-width:0;
+}
+.field.panel-preview-inline>.panel-image-preview,
+.spec-row.multi .field.panel-preview-inline>.panel-image-preview{
+ display:contents!important;
+}
+.field.panel-preview-inline .panel-preview-gallery{
+ grid-column:2;
+ grid-row:1 / span 3;
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ width:68px;
+ min-height:55px;
+ margin:0;
+ padding:0;
+}
+/* A visible per-field name (e.g. combined specification rows) occupies the first grid row. */
+.spec-row.multi .field.panel-preview-inline .panel-preview-gallery{grid-row:2 / span 2}
+.field.panel-preview-inline .panel-preview-gallery img{
+ display:block;
+ width:62px;
+ height:52px;
+ max-width:100%;
+ object-fit:contain;
+ background:#fff;
+ border:1px solid #e5edf4;
+ border-radius:5px;
+ padding:3px;
+ box-sizing:border-box;
+}
+.field.panel-preview-inline .panel-preview-note{
+ grid-column:1;
+ grid-row:auto;
+ display:block;
+ margin:0;
+ font-size:10px;
+ line-height:1.25;
+ color:#657d90;
+ overflow-wrap:break-word;
+}
+@media(max-width:650px){
+ .field.panel-preview-inline,
+ .hall-choice-item .field.panel-preview-inline,
+ .spec-row.multi .field.panel-preview-inline{grid-template-columns:minmax(0,1fr) 60px!important;column-gap:7px}
+ .field.panel-preview-inline .panel-preview-gallery{width:60px;min-height:49px}
+ .field.panel-preview-inline .panel-preview-gallery img{width:56px;height:47px;padding:2px}
+ .field.panel-preview-inline .panel-preview-note{font-size:9px}
+}
+
+/* v5.8.25 – source-code finish preview aligned to the right of current select. */
+.field.finish-preview-inline{display:grid!important;grid-template-columns:minmax(0,1fr) 72px!important;grid-template-rows:auto auto;gap:4px 9px;align-items:center}
+.field.finish-preview-inline>.nm{grid-column:1/-1}
+.field.finish-preview-inline>select{grid-column:1;min-width:0;width:100%}
+.field.finish-preview-inline>.finish-preview-thumb{grid-column:2;grid-row:2;width:68px;height:60px;object-fit:cover;border:1px solid #dfe5ec;border-radius:5px;background:white}
+.field.finish-preview-inline>.finish-preview-caption{grid-column:2;grid-row:3;text-align:center;font-size:10px;line-height:1.2;color:#637388;min-width:0}
+.spec-row.multi .field.finish-preview-inline .finish-preview-thumb{grid-row:2}
+.field.finish-preview-inline>.finish-preview-caption{grid-row:3}
+@media(max-width:540px){.field.finish-preview-inline{grid-template-columns:minmax(0,1fr) 58px!important;gap:4px 6px}.field.finish-preview-inline>.finish-preview-thumb{width:56px;height:50px}}
+
+/* v5.8.26 – one device / one line for MR and MRL V02. */
+#fields .car-design-section-fields{display:block!important;grid-template-columns:none!important}
+#fields .car-design-lines{width:100%;display:grid;grid-template-columns:minmax(0,1fr);border:1px solid #dce6f0;border-bottom:0}
+#fields .car-design-line{display:grid!important;grid-template-columns:minmax(165px,1.05fr) minmax(180px,1fr) minmax(230px,1.2fr);gap:14px;align-items:center;min-height:78px;padding:12px 15px;border-bottom:1px solid #dce6f0;background:#fff}
+#fields .car-design-line:nth-child(even){background:#fbfdff}
+#fields .car-design-label{font-weight:700;font-size:13px;color:#244766;line-height:1.45}
+#fields .car-design-material,#fields .car-design-variants{min-width:0}
+#fields .car-design-line .field{min-width:0}
+#fields .car-design-line .field>.nm{display:none!important}
+#fields .car-design-line .field select{width:100%;min-width:0}
+#fields .car-design-variants .car-finish-inactive{display:none!important}
+#fields .car-design-variants.car-design-no-variant::after{content:'—';color:#9ca8b3}
+#fields .car-design-line .technical-material-hint{display:none!important}
+/* Preview is anchored next to its select, not below or on the next grid row. */
+#fields .car-design-line .field.finish-preview-inline{display:grid!important;grid-template-columns:minmax(0,1fr) 76px!important;grid-template-rows:auto!important;column-gap:9px;align-items:center}
+#fields .car-design-line .field.finish-preview-inline>select{grid-column:1!important;grid-row:1!important}
+#fields .car-design-line .field.finish-preview-inline>.finish-preview-box{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0}
+#fields .car-design-line .finish-preview-thumb{width:68px;height:60px;object-fit:cover;border:1px solid #dfe5ec;border-radius:5px;background:#fff}
+#fields .car-design-line .finish-preview-caption{font-size:10px;line-height:1.2;text-align:center;color:#637388;overflow-wrap:anywhere}
+/* Same preview alignment for any non-car-design finish field. */
+.field.finish-preview-inline{display:grid!important;grid-template-columns:minmax(0,1fr) 76px!important;grid-template-rows:auto!important;align-items:center}
+.field.finish-preview-inline>.nm{grid-column:1/-1}
+.field.finish-preview-inline>select{grid-column:1!important;grid-row:2!important}
+.field.finish-preview-inline>.finish-preview-box{grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:center;gap:3px}
+.field.finish-preview-inline .finish-preview-thumb{width:68px;height:60px;object-fit:cover;border:1px solid #dfe5ec;border-radius:5px}
+.field.finish-preview-inline .finish-preview-caption{font-size:10px;line-height:1.2;text-align:center;color:#637388}
+@media(max-width:900px){#fields .car-design-line{grid-template-columns:minmax(130px,.9fr) minmax(135px,1fr) minmax(170px,1.1fr);gap:9px;padding:9px}}
+@media(max-width:620px){#fields .car-design-line{grid-template-columns:1fr 1fr!important;gap:8px}#fields .car-design-label{grid-column:1/-1}#fields .car-design-material{grid-column:1}#fields .car-design-variants{grid-column:2}#fields .car-design-line .field.finish-preview-inline{grid-template-columns:minmax(0,1fr) 56px!important}#fields .car-design-line .finish-preview-thumb{width:50px;height:48px}}
+
+/* v5.8.27 — section III unified full-width compact rows (MR + MRL V02).
+   This follows the existing DOM input nodes; cell IDs and export bindings are unchanged. */
+#fields .spec-section[data-section="III"] .car-design-section-fields{
+  display:flex!important;flex-direction:column!important;gap:0!important;
+  width:100%;border-top:1px solid #dce6f0;border-right:1px solid #dce6f0;
+}
+#fields .spec-section[data-section="III"] .car-design-lines{
+  display:flex!important;flex-direction:column!important;border:0!important;width:100%;
+}
+#fields .spec-section[data-section="III"] .car-design-line{
+  grid-template-columns:minmax(150px,32%) minmax(150px,32%) minmax(0,1fr)!important;
+  min-height:0!important;padding:5px 10px!important;gap:9px!important;
+  border-left:0!important;border-right:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-label{font-size:12px;line-height:1.28}
+#fields .spec-section[data-section="III"] .car-design-line .field{gap:2px!important;margin:0!important}
+#fields .spec-section[data-section="III"] .car-design-line .field select,
+#fields .spec-section[data-section="III"] .car-design-line .field input{
+  height:32px!important;min-height:32px!important;padding:4px 8px!important;font-size:12px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .finish-preview-thumb{
+  height:35px!important;width:43px!important;object-fit:cover;
+}
+#fields .spec-section[data-section="III"] .car-design-line .finish-preview-caption{
+  font-size:9px!important;line-height:1.15!important;max-width:65px;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field.finish-preview-inline{
+  grid-template-columns:minmax(0,1fr) 52px!important;gap:5px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .design-thumb{width:37px;height:31px}
+#fields .spec-section[data-section="III"] .car-design-line .design-inline{margin-top:3px;gap:5px}
+#fields .spec-section[data-section="III"] .car-design-line .design-hint{font-size:10px;line-height:1.2}
+#fields .spec-section[data-section="III"] .car-design-line .design-inline-btn{min-height:25px;padding:3px 6px;font-size:10px}
+/* Previously ungrouped rows must occupy their own full-width line, not alternate columns. */
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row{
+  display:grid!important;grid-template-columns:minmax(150px,32%) minmax(0,1fr)!important;
+  width:100%!important;grid-column:1/-1!important;gap:9px!important;
+  min-height:0!important;margin:0!important;padding:5px 10px!important;
+  border-left:0!important;border-top:0!important;border-radius:0!important;
+  align-items:center!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .spec-row-title{
+  font-size:12px!important;line-height:1.28!important;margin:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .spec-row-inputs{
+  width:100%;min-width:0;margin:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field{margin:0!important;gap:3px!important}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row select,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row input{
+  min-height:32px!important;height:32px!important;font-size:12px!important;padding:4px 8px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .readonly-value{
+  min-height:32px!important;padding:6px 9px!important;font-size:12px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .spec-row-inputs{
+  display:grid!important;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important;gap:7px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field{
+  display:block!important;padding:0!important;border:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field .nm{
+  font-size:10px!important;line-height:1.15!important;margin-bottom:3px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .design-inline{margin-top:4px;gap:6px}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .design-thumb{width:39px;height:32px}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .design-hint{font-size:10px;line-height:1.25}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .design-inline-btn{padding:3px 7px;min-height:26px;font-size:10px}
+@media(max-width:680px){
+ #fields .spec-section[data-section="III"] .car-design-line{grid-template-columns:minmax(110px,33%) minmax(0,1fr)!important;gap:6px!important}
+ #fields .spec-section[data-section="III"] .car-design-label{grid-column:1!important;grid-row:1/-1!important}
+ #fields .spec-section[data-section="III"] .car-design-material{grid-column:2!important;grid-row:1!important}
+ #fields .spec-section[data-section="III"] .car-design-variants{grid-column:2!important;grid-row:2!important}
+ #fields .spec-section[data-section="III"] .car-design-line .field.finish-preview-inline{grid-template-columns:minmax(0,1fr) 45px!important}
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row{grid-template-columns:minmax(110px,33%) minmax(0,1fr)!important;gap:6px!important}
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .spec-row-inputs{grid-template-columns:minmax(0,1fr)!important}
+}
+
+
+/* v5.8.28 — concise mobile UI, validation remains in Check Spec. */
+/* Hide descriptive notes, keep image previews, controls, validation and error messages. */
+#fields .cwt-minimum-hint,
+#fields .technical-material-hint,#fields .design-hint,
+#fields .finish-preview-caption{display:none!important}
+/* Remove placeholder dash; rows without a dependent choice take one grid row. */
+#fields .car-design-variants.car-design-no-variant{display:none!important}
+#fields .car-design-variants.car-design-no-variant::after{content:none!important}
+#fields .car-design-line:has(>.car-design-variants.car-design-no-variant){align-items:center!important}
+/* Remove extra vertical space around preview/image and single line controls. */
+#fields .car-design-line .finish-preview-box{gap:0!important}
+#fields .car-design-line .design-inline{margin-top:2px!important}
+#fields .car-design-section-fields>.spec-row .design-hint{display:none!important}
+@media(max-width:680px){
+  #fields .spec-section[data-section="III"] .car-design-line{padding:5px 7px!important;gap:4px 7px!important;min-height:0!important}
+  #fields .spec-section[data-section="III"] .car-design-label{grid-row:1!important;font-size:11px!important;line-height:1.28!important}
+  #fields .spec-section[data-section="III"] .car-design-variants{grid-row:2!important}
+  #fields .spec-section[data-section="III"] .car-design-line:has(>.car-design-variants:not(.car-design-no-variant)) .car-design-label{grid-row:1 / span 2!important}
+  #fields .spec-section[data-section="III"] .car-design-line select,
+  #fields .spec-section[data-section="III"] .car-design-line input{height:30px!important;min-height:30px!important;padding:3px 7px!important;font-size:12px!important}
+  #fields .spec-section[data-section="III"] .car-design-line .finish-preview-thumb{height:30px!important;width:32px!important}
+  #fields .spec-section[data-section="III"] .car-design-line .field.finish-preview-inline{grid-template-columns:minmax(0,1fr) 34px!important;gap:3px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row{padding:5px 7px!important;gap:7px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .spec-row-title{font-size:11px!important;line-height:1.25!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row select,
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row input{height:30px!important;min-height:30px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .readonly-value{min-height:30px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .design-inline-btn{min-height:23px!important}
+  #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row .design-thumb{height:27px!important;width:31px!important}
+  .dimension-entry,.dimension-hoistway .dimension-entry{min-height:0!important;padding:6px 9px!important;gap:6px!important}
+  .dimension-entry input,.dimension-entry select{height:34px!important;min-height:34px!important}
+  .dimension-entry .spec-row-title{font-size:12px!important;line-height:1.3!important}
+  .dimension-hoistway .dimension-entry input,.dimension-hoistway .dimension-entry select{grid-column:2!important}
+  .dimension-group-title{min-height:0!important;padding:9px 11px!important;font-size:13px!important}
+  .dimension-groups{gap:9px!important}
+  .spec-section{margin-bottom:12px!important;padding-bottom:12px!important}
+  .section-heading{padding-top:12px!important;padding-bottom:12px!important;margin-bottom:10px!important;font-size:17px!important}
+}
+
+/* v5.8.107 – contextual NY-40 material recommendation (non-blocking note) */
+#fields .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note:not([hidden]){
+ display:block!important;color:#805400;background:#fff7e5;border-left:3px solid #d59a28;
+ border-radius:4px;padding:9px 11px;font-size:12px;line-height:1.5;
+}
+#fields .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note strong{font-weight:800;color:#583700}
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-variants:has(.ny40-sus304-note:not([hidden]))::after{content:none!important}
+
+/* v5.8.108 — Keep SUS304 recommendation visible even when the third column is hidden. */
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note:not([hidden]){
+ display:block!important;margin-top:8px;color:#805400;background:#fff7e5;
+ border-left:3px solid #d59a28;border-radius:4px;padding:9px 11px;font-size:12px;line-height:1.5;
+}
+#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note strong{font-weight:800;color:#583700}
+#features .mbs-natural-light-note,.mbs-natural-light-note{
+ display:block;margin:0 0 9px 0;padding:9px 12px;color:#805400;background:#fff7e5;
+ border-left:3px solid #d59a28;border-radius:4px;font-size:12px;line-height:1.5;
+}
+
+/* v5.8.149 — aligned ceiling model and color; compact, right-hand visual icons on PC + mobile. */
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"]{
+ align-items:center!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-material,
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-variants{
+ align-self:center!important;min-width:0;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline){
+ display:grid!important;grid-template-columns:minmax(0,1fr) 39px!important;
+ align-items:center!important;column-gap:5px!important;row-gap:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline)>select{
+ grid-column:1!important;grid-row:1!important;min-width:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-line .field>.design-inline{
+ grid-column:2!important;grid-row:1!important;display:flex!important;
+ width:39px!important;height:33px!important;margin:0!important;padding:0!important;
+ align-items:center!important;justify-content:center!important;
+}
+#fields .car-design-line .design-icon-button{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ height:32px!important;min-height:32px!important;width:38px!important;
+ padding:1px!important;background:#f6f0e5!important;border:1px solid #d5c6af!important;
+ border-radius:5px!important;overflow:hidden!important;
+}
+#fields .car-design-line .design-icon-button .design-thumb{
+ display:block!important;width:34px!important;height:28px!important;
+ object-fit:contain!important;border:0!important;border-radius:3px!important;
+}
+#fields .car-design-line .design-inline .design-hint{display:none!important}
+/* Unify preview fields' heights and align thumbnails exactly beside selects. */
+#fields .spec-section[data-section="III"] .field.panel-preview-inline{
+ grid-template-columns:minmax(0,1fr) 42px!important;align-items:center!important;row-gap:0!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline>.panel-preview-gallery,
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-gallery{
+ grid-row:2!important;width:40px!important;min-height:30px!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-gallery img{
+ width:38px!important;height:30px!important;padding:1px!important;
+}
+#fields .spec-section[data-section="III"] .field.panel-preview-inline .panel-preview-note{display:none!important}
+/* Braille illustration is informational, no added dropdown and no extra line. */
+#fields .spec-section[data-section="III"] .field.braille-preview-inline{
+ display:grid!important;grid-template-columns:minmax(0,1fr) 46px!important;
+ align-items:center!important;gap:4px!important;
+}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>.nm{grid-column:1/-1!important}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>select{grid-column:1!important;grid-row:2!important}
+#fields .spec-section[data-section="III"] .field.braille-preview-inline>.braille-preview-thumb{
+ grid-column:2!important;grid-row:2!important;
+ width:44px!important;height:32px!important;object-fit:contain!important;
+ border:1px solid #d5c6af;border-radius:4px;background:white;
+}
+@media(max-width:680px){
+ /* Ceiling and finish remain on the same horizontal line on phones. */
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"]{
+  grid-template-columns:minmax(78px,26%) minmax(0,1fr) minmax(0,1fr)!important;
+  gap:4px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-label{
+  grid-column:1!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-material{
+  grid-column:2!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_CeilingModel"] .car-design-variants{
+  grid-column:3!important;grid-row:1!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line .field:has(>.design-inline){
+  grid-template-columns:minmax(0,1fr) 28px!important;column-gap:2px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-line .field>.design-inline,
+ #fields .spec-section[data-section="III"] .car-design-line .design-icon-button{
+  width:27px!important;height:28px!important;min-height:28px!important;
+ }
+ #fields .car-design-line .design-icon-button .design-thumb{width:25px!important;height:24px!important}
+ #fields .spec-section[data-section="III"] .car-design-line .field select{font-size:10px!important;padding:2px 2px!important}
+ #fields .spec-section[data-section="III"] .field.braille-preview-inline{grid-template-columns:minmax(0,1fr) 38px!important}
+ #fields .spec-section[data-section="III"] .field.braille-preview-inline>.braille-preview-thumb{width:36px!important;height:29px!important}
+}
+
+/* v5.8.150 — MRL Version02: all Section III thumbnails stay beside their controls.
+   The .spec-row.multi .field display:block rule previously overrode the grid. */
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field.panel-preview-inline,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field:has(>.design-inline),
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline){
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 42px!important;
+  grid-template-rows:auto 32px!important;
+  gap:2px 5px!important;
+  align-items:center!important;
+  min-width:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >.nm,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>.nm{
+  grid-column:1/-1!important;grid-row:1!important;margin:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >select,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline >input,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>select,
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline)>input{
+  grid-column:1!important;grid-row:2!important;min-width:0!important;width:100%!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline>.panel-image-preview{
+  display:contents!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery{
+  grid-column:2!important;grid-row:2!important;
+  width:40px!important;height:32px!important;min-height:0!important;
+  margin:0!important;align-self:center!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery img{
+  width:38px!important;height:30px!important;padding:1px!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-note{display:none!important}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field>.design-inline{
+  grid-column:2!important;grid-row:2!important;
+  display:flex!important;width:40px!important;height:32px!important;
+  align-items:center!important;justify-content:center!important;
+  margin:0!important;padding:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button{
+  width:38px!important;height:31px!important;min-height:31px!important;padding:1px!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:5px!important;border:1px solid #d5c6af!important;
+  background:#f6f0e5!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button .design-thumb{
+  width:34px!important;height:27px!important;object-fit:contain!important;
+  border:0!important;
+}
+#fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-hint{display:none!important}
+@media(max-width:680px){
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field.panel-preview-inline,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row.multi .field:has(>.design-inline),
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field:has(>.design-inline){
+   grid-template-columns:minmax(0,1fr) 31px!important;
+   column-gap:3px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery,
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field>.design-inline{
+   width:30px!important;height:29px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field.panel-preview-inline .panel-preview-gallery img{
+   width:29px!important;height:27px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button{
+   width:30px!important;height:28px!important;min-height:28px!important;
+ }
+ #fields .spec-section[data-section="III"] .car-design-section-fields > .spec-row .field .design-icon-button .design-thumb{
+   width:27px!important;height:24px!important;
+ }
+}
+
+</style>
+
+<style id="classic-selective-ui-v5884">
+/* Restore classic colors; emphasize editable inputs and selected feature only. */
+.feature-tabs .btn.feature-tab{background:#fff;border:1px solid #dfe5ec;color:#506377;box-shadow:none}
+.feature-tabs .btn.feature-tab-current:not(.feature-tab-selected){background:#f6f8fa;border-color:#b4c5d4;color:#274862}
+.feature-tabs .btn.feature-tab-selected{background:#e1f0fc;border-color:#83b7da;color:#164f78;box-shadow:inset 3px 0 0 #3c88b8}
+.feature-tabs .btn.feature-tab-selected.feature-tab-current{background:#d4eafa;border-color:#569acc}
+.feature-line.feature-line-selected{background:#eef7ff;box-shadow:inset 3px 0 0 #4e9ccc}
+.feature-line:not(.feature-line-selected){background:#fff;box-shadow:none}
+.feature-line.x{opacity:.5}
+/* Input options retain original cool blue; read-only and disabled remain neutral. */
+.field.locked input,.field.locked select,.field.cf-locked input,.field.cf-locked select,
+input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important;box-shadow:none!important}
+#leadtime-days.leadtime-standard{color:#24824a!important}
+#leadtime-days.leadtime-extended{color:#b72832!important}
+</style>
+
+<style id="mobile-first-three-rows-v5885">
+/* Mobile-only compact first viewport. Does not alter field DOM, values, or validation. */
+@media (max-width:740px){
+  .site-header{height:43px!important;padding:0 12px!important}
+  .brand{gap:8px!important}.brand-bar{height:23px!important;width:3px!important}
+  .brand-text{font-size:11.1px!important;letter-spacing:0!important;line-height:1.15}
+  .brand-sub{font-size:8px!important;letter-spacing:.1px!important;margin-top:1px!important}
+  .workspace{padding:7px 9px 85px!important}
+  .workspace>.intro{display:grid!important;grid-template-columns:minmax(0,.84fr) minmax(0,1.16fr)!important;
+    gap:6px!important;align-items:center!important;padding:9px 10px!important;margin:0 0 6px!important;
+    min-height:0!important;border-radius:7px!important}
+  .intro>div:first-child{min-width:0!important}
+  .intro-title{font-size:15px!important;line-height:1.2!important;letter-spacing:-.2px!important}
+  .intro-title span{display:block;font-size:10px!important;line-height:1.2!important}
+  .intro-caption{font-size:9px!important;margin:2px 0 0!important}
+  .model-control{width:100%!important;min-width:0!important}
+  .model-control .label-top{font-size:9px!important;line-height:1.2!important;margin:0 0 3px!important;
+    white-space:normal!important}
+  .model-control select{height:37px!important;min-height:37px!important;font-size:11px!important;
+    font-weight:680!important;padding:5px 20px 5px 8px!important}
+  .workspace>.project-box{padding:6px 9px 7px!important;margin:0 0 6px!important;border-radius:7px!important}
+  .workspace>.project-box .project-heading{font-size:11px!important;line-height:1.15!important;
+    margin:0 0 5px!important;padding:0!important}
+  .workspace .project-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    column-gap:9px!important;row-gap:0!important}
+  .workspace .project-grid .field{display:flex!important;flex-direction:column!important;
+    align-items:stretch!important;gap:2px!important;padding:0!important;min-height:0!important;
+    border:0!important}
+  .workspace .project-grid .field .nm{font-size:9px!important;line-height:1.2!important;min-height:0!important}
+  .workspace .project-grid .field input{height:34px!important;min-height:34px!important;
+    font-size:11px!important;padding:5px 8px!important}
+  .workspace>.leadtime-check{display:flex!important;align-items:center!important;justify-content:space-between!important;
+    gap:7px!important;min-height:39px!important;padding:6px 10px!important;margin:0 0 6px!important}
+  .workspace>.leadtime-check .leadtime-label{font-size:11px!important;font-weight:700!important}
+  .workspace>.leadtime-check .leadtime-main{display:flex!important;gap:6px!important;
+    margin:0!important;align-items:center!important;justify-content:flex-end!important;min-width:0!important}
+  .workspace>.leadtime-check .leadtime-main strong{font-size:16px!important;line-height:1.1!important}
+  .workspace>.leadtime-check .leadtime-reasons{font-size:9px!important;max-width:110px!important;
+    overflow-wrap:anywhere!important}
+  .workspace>.action-panel{padding:5px 8px!important;margin:0 0 6px!important}
+  .workspace>.action-panel .tech-export-choice{padding:4px 6px!important;min-height:30px!important;
+    margin:0 0 4px!important;border:0!important;background:transparent!important;gap:7px!important}
+  .workspace>.action-panel .tech-export-choice input{width:16px!important;height:16px!important}
+  .workspace>.action-panel .tech-export-choice strong{font-size:10.5px!important;line-height:1.2!important}
+  .workspace>.action-panel .check-top{padding:5px 7px!important;font-size:10.5px!important;
+    line-height:1.2!important;min-height:24px!important;margin:0!important}
+  .workspace>.action-panel #check-issues:not(:empty){margin-top:7px!important}
+  .workspace .spec-nav{padding:0 0 6px!important;gap:5px!important}
+  .workspace .spec-nav a{min-height:28px!important;padding:5px 7px!important;font-size:10px!important;
+    border-radius:5px!important}
+  .workspace .spec-section{margin-bottom:9px!important;padding:0 9px 9px!important}
+  .workspace .spec-section .section-heading{margin:0 -9px 3px!important;padding:8px 9px!important;
+    font-size:13px!important;line-height:1.2!important}
+  .workspace .spec-section .section-heading:before{height:16px!important;width:3px!important}
+  .workspace #fields .spec-section[data-section="I"] .spec-row{min-height:39px!important;
+    padding:4px 6px!important;gap:5px!important}
+  .workspace #fields .spec-section[data-section="I"] .spec-row-title{font-size:11px!important;
+    line-height:1.2!important}
+  .workspace #fields .spec-section[data-section="I"] .field input,
+  .workspace #fields .spec-section[data-section="I"] .field select,
+  .workspace #fields .spec-section[data-section="I"] .readonly-value{
+    min-height:32px!important;height:32px!important;font-size:11px!important;padding:5px 7px!important}
+  .mobile-actions{padding:6px 9px calc(6px + env(safe-area-inset-bottom,0px))!important;
+    gap:6px!important}
+  .mobile-actions button{min-height:40px!important;padding:8px 5px!important}
+}
+</style>
+<style id="v5892-jamb-depth">
+.jamb-jd-field{display:flex;flex-direction:column;gap:5px;margin:8px 0 2px;padding:9px 11px;border:1px solid #e4eaf1;background:#f8fafc;border-radius:5px}
+.jamb-jd-field[hidden]{display:none!important}
+.jamb-jd-field .nm{display:block!important;font-size:12px;font-weight:650;color:#34465c}
+.jamb-jd-field select{width:100%;max-width:320px;height:38px}
+.jamb-jd-range{font-size:11px;color:#5a7086}
+@media(max-width:740px){.jamb-jd-field{margin-top:6px;padding:7px}.jamb-jd-field select{max-width:none}}
+</style>
+
+<style id="hall-panel-quantity-58109">
+.hall-qty-pair{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:8px;align-items:end;width:100%}
+.hall-qty-pair>.field{min-width:0;width:100%}.hall-qty-pair>.field select{width:100%;min-width:0;max-width:100%}
+.hall-qty-wrap{display:flex;flex-direction:column;gap:5px;min-width:0}.hall-qty-label{font-size:11px;color:#455a70;font-weight:700}
+.hall-qty-wrap select{width:100%;height:39px;padding:5px 7px;border:1px solid #b4c9dc;border-radius:5px;background:#fff}
+.hall-display-info{display:block;margin:5px 0 0;font-size:11px;color:#60768b}
+@media(max-width:510px){.hall-qty-pair{grid-template-columns:minmax(0,1fr) 84px;gap:5px}}
+</style>
+<style id="warm-beige-ui-58140">
+/* Warm beige controls; no changes to technical calculations or export. */
+:root{--me-light:#f8f2e8;--me-blue-border:#dacdb9}
+body{background:#f5f2ed}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select{background:#f6f0e5;border-color:#d5c6af;color:#382f26}
+input:not([type="checkbox"]):focus,select:focus{border-color:#a58a64;box-shadow:0 0 0 2px #e8dac4}
+.spec-nav a{background:#f7f0e5;border-color:#dccdb8;color:#5f4c36}
+.spec-nav a:hover{background:#eee1ce;border-color:#bca380;color:#533e29}
+.section-heading,.dimension-group-title{background:#f5ece0;color:#493b2d;border-bottom-color:#dfcfb8}
+.dimension-group{border-color:#dfcfb8}
+.feature-tabs .btn.feature-tab{background:#f8f1e6;border-color:#dfd0ba;color:#5a4a38}
+.feature-tabs .btn.feature-tab-current:not(.feature-tab-selected){background:#f1e6d5;border-color:#cbb394;color:#4f3f2f}
+.feature-tabs .btn.feature-tab-selected,.feature-tabs .btn.feature-tab-selected.feature-tab-current{background:#e9d9bf;border-color:#b5966c;color:#49321b;box-shadow:inset 3px 0 0 #9d7650}
+.feature-line.feature-line-selected{background:#f7efe4;box-shadow:inset 3px 0 0 #ae8d66}
+.tech-export-choice{background:#f8f2e8;border-color:#e0d1ba;color:#4b3b2b}
+.spec-row.multi{background:#fcf8f2;border-color:#e9dfd1}
+.field .dirty{border-color:#b79b75}
+.ny40-tag,.ny40-desc,.ny40-choice.active{background:#f1e4d1;border-color:#c7ad8b;color:#60452c}
+.ny40-body .ny40-imagewrap{background:linear-gradient(#fbf7f0,#f3eadc)}
+input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important}
+</style>
+<style id="warm-features-58141">
+/* Features panel: neutral warm colors in every state, including selected groups.
+   This stylesheet is after responsive-ui.css and classic-selective-ui overrides. */
+.features-panel .feature-tabs .btn.feature-tab,
+.features-panel .feature-tabs .btn.feature-tab:not(.feature-tab-selected):not(.feature-tab-current){
+  background:#f9f3e9!important;border-color:#ded1be!important;
+  color:#604c36!important;box-shadow:none!important;
+}
+.features-panel .feature-tabs .btn.feature-tab:hover,
+.features-panel .feature-tabs .btn.feature-tab:focus-visible{
+  background:#efe3d2!important;border-color:#bfa686!important;
+  color:#483725!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-current:not(.feature-tab-selected){
+  background:#eadcc8!important;border-color:#b99b76!important;
+  color:#513b25!important;box-shadow:inset 3px 0 0 #a48562!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-selected:not(.feature-tab-current){
+  background:#e6d5b9!important;border-color:#b5946c!important;
+  color:#4b3622!important;box-shadow:inset 3px 0 0 #a17b50!important;
+}
+.features-panel .feature-tabs .btn.feature-tab.feature-tab-selected.feature-tab-current{
+  background:#dec7a5!important;border-color:#a9875e!important;
+  color:#40301f!important;box-shadow:inset 3px 0 0 #8c663d!important;
+}
+.features-panel .feature-list{border-top-color:#e1d3c0!important}
+.features-panel .feature-line{border-bottom-color:#e5dacb!important}
+.features-panel .feature-line:not(.feature-line-selected){background:#fffdf9;box-shadow:none}
+.features-panel .feature-line.feature-line-selected,
+.features-panel .feature-line.feature-line-selected:nth-child(n){
+  background:#f4e7d6!important;box-shadow:inset 3px 0 0 #b28d5f!important;
+}
+.features-panel .feature-line input[type="checkbox"]{accent-color:#9d7650!important}
+@media (min-width:741px){
+ .features-panel .feature-line:nth-child(odd){border-right-color:#dbc7aa!important}
+ .features-panel .feature-line:nth-child(4n+3):not(.feature-line-selected),
+ .features-panel .feature-line:nth-child(4n+4):not(.feature-line-selected){background:#fbf5eb!important}
+}
+@media (max-width:740px){
+ .features-panel .feature-line{border-bottom-color:#e5dacb!important}
+}
+</style>
+
+<style id="hall-card-alignment-58151">
+/* PIV/HBV dropdowns, images and quantity aligned across floor cards */
+.hall-floor-grid{align-items:stretch}
+.hall-choice-item>.hall-choice-label{min-height:17px;line-height:17px;margin:0}
+.hall-choice-item>.hall-qty-pair{display:grid!important;grid-template-columns:minmax(0,1fr) 104px!important;align-items:start!important;gap:8px!important;width:100%}
+.hall-qty-pair>.field{min-width:0;align-self:start!important}
+.hall-qty-pair .hall-qty-wrap{position:relative;display:flex;flex-direction:column;gap:0!important;align-self:start!important;padding:0!important}
+.hall-qty-pair .hall-qty-label{position:absolute;left:0;bottom:calc(100% + 8px);margin:0!important;line-height:17px;white-space:nowrap}
+.hall-qty-pair .hall-qty-wrap select{margin:0!important;height:39px!important;min-height:39px!important}
+.hall-choice-item .field.panel-preview-inline{display:grid!important;grid-template-columns:minmax(0,1fr) 58px!important;grid-template-rows:39px auto!important;align-items:start!important;column-gap:7px!important;row-gap:2px!important}
+.hall-choice-item .field.panel-preview-inline>select{grid-column:1!important;grid-row:1!important;height:39px!important;min-height:39px!important;margin:0!important}
+.hall-choice-item .field.panel-preview-inline>.panel-image-preview{display:contents!important}
+.hall-choice-item .field.panel-preview-inline .panel-preview-gallery{grid-column:2!important;grid-row:1 / span 2!important;align-self:start!important;justify-self:center!important;width:58px!important;min-height:39px!important;margin:0!important}
+.hall-choice-item .field.panel-preview-inline .panel-preview-gallery img{width:52px!important;height:49px!important;object-fit:contain}
+.hall-choice-item .field.panel-preview-inline .panel-preview-note{grid-column:1!important;grid-row:2!important;margin:0!important;line-height:1.2!important}
+@media(max-width:510px){.hall-choice-item>.hall-qty-pair{grid-template-columns:minmax(0,1fr) 84px!important;gap:5px!important}.hall-choice-item .field.panel-preview-inline{grid-template-columns:minmax(0,1fr) 46px!important;column-gap:4px!important}.hall-choice-item .field.panel-preview-inline .panel-preview-gallery{width:46px!important}.hall-choice-item .field.panel-preview-inline .panel-preview-gallery img{width:43px!important;height:43px!important}}
+</style>
+
+<style id="unified-alignment-58153">
+/* Use one label/control ratio throughout, with no shift at section boundaries. */
+:root{--spec-label-ratio:42%;--spec-field-gap:10px;--spec-control-height:40px}
+.workspace .spec-section .spec-row:not(.multi):not(.dimension-entry),
+.workspace .spec-section .dimension-entry{
+  grid-template-columns:minmax(0,var(--spec-label-ratio)) minmax(0,1fr)!important;
+  column-gap:var(--spec-field-gap)!important;
+  align-items:center!important;
+  box-sizing:border-box!important;
+}
+.workspace .spec-section .spec-row-title,
+.workspace .spec-section .spec-row-inputs,
+.workspace .spec-section .field{min-width:0}
+.workspace .spec-section .spec-row:not(.multi) .spec-row-inputs,
+.workspace .spec-section .spec-row:not(.multi) .field{width:100%;min-width:0}
+.workspace .spec-section .spec-row:not(.dimension-entry) input:not([type=checkbox]),
+.workspace .spec-section .spec-row:not(.dimension-entry) select,
+.workspace .spec-section .spec-row:not(.dimension-entry) .readonly-value{
+  min-width:0;max-width:100%;box-sizing:border-box;
+}
+/* Dimension section cards no longer have a third phantom column. */
+.workspace .dimension-groups{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:start}
+.workspace .dimension-group{min-width:0}
+.workspace .dimension-entry{padding:9px 12px!important;min-height:58px!important}
+.workspace .dimension-entry .spec-row-title{min-width:0;overflow-wrap:normal;word-break:normal}
+.workspace .dimension-entry input,
+.workspace .dimension-entry select{
+  min-width:0;max-width:100%;height:var(--spec-control-height)!important;
+  box-sizing:border-box;
+}
+/* Display-only dimension hints always follow the input, not a phantom column. */
+.workspace .dimension-hoistway .dimension-entry .cwt-minimum-hint,
+.workspace .dimension-hoistway .dimension-entry .oh-minimum-hint,
+.workspace .dimension-hoistway .dimension-entry .travel-limit-hint,
+.workspace .dimension-hoistway .dimension-entry .mr-mh-maintenance-note,
+.workspace .dimension-hoistway .dimension-entry .mr-bed-shaft-note:not([hidden]){
+  grid-column:2!important;grid-row:auto!important;
+}
+.workspace .dimension-hoistway .dimension-entry input,
+.workspace .dimension-hoistway .dimension-entry select{grid-column:2!important}
+/* Equal baseline for ceiling/finish/COP pair of dropdowns, regardless of icon. */
+.workspace .spec-row.multi .spec-row-inputs{align-items:start!important}
+.workspace .spec-row.multi .field{min-width:0;align-self:start!important}
+.workspace .spec-row.multi .field>.nm{min-height:16px;line-height:16px;margin:0!important}
+.workspace .spec-row.multi .field select,
+.workspace .spec-row.multi .field input:not([type=checkbox]){
+  min-height:var(--spec-control-height)!important;height:var(--spec-control-height)!important;
+  margin:0!important;
+}
+.workspace .spec-row.multi .field.panel-preview-inline{align-items:start!important}
+.workspace .spec-row.multi .field.panel-preview-inline .panel-preview-gallery{align-self:start!important}
+/* Shared styling at phone and tablet widths. */
+@media(max-width:1080px){.workspace .dimension-groups{grid-template-columns:minmax(0,1fr)!important}}
+@media(max-width:740px){
+  :root{--spec-label-ratio:42%;--spec-field-gap:8px;--spec-control-height:36px}
+  .workspace .spec-section .spec-row:not(.multi):not(.dimension-entry),
+  .workspace .spec-section .dimension-entry{padding:8px 9px!important}
+  .workspace .dimension-entry{min-height:52px!important}
+  .workspace .dimension-entry .spec-row-title,
+  .workspace .spec-section .spec-row-title{line-height:1.35!important}
+  .workspace .spec-row.multi .field select,
+  .workspace .spec-row.multi .field input:not([type=checkbox]){
+    height:36px!important;min-height:36px!important
+  }
+  .workspace .spec-row.multi .field.panel-preview-inline .panel-preview-gallery img{
+    max-width:46px!important;max-height:42px!important;object-fit:contain
+  }
+}
+@media(max-width:380px){:root{--spec-label-ratio:40%;--spec-field-gap:7px}}
+</style>
+<style id="desktop-check-float-style">
+/* v5.8.173 — floating Check Spec action for both desktop models. */
+.desktop-check-float{display:none}
+@media (min-width:851px){
+ .desktop-check-float{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:75;display:flex;flex-direction:column;align-items:stretch;gap:5px;max-width:160px;padding:8px;border:1px solid #d4dce6;border-radius:12px;background:rgba(255,255,255,.97);box-shadow:0 5px 22px rgba(27,48,71,.18)}
+ .desktop-check-float button{font-family:inherit;font-size:13px;font-weight:700;line-height:1.25;min-height:45px;padding:9px 11px;color:white;background:#bc2330;border:1px solid #a81926;border-radius:8px;cursor:pointer;white-space:nowrap}
+ .desktop-check-float button:hover,.desktop-check-float button:focus-visible{background:#a71926;outline:2px solid #b5d9f7;outline-offset:2px}
+ .desktop-check-float-status{color:#596b7d;font-size:10px;font-weight:650;text-align:center;max-width:150px;line-height:1.3}
+}
+@media (max-width:850px){.desktop-check-float{display:none!important}}
+</style>
+<script id="mr-scroll-start-fix">
+// New initial opening starts at the top. Keep user-controlled scrolling on subsequent model changes.
+(function(){
+ if('scrollRestoration' in history)history.scrollRestoration='manual';
+ let userMoved=false,done=false;
+ const mark=()=>{userMoved=true};
+ ['wheel','touchstart','pointerdown','keydown'].forEach(type=>window.addEventListener(type,mark,{once:true,passive:true}));
+ const reset=()=>{if(!userMoved&&!done)window.scrollTo(0,0)};
+ reset();
+ document.addEventListener('DOMContentLoaded',reset,{once:true});
+ window.addEventListener('load',()=>{if(!userMoved){window.scrollTo(0,0);requestAnimationFrame(()=>{if(!userMoved)window.scrollTo(0,0)})}done=true},{once:true});
+})();
+</script>
+<style id="mrl-v02-g11l1-vertical-css">
+/* NEXIEZ-MRL Version 2 — Technical Study controls */
+.mrl-ts-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 12px;padding:10px;border:1px solid #dbe5ed;border-radius:8px;background:#f8fbfd}
+.mrl-ts-control{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mrl-ts-control label{font-size:11px;font-weight:700;color:#294664}
+.mrl-ts-control select{width:100%;background:#eaf5ff;border:1px solid #b5d2f0;color:#163454;min-height:36px;border-radius:5px;padding:4px 7px}
+.mrl-ts-details{grid-column:1/-1;font-size:11px;color:#586a7c;line-height:1.4}
+.mrl-ts-output{grid-column:1/-1;font-size:12px;color:#233e58;font-weight:650;line-height:1.4}
+.mrl-ts-output.mrl-ts-unavailable{color:#975629}
+.workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline}
+.mrl-ts-removed-note{font-size:11px;color:#294c74;font-weight:700}
+@media(max-width:520px){.mrl-ts-settings{grid-template-columns:1fr}.mrl-ts-settings>*{grid-column:1}}
+
+/* v5.8.184: MRL Technical Study OH/PD minima must remain visible.
+   Legacy note hiding excluded oh-minimum-hint; display beside value on PC. */
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry .oh-minimum-hint.mrl-ts-two-minima{display:flex!important;flex-direction:column!important;gap:3px!important;visibility:visible!important;grid-column:3!important;align-self:center;min-width:0;line-height:1.4!important}
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.oh-minimum-hint.mrl-ts-two-minima) > .spec-row-title{grid-column:1!important}
+#fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry:has(.oh-minimum-hint.mrl-ts-two-minima) input{grid-column:2!important}
+@media(max-width:580px){
+ #fields .dimension-groups[data-model="MRL"] .dimension-hoistway .dimension-entry .oh-minimum-hint.mrl-ts-two-minima{grid-column:2!important;grid-row:auto!important;margin-top:3px!important}
+}
+</style>
+<style id="mrl-g11l1-min-travel-186">
+/* Separate G11L1 minimum TR; do not hide the existing two-stop/max-travel advice. */
+ display:block!important;grid-column:3!important;font-size:11px;font-weight:700;color:#29577c;line-height:1.35;min-width:0;white-space:normal
+}
+.mrl-travel-panel-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 12px;background:#f9fbfd}
+.mrl-travel-panel-option{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#294664;font-weight:700}
+.mrl-travel-panel-option select{font-size:12px;max-width:100%;padding:5px;min-height:34px;background:#eaf5ff;border:1px solid #b5d2f0;border-radius:5px;color:#163454}
+@media(max-width:650px){
+ .mrl-travel-panel-options{grid-template-columns:1fr}
+}
+</style>
+<style id="mrl-beam-removal-notice-v192">
+#check-issues .check-hoisting-beam-notice{grid-column:1/-1;display:block;padding:9px 12px;border:1px solid #e1d4ae;border-left:3px solid #a88a3c;border-radius:5px;background:#fffdf5;color:#594c2d;font-size:13px;line-height:1.5;font-weight:600}
+</style>
+
+<style id="mrl-sets-l-notice-v194">
+#fields .dimension-groups[data-model="MRL"] .oh-minimum-hint .mrl-sets-l-advice{display:block!important;margin-top:5px;font-size:10.5px;line-height:1.4;color:#395b74;font-weight:500;max-width:300px}
+#check-issues .check-sets-l-notice{grid-column:1/-1;display:block;padding:9px 12px;border:1px solid #b9d8c9;border-left:3px solid #508971;border-radius:5px;background:#f5fbf8;color:#265741;font-size:12.5px;line-height:1.5;font-weight:600}
+</style>
+</head>
+<body>
+<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING · v5.8.96</span></header>
+<main class="workspace">
+<div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select></div></div>
+<details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
+<section class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="project-fields" class="project-grid"></div></section>
+<section class="leadtime-check" id="product-leadtime" aria-live="polite"><div class="leadtime-label">Product Lead Time (ETD)</div><div class="leadtime-main"><strong id="leadtime-days">—</strong><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div></div></section>
+<section class="action-panel"><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary" id="final-xlsx" type="button">Xuất Excel (.xlsx)</button><button class="btn btn-secondary" id="final-pdf" type="button">Xuất A4 PDF</button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
+<nav class="spec-nav" id="spec-nav" aria-label="Điều hướng nhóm thông số / Sections"></nav>
+<div class="fields-root" id="fields"></div>
+<section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
+<div class="hidden-internal" aria-hidden="true"><span id="numfields"></span><span id="numvalid"></span><span id="numtables"></span><div id="formula-audit"></div></div>
+<div class="footer">MITSUBISHI ELECTRIC VIETNAM · SPEC ENGINEERING</div>
+<aside class="desktop-check-float" aria-label="Kiểm tra thông số nhanh / Floating Check Spec">
+ <button id="desktop-check-floating" type="button" aria-label="Chạy Check Spec">✓ Check Spec</button>
+ <span id="desktop-check-floating-status" class="desktop-check-float-status" aria-live="polite">Chưa kiểm tra</span>
+</aside>
+<div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div>
+</main>
+
+<div id="ny40-popup" aria-hidden="true">
+  <div class="ny40-dialog" role="dialog" aria-modal="true" aria-labelledby="ny40-title">
+    <div class="ny40-head">
+      <div><span class="ny40-tag">Glass arrangements</span><h3 id="ny40-title">NY-40A — Quan sát</h3></div>
+      <button type="button" class="ny40-close" id="ny40-close" aria-label="Đóng">×</button>
+    </div>
+    <div class="ny40-body">
+      <div class="ny40-imagewrap"><img id="ny40-image" src="assets/NY-40A.png" alt="NY-40A"></div>
+      <div class="ny40-desc"><strong id="ny40-vi">Kính phía sau và hai bên</strong><span id="ny40-en">Rear & both sides</span></div>
+      <div class="ny40-choices" id="ny40-choices"></div>
+    </div>
+    <div class="ny40-foot"><button type="button" class="btn btn-secondary" id="ny40-ok">Đóng</button><button type="button" class="btn btn-primary" id="ny40-apply" style="margin-left:8px">Áp dụng mẫu</button></div>
+  </div>
+</div>
+<div id="design-popup" class="design-popup" aria-hidden="true">
+  <div class="design-dialog" role="dialog" aria-modal="true" aria-labelledby="design-title">
+    <div class="design-header"><div><span class="design-eyebrow">MITSUBISHI · DESIGN REFERENCE</span><h3 id="design-title">Hình mẫu & mô tả thiết kế</h3><p id="design-subtitle"></p></div><button type="button" class="design-close" id="design-close" aria-label="Đóng">×</button></div>
+    <div class="design-content"><div id="design-cards" class="design-cards"></div><p class="design-footnote">Ảnh dùng để đối chiếu mẫu. Chỉ các lựa chọn có trong Excel database đang nạp mới có thể áp dụng trực tiếp vào SpecForm; các mẫu khác được ghi rõ là tham khảo.</p></div>
+  </div>
+</div>
+
+<script>
+/* v5.8.99 — bilingual proofreading of UI and customer-facing export text.
+   Display-only: do not mutate technical lookup keys, formulas, workbook cells or user-entered values. */
+window.SPEC_PROOFREAD = function(input){
+ if(typeof input!=='string'||!input)return input;
+ const corrections=[
+  [/\binvertors\b/gi,'inverters'],
+  [/\bimmediatedly\b/gi,'immediately'],
+  [/\bcontroled\b/gi,'controlled'],
+  [/\bcontinously\b/gi,'continuously'],
+  [/\bswitchs\b/gi,'switches'],
+  [/\bequiped\b/gi,'equipped'],
+  [/\bprioiritizes\b/gi,'prioritizes'],
+  [/\bT\s+orque\b/gi,'Torque'],
+  [/\bFeauture\b/gi,'Feature'],
+  [/\bMuti\s*-\s*Beam\b/gi,'Multi-Beam'],
+  [/\bSuccesfully\b/gi,'Successfully'],
+  [/\btalking account of\b/gi,'taking account of'],
+  [/\binvertor\b/gi,'inverter'],
+  [/\btrickle\s*-\s*charge\b/gi,'trickle-charge'],
+  [/(?<!\d)1 lượng/gu,'một lượng'],
+  [/(?<!\d)1 tiếng bíp/gu,'một tiếng bíp'],
+  [/người tàn tật/giu,'người khuyết tật'],
+  [/Người tàn tật/gu,'Người khuyết tật'],
+  [/đươc/gu,'được'],
+  [/điêu khiển/gu,'điều khiển'],
+  [/trước\.Tuỳ/gu,'trước. Tùy'],
+  [/trước\.Tùy/gu,'trước. Tùy'],
+  [/Tuỳ chọn/gu,'Tùy chọn'],
+  [/tuỳ chọn/gu,'tùy chọn'],
+  [/khoá/gu,'khóa'],
+  [/Khoá/gu,'Khóa'],
+  [/huỷ/gu,'hủy'],
+  [/Huỷ/gu,'Hủy'],
+  [/độ  cao/gu,'độ cao'],
+  [/lính cứu hỏa/giu,'lực lượng chữa cháy'],
+  [/Lính cứu hỏa/gu,'Lực lượng chữa cháy'],
+  [/được dời đi/gu,'được loại bỏ'],
+  [/sửa chửa/gu,'sửa chữa'],
+  [/quá tãi/gu,'quá tải'],
+  [/cám biến/gu,'cảm biến'],
+  [/điều khiền/gu,'điều khiển'],
+  [/lụa chọn/gu,'lựa chọn'],
+  [/tối thiếu/gu,'tối thiểu'],
+  [/\bVVVF inverters control\b/gi,'VVVF inverter control'],
+  [/do\s+đó/gu,'do đó'],
+  [/Các kích thước\s*\(Dimensional provision\)/gu,'Các kích thước (Dimensional provision)'],
+  [/Công suất máy kéo\s*\(Motor\)\s*–\s*kW/gu,'Công suất máy kéo (Motor) – kW'],
+  [/được ấn nút/gu,'được nhấn nút'],
+  [/(?<!\d)1 công tắc/gu,'một công tắc'],
+  [/(?<!\d)1 chiều/gu,'một chiều'],
+  [/(?<!\d)3 tầng như tiêu chuẩn/gu,'ba tầng theo tiêu chuẩn']
+ ];
+ let text=input;
+ for(const [a,b] of corrections)text=text.replace(a,b);
+ // Adjacent spaces inside prose (but never reformat line breaks or indentation).
+ text=text.replace(/([^\s\n]) {2,}(?=[^\s\n])/g,'$1 ');
+ return text;
+};
+</script>
+<script src="vendor/jszip.min.js?v=5.8.79"></script>
+<script src="spec-core.bundle.js?v=5.8.79"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="spec-conditional.js?v=5.8.79"></script>
+<script src="source-engine.js?v=5.8.79"></script>
+<script src="legacy-step1.js?v=5.8.104"></script>
+<script>
+
+'use strict';
+/* Reconstruct DevExpress LightUp hatched-cell rules from actual workbook
+   conditional formatting (dxf fill pattern=lightUp). Never use cached colours. */
+window.SPEC_CF_CHECK=function(model,changes,db,engine){
+ const meta=db?.conditional||window.SPEC_CONDITIONAL?.[model];
+ if(!meta?.lightUp||!meta?.namedRanges)return{errors:[],unknown:['Workbook conditional formatting (LightUp) unavailable'],verified:[],locked:{}};
+ const rules=meta.lightUp, errors=[],unknown=[],verified=[],locked={};
+ const a1=(str)=>{const m=/^([A-Z]+)(\d+)$/.exec(str||'');if(!m)return null;let c=0;for(const a of m[1])c=26*c+(a.charCodeAt(0)-64);return[c,Number(m[2])];};
+ const contains=(ranges,addr)=>{const xy=a1(addr);return xy&&ranges.some(([c1,r1,c2,r2])=>xy[0]>=c1&&xy[0]<=c2&&xy[1]>=r1&&xy[1]<=r2)};
+ const seen=new Set();
+ for(const [name,ref] of Object.entries(meta.namedRanges)){
+  const match=/^'?SpecForm'?!\$?([A-Z]+)\$?(\d+)$/i.exec(String(ref).trim());
+  if(!match)continue;
+  const cell=match[1].toUpperCase()+match[2];if(seen.has(cell))continue;seen.add(cell);
+  // Service floor is optional free text; never require a value or floor-count match.
+  if(name==='K10_SFloor')continue;
+  let hatched=(meta.defaultLightUp||[]).includes(cell), valid=true;
+  for(const rule of rules){
+   if(!contains(rule.ranges,cell))continue;
+   try{
+    const v=engine.eval(engine.ast(rule.formula),{sheet:'SpecForm',addr:cell});
+    if(typeof v!=='boolean'&&typeof v!=='number')throw Error('Condition did not return TRUE/FALSE');
+    if(Boolean(v)){hatched=true;if(rule.stop)break;}
+   }catch(err){valid=false;unknown.push('SpecForm!'+cell+' ('+name+'): Conditional Formatting ='+rule.formula+' → '+(err.message||String(err)));}
+  }
+  if(!valid)continue;
+  locked[cell]=hatched;
+  const result=engine.safe('SpecForm',cell);
+  if(!result.ok){unknown.push('SpecForm!'+cell+' ('+name+'): '+result.error);continue;}
+  const val=result.value;
+  const empty=val===null||val===undefined||val==='';
+  if(hatched&&!empty)errors.push({id:'SpecForm!'+cell+' / LightUp',cell,message:'Ô đang bị khóa theo Excel nhưng vẫn có dữ liệu / Value must be cleared from hatched field',detail:name+' — Conditional Formatting (LightUp)'});
+  else if(!hatched&&empty)errors.push({id:'SpecForm!'+cell+' / Required',cell,message:'Ô bắt buộc chưa nhập dữ liệu / Required input is blank',detail:name+' — Named Range / Non-hatched input'});
+  verified.push('SpecForm!'+cell+' / '+name+' (LightUp='+hatched+')');
+ }
+ return{errors,unknown,verified,locked};
+};
+
+</script>
+<script>
+/* Hall Lanterns — NEXIEZ-MRL Alpha Package Version02 (G11L1P),
+   Sales Manual S-1-U4010-E, Table 5.6.2, page 27.
+   Independent from NEXIEZ-MR Feature and equipment catalogs. */
+(function(){'use strict';
+ const names=['HLV-A16S','HLV-E65','HLV-E66','HLH-A16S',
+  'HLV1-A80S','HLV3-A80S','HLV1-A90S','HLV3-A90S','HLV1-E62','HLV3-E62',
+  'HLH1-A80S','HLH3-A80S','HLH1-A90S','HLH3-A90S'];
+ // Faceplate materials from Sales Manual S-1-U4010-E, Table 5.6.2, p.27.
+ // A90S variants have a black plastic faceplate; all other listed variants use SUS-HL (SUS304).
+ const blackPlastic=new Set(['HLV1-A90S','HLV3-A90S','HLH1-A90S','HLH3-A90S']);
+ const catalog=names.map(code=>({code,image:'assets/hall-lanterns/'+code+'.jpeg',
+  finish:blackPlastic.has(code)?'Black plastic':'SUS-HL (SUS304)'}));
+ function exportDescription(code){
+   const rec=catalog.find(item=>item.code===code);
+   if(!rec)return null;
+   if(rec.finish==='Black plastic')return {
+     vi:`Đèn báo tầng model ${code}, mặt hộp nhựa đen.`,
+     en:`(Hall lantern model ${code}, black plastic faceplate.)`
+   };
+   return {
+     vi:`Đèn báo tầng model ${code}, mặt hộp inox sọc nhuyễn SUS-HL (SUS304).`,
+     en:`(Hall lantern model ${code}, SUS-HL (SUS304) stainless steel hairline faceplate.)`
+   };
+ }
+ const keys={TopFloor:'HL_TOP',OtherFloor:'HL_OTHER',MainFloor:'HL_MAIN'};
+ const none='Not supplied';
+ const byCode=new Map(catalog.map(a=>[a.code,a]));
+ const selection=(changes,key)=>{
+  const code=String(changes?.[key]||none).trim();return code===none||byCode.has(code)?code:none;
+ };
+ const selected=(changes)=>Object.values(keys).map(key=>selection(changes,key)).filter(x=>x!==none);
+ const any=(changes)=>selected(changes).length>0;
+ window.SPEC_HALL_LANTERN={catalog,keys,none,byCode,selection,selected,any,exportDescription,allowed:code=>code===none||byCode.has(code)};
+})();
+
+</script>
+<script src="ny40-rules.js?v=5.8.198"></script>
+<script>
+'use strict';
+// Required EVRC-C for special COPs when any of four features is selected.
+// Keep model-specific COP formats and do not auto-apply the feature.
+window.SPEC_EVRC_C_RULE = Object.freeze({
+ check(model, copResult, selected){
+  const cop = String(copResult?.ok ? copResult.value ?? '' : '').trim().toUpperCase();
+  const special = model === 'MR'
+   ? /^(?:C)?(?:760|770|780)(?:\b|$)/.test(cop)
+   : model === 'MRL' && /^[MP]\d{3,4}(?:ETL|E)?$/.test(cop);
+  const triggers = ['NSCR-C','AS','SCS-B','NS-CB'];
+  const triggered = special ? triggers.filter(code => !!selected(code)) : [];
+  return {cop, special, triggered, required: triggered.length > 0,
+   evrcC: !!selected('EVRC-C')};
+ }
+});
+
+</script>
+<script src="mr-bed-capacity.js?v=5.8.79"></script>
+<script src="alpha-technical-rules.js?v=5.8.198"></script>
+<script src="source-check.js?v=5.8.198"></script>
+<script src="g11l1-ts-alpha-tables.js?v=5.8.79"></script>
+<script src="g11l1-ts-il-data.js?v=5.8.79"></script>
+<script src="g11l1-ts-il-runtime.js?v=5.8.79"></script>
+<script src="g11l1-source-machine-il.js?v=5.8.79"></script>
+<script src="g11l1-source-machine.js?v=5.8.79"></script>
+<script src="g11l1-source-cage.js?v=5.8.99"></script>
+<script src="g11l1-source-traction.js?v=5.8.182"></script>
+<script src="g11l1-source-duty.js?v=5.8.79"></script>
+<script src="g11l1-source-engine.js?v=5.8.79"></script>
+<script src="mrl-decoration-v02.js?v=5.8.99"></script>
+<script src="feature-v02.js?v=5.8.79"></script>
+<script src="mirror-rules.js?v=5.8.79"></script>
+<script src="jamb-depth.js?v=5.8.94"></script>
+<script src="export-engine.js?v=5.8.138"></script>
+<script src="print-layout.js?v=5.8.130"></script>
+<script src="design-guide.js?v=5.8.79"></script>
+<script src="panel-images.js?v=5.8.79"></script>
+<script src="material-finish.js?v=5.8.79"></script>
+<script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
+<script src="mrl-v02-min-travel.js?v=5.8.191"></script>
+<script src="app.js?v=5.8.200"></script>
+
+<script>
+for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
+</script>
+</body></html>
+
+<!-- 5.8.195: EN81-72 and BufferCap remain hidden until re-enabled. -->
