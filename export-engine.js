@@ -637,7 +637,12 @@
    // v5.8.243: Export the customer's bilingual Control system description and
    // explain actual MRL group-operation codes without changing any SpecForm values.
    // Both XLSX and PDF are built from these same frozen customer-facing cells.
-   cells.C35='Động cơ máy kéo và động cơ cửa cabin được điều khiển bằng công nghệ biến đổi điện áp và tần số (VVVF), kết hợp với hệ thống điều khiển vi xử lý.\n'+
+   // v5.8.244: Use SOURCE SpecFormExport coordinates, not final display
+   // coordinates. Both models insert rail rows before rendering; raw C35 is
+   // blank (MR) or a section heading (MRL). Writing VVVF to raw C35 used to
+   // leak text into final C37/C38 and inflate MRL's merged section heading.
+   const controlSourceAddress = model==='MR'?'C33':'C32';
+   cells[controlSourceAddress]='Động cơ máy kéo và động cơ cửa cabin được điều khiển bằng công nghệ biến đổi điện áp và tần số (VVVF), kết hợp với hệ thống điều khiển vi xử lý.\n'+
      'The traction machine and cabin door motor are controlled by Variable Voltage Variable Frequency (VVVF) technology, in combination with a microprocessor-based control system';
    if(model==='MRL'){
      const code=text(cells.C25).trim().toUpperCase();
@@ -4121,7 +4126,9 @@
      };
      const fitted=[];
      for(const address of (model==='MRL'?['C26','C35']:['C35'])){
-       const source=String(doc.cells[address==='C26'?'C25':address]||'');
+       // Look up the ORIGINAL cell; final physical C35 is shifted +2.
+       const rawAddress=address==='C26'?'C25':address==='C35'?(model==='MR'?'C33':'C32'):address;
+       const source=String(doc.cells[rawAddress]||'');
        if(!source.includes('\n'))continue;
        const chunks=source.split('\n');
        const groupTriplet=address==='C26'&&chunks.length>=3;
@@ -4167,6 +4174,34 @@
      }
      zip.file('xl/styles.xml',serial(sd));
      if(typeof window!=='undefined')window.__SPEC_EXPORT_243_AUDIT__={model,controlCells:fitted};
+   }
+   // v5.8.244: The standard export has an unused source spacer at physical
+   // row 37, immediately before section II. Collapse only this empty row;
+   // detailed Export uses row 37 for actual technical data and is untouched.
+   if(!doc.includeTechDetails){
+     const sheetData=all(x,'sheetData')[0];
+     let spacer=all(x,'row').find(row=>row.getAttribute('r')==='37');
+     if(!spacer){
+       spacer=x.createElementNS(n,'row');spacer.setAttribute('r','37');
+       const later=Array.from(sheetData.children).find(row=>row.localName==='row'&&Number(row.getAttribute('r'))>37);
+       sheetData.insertBefore(spacer,later||null);
+     }
+     // Non-empty content here would indicate a new shift bug; fail visibly
+     // rather than hiding customer-facing text beneath a section heading.
+     if(Array.from(spacer.children).some(c=>c.localName==='c'&&(all(c,'t').some(t=>t.textContent.trim())||all(c,'v').some(v=>v.textContent.trim()))))
+       throw Error('Unexpected content in pre-section II spacer row 37');
+     spacer.setAttribute('ht','0');spacer.setAttribute('customHeight','1');spacer.setAttribute('hidden','1');
+   }
+   // Section II is merged A:C: its right-hand cells must remain empty.
+   // Stale control-system text in C38 previously expanded the entire heading.
+   // A position-independent check makes the guard safe when optional rows move.
+   const iiHeading=all(x,'row').find(row=>Array.from(row.children).some(c=>c.localName==='c'&&/^A\d+$/.test(c.getAttribute('r')||'')&&
+     /^II\.\s*Các kích thước liên quan/.test(all(c,'t').map(t=>t.textContent||'').join(''))));
+   if(iiHeading){
+     const rn=iiHeading.getAttribute('r');
+     const c=Array.from(iiHeading.children).find(cell=>cell.localName==='c'&&cell.getAttribute('r')==='C'+rn);
+     if(c&&(all(c,'t').some(t=>t.textContent.trim())||all(c,'v').some(v=>v.textContent.trim())))
+       throw Error('Unexpected content in section II merged C'+rn);
    }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
