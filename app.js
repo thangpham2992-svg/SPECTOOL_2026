@@ -3154,12 +3154,12 @@ function download(bytes,name,type){
  const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),120000);
 }
-async function buildFinalExport(){
+async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked)){
   const model=$('model').value,db=workbookEngineData();
   // Source validation MUST pass before any export side effect.
   const evaluation=window.SPEC_EXPORT.exportModel(model,changes,db);
   // Optional presentation-only detail rows; defaults OFF for both models.
-  evaluation.includeTechDetails=Boolean($('export-tech-details')?.checked);
+  evaluation.includeTechDetails=includeTechDetails;
   window.SPEC_EXPORT.attachMRMaterialThickness?.(model,changes,db,evaluation);
   const bytes=sourceFiles[model]?.bytes||bytesFromB64(window.SPEC_WORKBOOKS[model]);
   const zip=await JSZip.loadAsync(bytes);

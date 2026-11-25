@@ -60,7 +60,7 @@
    }).join('');
  }
  function readText(c,strings){if(!c)return '';const type=attr(c,'t');if(type==='inlineStr')return qa(q(c,'is'),'t').map(t=>t.textContent).join('');let v=q(c,'v')?.textContent||'';if(type==='s')return strings[Number(v)]||'';if(type==='b')return v==='1'?'TRUE':'FALSE';return v}
- async function fromXlsx(bytes,model){
+ async function fromXlsx(bytes,model,rowsOnly=false){
    const zip=await JSZip.loadAsync(bytes);
    const wb=parse(await zip.file('xl/workbook.xml').async('string'));
    const rels=parse(await zip.file('xl/_rels/workbook.xml.rels').async('string'));
@@ -95,7 +95,7 @@
    for(const row of rows){let rn=Number(attr(row,'r'));if(!rn||!isExtraRow(rn,row)||attr(row,'hidden')==='1')continue;
      visibleRows.set(rn,row);
      for(const c of Array.from(row.children).filter(x=>x.localName==='c')){const a=attr(c,'r'),p=addrParts(a);if(!p||p.col>3)continue;
-       const v=readText(c,strings);cells.set(a,{value:v,style:Number(attr(c,'s',0)),richHtml:readInlineRichHtml(c)});if(v.trim())largest=Math.max(largest,rn);
+       const v=readText(c,strings);cells.set(a,{value:v,style:Number(attr(c,'s',0)),richHtml:readInlineRichHtml(c),element:rowsOnly?c:null});if(v.trim())largest=Math.max(largest,rn);
      }
    }
    if(!largest)throw Error('Export SpecFormExport is empty');
@@ -234,6 +234,34 @@
    // Prelude ends at the first real specification section (different row in
    // MR and MRL). Do not strip borders from Manufacturer or Basic Spec rows.
    const firstSectionRow=blueRomanRows.size?Math.min(...blueRomanRows):11;
+   if(rowsOnly){
+     const result=[];let section='',label='',sub='',occurrences=new Map();
+     for(const rn of visibleRows.keys()){
+       if(rn<=titleRow)continue;
+       let [a,b,c]=['A','B','C'].map(col=>String(cells.get(col+rn)?.value??'').trim());
+       const itpLabel=a.match(/^(Hệ thống liên lạc nội bộ|\(ITP\)\s*Inter[- ]communication System)(?:\s+[-–—]\s+(.+))?$/iu);
+       let itpType=null;
+       if(itpLabel){
+         const note=c.match(/\s*\|\s*(?:Loại ITP|ITP type)\s*:\s*(.+)$/iu);
+         itpType=(note?.[1]||itpLabel[2]||'').trim();
+         a=itpLabel[1];
+         if(note)c=c.slice(0,note.index).trimEnd();
+       }
+       if(!a&&!b&&!c)continue;
+       if(romanSection.test(a)){section=a;label='';sub='';}
+       if(a){label=a;sub='';}
+       if(b&&rn>=firstSectionRow)sub=b;
+       const source=cells.get('C'+rn);
+       const englishParts=qa(source?.element,'r').filter(run=>{
+         const props=q(run,'rPr');
+         return q(props,'i')||attr(q(props,'color'),'rgb').endsWith('245A86');
+       }).map(run=>qa(run,'t').map(t=>t.textContent).join('').trim()).filter(Boolean);
+       const base=JSON.stringify([section,label,sub]);
+       const count=occurrences.get(base)||0;occurrences.set(base,count+1);
+       result.push({itpType,quantity:label.split(/\r?\n/)[0].trim()==='Số lượng',englishParts,meta:result.length?null:{company,address:companyAddress,doc:cells.get('C1')?.value,revision:cells.get('C2')?.value},fullWidth:merges.get('A'+rn)?.colspan===3&&!b&&!c,upper:bilingualUpper.has(rn),lower:bilingualLower.has(rn),preamble:rn<firstSectionRow,key:base+count,a,b:rn<firstSectionRow?'':b,value:rn<firstSectionRow?(c||b):c,heading:romanSection.test(a)});
+     }
+     return result;
+   }
    const printRows=[],printedCells=new Set();
    for(let rowNum=1;rowNum<=end;rowNum++){
      const row=visibleRows.get(rowNum);if(!row||rowNum<=titleRow)continue;
