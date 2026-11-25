@@ -1292,6 +1292,18 @@ function row(field,displayName='',compact=false){
  input.value=value;
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
+   // MR: an unsupplied handrail has no mounting location/quantity (D68).
+   // Leaving its previous value in this hatched cell falsely fails Check Spec.
+   // If the user later chooses a handrail, restore an allowed location.
+   if($('model').value==='MR'&&field.cell==='D67'){
+     if(String(input.value).trim()==='Not supplied')applyValue('D68','');
+     else if(!String(currentValue('D68')).trim()){
+       const locationField=current.fields.find(f=>f.cell==='D68');
+       const options=locationField?workbookChoices(locationField):[];
+       const preferred=options.includes('1 pc on rear wall')?'1 pc on rear wall':options[0];
+       if(preferred)applyValue('D68',preferred);
+     }
+   }
    // Version 2 popup No denotes an unsupplied handrail, not a fourth mounting position.
    if($('model').value==='MRL'&&field.cell==='D65'&&input.value==='No'&&String(currentValue('D64')).trim()!=='Not supplied')applyValue('D64','Not supplied');
    if($('model').value==='MRL'&&field.cell==='D65'&&input.value!=='No'&&String(currentValue('D64')).trim()==='Not supplied')applyValue('D64','YH-100SL (SUS304)');
@@ -2781,6 +2793,9 @@ function classifyMRLHoistingBeamOH(actual,remain,removed){
 }
 function check(){
  const model=$('model').value;
+ // Also normalize imported/legacy MR configurations where D68 still carries
+ // a location after D67 was switched to 'Not supplied'.
+ if(model==='MR'&&String(currentValue('D67')).trim()==='Not supplied'&&String(currentValue('D68')).trim())applyValue('D68','');
  const engineData=workbookEngineData();
  const result=window.SPEC_SOURCE_CHECK?.(model,changes,engineData);
  if(!result)throw Error('Source Check Engine chưa được tải / Calculation engine not loaded');

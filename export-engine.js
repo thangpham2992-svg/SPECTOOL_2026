@@ -337,6 +337,22 @@
        cells.C20=sourceSpeed[mpm]||`${mpm} m/phút - ${rate} m/giây (${mpm} mpm - ${rate} m/s)`;
      }
    }
+   // v5.8.239: preserve at least 1 decimal for the m/s display.
+   // Match speed by VALUE rather than a fixed row index; final Excel row
+   // positions differ from the source depending on split/inserted rows.
+   {
+     for(const [cell,rawValue] of Object.entries(cells)){
+       if(!/^C\d+$/.test(cell))continue;
+       const raw=String(rawValue??'');
+       const match=/(\d+(?:[.,]\d+)?)\s*m\/phút/i.exec(raw);
+       if(!match||!/(?:m\/giây|m\/s)/i.test(raw))continue;
+       const mpm=Number(match[1].replace(',','.'));
+       if(!(Number.isFinite(mpm)&&mpm>0))continue;
+       const speed=(mpm/60).toFixed(2).replace(/0$/,'');
+       const amount=String(mpm);
+       cells[cell]=`${amount} m/phút - ${speed} m/giây (${amount} mpm - ${speed} m/s)`;
+     }
+   }
    // Obsolete MBSS: hide the bilingual pair even if the historic MR workbook
    // contains it in SpecFormExport but no longer lists it as an active feature.
    // Do not remove unrelated door-sensor features.
@@ -618,6 +634,26 @@
      };
      if(doorWording[doorType])cells.C18=doorWording[doorType];
    }
+   // v5.8.243: Export the customer's bilingual Control system description and
+   // explain actual MRL group-operation codes without changing any SpecForm values.
+   // Both XLSX and PDF are built from these same frozen customer-facing cells.
+   cells.C35='Động cơ máy kéo và động cơ cửa cabin được điều khiển bằng công nghệ biến đổi điện áp và tần số (VVVF), kết hợp với hệ thống điều khiển vi xử lý.\n'+
+     'The traction machine and cabin door motor are controlled by Variable Voltage Variable Frequency (VVVF) technology, in combination with a microprocessor-based control system';
+   if(model==='MRL'){
+     const code=text(cells.C25).trim().toUpperCase();
+     const match=/^([1-4])C(?:[-/].+)?$/.exec(code);
+     if(match){
+       const types={
+         1:['Điều khiển đơn','Simplex control'],
+         2:['Điều khiển đôi','Duplex control'],
+         3:['Điều khiển nhóm 3 thang','3-elevator group control'],
+         4:['Điều khiển nhóm 4 thang','4-elevator group control']
+       };
+       const [vi,en]=types[Number(match[1])];
+       // Three physical text lines in ONE cell; the English run is blue italic.
+       cells.C25=code+'\n'+vi+'\n'+en;
+     }
+   }
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
@@ -637,6 +673,42 @@
    // MR: separate PIV/HBV/PIH rows; MRL: consolidated 3-floor blocks.
    // Keep the standard Export descriptions unchanged when detail is disabled.
    if(!doc.includeTechDetails)return;
+   // v5.8.236: Add verified handrail cross-section dimensions only in
+   // optional detailed Export, not in the SpecForm/weight-calculation inputs.
+   // MR YH-59S/YH-59M: Ø38 mm; MRL YH-100SL: Ø32 mm;
+   // YH-57S in both products: 75 mm wide. Always output bilingual wording.
+   {
+     const rail=read(mrl?'D64':'D67');
+     const position=read(mrl?'D65':'D68');
+     const railModel=/^(YH-59S|YH-59M|YH-100SL|YH-57S)(?=\s|\(|$)/i.exec(rail)?.[1]?.toUpperCase();
+     const railDim=(mrl?{'YH-100SL':['tròn','round','đường kính Ø32 mm','Ø32 mm diameter'],
+                         'YH-57S':['dẹt','flat','bản rộng 75 mm','75 mm wide']}:
+                        {'YH-59S':['tròn','round','đường kính Ø38 mm','Ø38 mm diameter'],
+                         'YH-59M':['tròn','round','đường kính Ø38 mm','Ø38 mm diameter'],
+                         'YH-57S':['dẹt','flat','bản rộng 75 mm','75 mm wide']})[railModel];
+     if(railDim){
+       const [typeVi,typeEn,dimensionVi,dimensionEn]=railDim;
+       const locationVi={
+         '1 pc on rear wall':'1 tay vịn trên vách sau',
+         '1 pc on right side wall':'1 tay vịn trên vách phải',
+         '1 pc on left side wall':'1 tay vịn trên vách trái',
+         '2 pcs on both side walls':'2 tay vịn trên hai vách bên',
+         '2 pcs on rear & right side wall':'2 tay vịn trên vách sau và vách phải',
+         '2 pcs on rear & left side wall':'2 tay vịn trên vách sau và vách trái',
+         '3 pcs on 3 walls':'3 tay vịn trên ba vách',
+         'No':''
+       }[position]||position;
+       const locationEn=position==='No'?'':position;
+       // Separate full sentences: existing Excel/PDF bilingual processors turn
+       // the parenthesized English translation into a blue italic line.
+       const vi='Tay vịn '+typeVi+' inox sọc nhuyễn SUS304, '+dimensionVi+', mã hiệu '+railModel+
+         (locationVi?', '+locationVi:'')+'.';
+       const en=typeEn.charAt(0).toUpperCase()+typeEn.slice(1)+
+         ' handrail in hairline-finish stainless steel SUS304, '+dimensionEn+', model '+railModel+
+         (locationEn?', '+locationEn:'')+'.';
+       doc.cells.C62=vi+' ('+en+')';
+     }
+   }
    // v5.8.139: Every supplied car operating panel (COP), including wheelchair COP,
    // has 2.0 mm panel thickness in the detailed Excel/PDF export. Do not alter
    // other feature descriptions that incidentally mention a COP.
@@ -794,6 +866,43 @@
      doc.cells[kickAddr]=kickMatch[1].replace(/[.;]\s*$/,'')+', dày 1.2 mm.\n('+kickMatch[2].replace(/[.;]\s*$/,'')+', thickness 1.2 mm).';
    }else supplement(kickAddr,1.2,false);
    doc.materialThicknessResults.push({name:'Kickplate',thickness:1.2});
+   // v5.8.237: Optional detailed Export only — CBV/PIV/HBV button diameter.
+   // Keep the measurement in the SAME Vietnamese/English sentence (no new
+   // spreadsheet rows); this preserves bilingual styling, merges and row fit.
+   // Target actual panel model codes rather than fixed C59/C60 etc., because
+   // MR and MRL have different row layouts and MRL combines hall panels.
+   const panelModel=/(?:^|\b)(?:CBV|PIV|HBV)\d*\s*[-–]?\s*[A-Z]\d+[A-Z0-9-]*/i;
+   const buttonVi='đường kính nút bấm Ø33 mm';
+   const buttonEn='button diameter Ø33 mm';
+   function addButtonDimension(segment){
+     const line=String(segment);
+     if(!panelModel.test(line)||/\b(?:Not supplied|Không cung cấp)\b/i.test(line)||
+       /(?:đường kính nút bấm|button diameter)\s*Ø\s*33\s*mm/i.test(line))return line;
+     const trimmed=line.trim();
+     // Mixed line: VI (English). Safely append to BOTH language clauses.
+     const bilingual=/^([\s\S]*?)\s+\(([^()]*)\)([.!]?\s*)$/.exec(line);
+     if(bilingual&&panelModel.test(bilingual[1])&&panelModel.test(bilingual[2])){
+       const vi=bilingual[1].replace(/[.;,]\s*$/,'').trimEnd();
+       const en=bilingual[2].replace(/[.;,]\s*$/,'').trimEnd();
+       return vi+', '+buttonVi+' ('+en+', '+buttonEn+')'+(bilingual[3]||'');
+     }
+     // On separate bilingual lines, English is usually parenthesized.
+     const wrappedEn=/^([\s]*\()([\s\S]*?)(\)\.?[\s]*)$/.exec(line);
+     if(wrappedEn){
+       const trailing=wrappedEn[3].includes('.')?').':')';
+       return wrappedEn[1]+wrappedEn[2].replace(/[.;,]\s*$/,'')+', '+buttonEn+trailing;
+     }
+     const english=/^\s*(?:Hall |Car |Model |Operating |Wheelchair )/i.test(line)&&
+       !/[À-ỹ]/.test(line);
+     const ending=/([.;]\s*)$/.exec(line);
+     return line.replace(/[.;]\s*$/,'')+', '+(english?buttonEn:buttonVi)+(ending?ending[1]: '');
+   }
+   for(const addr of Object.keys(doc.cells)){
+     if(!/^C\d+$/.test(addr)||typeof doc.cells[addr]!=='string')continue;
+     const source=doc.cells[addr];
+     if(!panelModel.test(source))continue;
+     doc.cells[addr]=source.split('\n').map(addButtonDimension).join('\n');
+   }
  }
  function updateCell(document, c, v){
    for(const old of Array.from(c.childNodes))if(['f','v','is'].includes(old.localName))c.removeChild(old);
@@ -1980,7 +2089,7 @@
        ['Gia tốc (m/s²)','0,60 ± 0,10'],
        ['Gia tốc giảm tốc (m/s²)','0,60 ± 0,10'],
        ['Rung đứng / rung ngang – tốc độ không đổi (m/s²)',`Đứng: ${highSpeed?'0,25':'0,20'}; ngang: 0,30 (P–Pmax, hoặc thấp hơn)`],
-       ['Độ chính xác dừng tầng (mm)','Trong phạm vi ±5 mm']
+       ['Độ chính xác dừng tầng (mm)','Trong phạm vi ±10 mm']
      ];
      const noiseRows=model==='MR'?[
        ['Độ ồn trong cabin [dB(A)]','≤ 50 (tối đa 55)'],
@@ -3505,6 +3614,559 @@
      node.setAttribute('ContentType','application/vnd.openxmlformats-officedocument.drawing+xml');types.documentElement.appendChild(node);
      zip.file(ctPath,serial(types));
      if(typeof window!=='undefined')window.__SPEC_EXPORT_226_MR_HEADER__={company:true,address:true,logo:true,titleRow:6};
+   }
+   // v5.8.233: Use the same bilingual inline rich-text convention in A/B
+   // as in C: Vietnamese first, literal line break, English without its
+   // translation parentheses, italic navy #245A86. Never split worksheet
+   // rows: preserved merges, borders, feature codes and quantity cells.
+   {
+     const stylesPart='xl/styles.xml';
+     const styleDoc=parse(await zip.file(stylesPart).async('string'));
+     const xfs=all(styleDoc,'cellXfs')[0],fonts=all(styleDoc,'fonts')[0];
+     const rows=all(x,'sheetData')[0] ? all(all(x,'sheetData')[0],'row') : [];
+     const rowByNum=new Map(rows.map(row=>[Number(row.getAttribute('r')),row]));
+     const mergeNodes=all(x,'mergeCell');
+     const mainDataTop=8; // do not rewrite company address, logo or main banner
+     const sharedPart=zip.file('xl/sharedStrings.xml');
+     const shared=sharedPart?all(parse(await sharedPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const getCell=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const cellText=cell=>!cell?'':cell.getAttribute('t')==='s'?(shared[Number(all(cell,'v')[0]?.textContent||0)]||''):
+       cell.getAttribute('t')==='inlineStr'?all(cell,'t').map(t=>t.textContent||'').join(''):(all(cell,'v')[0]?.textContent||'');
+     const hasVietnamese=v=>/[À-ỹ]/.test(v);
+     const codeOnly=/^(?:CAR|CWT|MR|MRL|COP|HPI|PIH|BA|BMS|P\d{1,2}D?|W|D|H|R|S)$/i;
+     // Only a parenthesized ENGLISH translation at the end of a Vietnamese
+     // label is converted. Internal notes (lần đầu), abbreviations (CAR)
+     // and function codes such as (OEPS-A) remain untouched.
+     function bilingualLabel(source){
+       const original=String(source||'').trim();
+       if(!original||/^\(/.test(original)||!hasVietnamese(original))return null;
+       let vi='',en='',suffix='';
+       const inline=/^([\s\S]+?)\s*\(\s*([A-Za-z][^()\n\r]*)\s*\)\s*([:;.]*)$/.exec(original);
+       if(inline){vi=inline[1].trim();en=inline[2].trim();suffix=inline[3]||'';}
+       else {
+         const separated=/^([\s\S]+?)\s*\n\s*\(?\s*([A-Za-z][^()\r\n]*)\s*\)?\s*([:;.]*)$/.exec(original);
+         if(!separated)return null;
+         vi=separated[1].trim();en=separated[2].trim();suffix=separated[3]||'';
+       }
+       if(!hasVietnamese(vi)||hasVietnamese(en)||!/[a-z]/i.test(en)||codeOnly.test(en)||!en.trim())return null;
+       // Main heading has a trailing colon in its source; retain it at the
+       // English end rather than losing punctuation.
+       return {vi,en:en+suffix};
+     }
+     function rPrFromBase(base,isEnglish){
+       const baseFont=all(fonts,'font')[Number(base.getAttribute('fontId')||0)]||all(fonts,'font')[0];
+       const pr=x.createElementNS(n,'rPr');
+       const name=x.createElementNS(n,'rFont');name.setAttribute('val','Arial');pr.appendChild(name);
+       const size=all(baseFont,'sz')[0];if(size){const el=x.createElementNS(n,'sz');el.setAttribute('val',size.getAttribute('val'));pr.appendChild(el);}
+       if(all(baseFont,'b').length)pr.appendChild(x.createElementNS(n,'b'));
+       if(isEnglish){
+         pr.appendChild(x.createElementNS(n,'i'));
+         const ink=x.createElementNS(n,'color');ink.setAttribute('rgb','FF245A86');pr.appendChild(ink);
+       }else{
+         const color=all(baseFont,'color')[0];
+         if(color)pr.appendChild(x.importNode(color,true));
+       }
+       return pr;
+     }
+     const wrapCache=new Map();
+     function wrappedStyle(old){
+       const key=String(old||0);if(wrapCache.has(key))return wrapCache.get(key);
+       const xf=(all(xfs,'xf')[Number(key)]||all(xfs,'xf')[0]).cloneNode(true);
+       let align=Array.from(xf.children).find(el=>el.localName==='alignment');
+       if(!align){align=styleDoc.createElementNS(n,'alignment');xf.appendChild(align);}
+       align.setAttribute('wrapText','1');align.setAttribute('vertical','center');xf.setAttribute('applyAlignment','1');
+       const styleIndex=all(xfs,'xf').length;xfs.appendChild(xf);wrapCache.set(key,styleIndex);return styleIndex;
+     }
+     function addRun(inline,base,text,english){
+       if(!text)return;
+       const run=x.createElementNS(n,'r');run.appendChild(rPrFromBase(base,english));
+       const el=x.createElementNS(n,'t');el.setAttribute('xml:space','preserve');el.textContent=text;
+       run.appendChild(el);inline.appendChild(run);
+     }
+     const measuredCanvas=(typeof document!=='undefined')?document.createElement('canvas'):null;
+     const ctx=measuredCanvas?.getContext('2d')||null;
+     function visibleLines(str,width,fontSize,italic){
+       const body=String(str||'').trim();if(!body)return 1;
+       if(ctx)ctx.font=(italic?'italic ':'')+fontSize+'pt Arial';
+       const measure=word=>ctx?ctx.measureText(word).width:word.length*fontSize*0.67;
+       const space=measure(' ');let count=0;
+       for(const part of body.split('\n')){
+         count++;let used=0;
+         for(const word of part.split(/\s+/).filter(Boolean)){
+           const size=measure(word);
+           if(used>0&&used+space+size>width){count++;used=0;}
+           if(size>width){if(used>0){count++;used=0;}const wraps=Math.ceil(size/width);count+=wraps-1;used=size%width||width;}
+           else used=used?used+space+size:size;
+         }
+       }
+       return count;
+     }
+     const colWidth={A:20.5546875,B:25.5546875,C:70.5546875};
+     const colPixel=col=>Math.floor((colWidth[col]||20)*7+5);
+     const mergeInfos=[];
+     for(const node of mergeNodes){
+       const match=/^([A-C])(\d+):([A-C])(\d+)$/.exec(node.getAttribute('ref')||'');
+       if(match)mergeInfos.push({col:match[1],r1:+match[2],endCol:match[3],r2:+match[4]});
+     }
+     const indexes={A:0,B:1,C:2},letters=['A','B','C'];
+     let converted=0,notChangedCodes=0,heightAdjusted=0;
+     const samples=[];
+     for(const row of rows){
+       const rn=Number(row.getAttribute('r'));
+       if(rn<mainDataTop||rn>310||row.getAttribute('hidden')==='1')continue;
+       for(const col of ['A','B']){
+         const cell=getCell(row,col);if(!cell)continue;
+         const value=cellText(cell);
+         const normalized=bilingualLabel(value);
+         if(!normalized){if(/\((?:CAR|CWT)\)/.test(value))notChangedCodes++;continue;}
+         // Already-correct bilingual rich strings (e.g. dimensional A/B)
+         // should remain byte-for-byte equivalent; no need to reserialize.
+         const inlineExisting=all(cell,'is')[0];
+         if(inlineExisting&&all(inlineExisting,'r').length>1&&value.includes('\n')){
+           const enRuns=all(inlineExisting,'r').filter(run=>
+             all(run,'i').length>0&&all(run,'color').some(c=>/245A86$/i.test(c.getAttribute('rgb')||'')));
+           if(enRuns.length)continue;
+         }
+         const oldStyle=Number(cell.getAttribute('s')||0);
+         const xf=all(xfs,'xf')[oldStyle]||all(xfs,'xf')[0];
+         for(const child of Array.from(cell.children).filter(node=>['v','f','is'].includes(node.localName)))child.remove();
+         cell.setAttribute('t','inlineStr');
+         const inline=x.createElementNS(n,'is');
+         addRun(inline,xf,normalized.vi,false);
+         addRun(inline,xf,'\n',false);
+         addRun(inline,xf,normalized.en,true);
+         cell.appendChild(inline);cell.setAttribute('s',String(wrappedStyle(oldStyle)));
+         converted++;
+         if(samples.length<15)samples.push({cell:col+rn,vi:normalized.vi,en:normalized.en});
+         const cols=mergeInfos.find(m=>m.col===col&&m.r1===rn)||{col,endCol:col,r1:rn,r2:rn};
+         const span=letters.slice(indexes[col],indexes[cols.endCol]+1);
+         const pixels=Math.max(60,span.reduce((sum,c)=>sum+colPixel(c),0)-17);
+         const font=all(fonts,'font')[Number(xf.getAttribute('fontId')||0)]||all(fonts,'font')[0];
+         const fontSize=Number(all(font,'sz')[0]?.getAttribute('val')||11);
+         const lines=visibleLines(normalized.vi,pixels,fontSize,false)+visibleLines(normalized.en,pixels,fontSize,true);
+         const needed=Math.max(20,Math.ceil(lines*fontSize*1.35+5));
+         const block=[];for(let r=rn;r<=cols.r2;r++){const item=rowByNum.get(r);if(item&&item.getAttribute('hidden')!=='1')block.push(item);}
+         if(!block.length)continue;
+         const sum=block.reduce((total,item)=>total+Math.max(0,Number(item.getAttribute('ht')??13.8)),0);
+         // For merged vertical blocks, preserve zero-height continuation rows.
+         if(sum+0.75<needed){
+           const target=block.find(item=>Number(item.getAttribute('ht')??13.8)>0);if(!target)continue;
+           const previous=Number(target.getAttribute('ht')??13.8);
+           target.setAttribute('ht',String(Math.min(360,Math.ceil(previous+needed-sum+1))));
+           target.setAttribute('customHeight','1');heightAdjusted++;
+         }
+       }
+     }
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     zip.file(stylesPart,serial(styleDoc));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_233_AUDIT__={model,converted,notChangedCodes,heightAdjusted,samples};
+   }
+   // v5.8.238 — final Excel presentation pass. It intentionally operates
+   // AFTER all bilingual rich-text conversions so row fit is based on what
+   // the customer will see. Does not change printHtml / PDF or Feature V.
+   {
+     const stylePath='xl/styles.xml';
+     const styleDoc=parse(await zip.file(stylePath).async('string'));
+     const styleXfs=all(all(styleDoc,'cellXfs')[0],'xf');
+     const styleFonts=all(all(styleDoc,'fonts')[0],'font');
+     const targetRows=all(x,'row');
+     const byRow=new Map(targetRows.map(rr=>[Number(rr.getAttribute('r')),rr]));
+     const sharedPart=zip.file('xl/sharedStrings.xml');
+     const shared=sharedPart?all(parse(await sharedPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const cell=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const textOf=c=>!c?'':c.getAttribute('t')==='s'?(shared[Number(all(c,'v')[0]?.textContent||0)]||''):
+       c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join(''):(all(c,'v')[0]?.textContent||'');
+     let entranceFixed=0,rowsReduced=0;
+     if(model==='MRL'){
+       // The English material + thickness is present on a collapsed source
+       // continuation row. The prior visible combined cell was malformed:
+       // "(Stainless..., dày 1.2 mm.". Read the validated English source,
+       // strip its parentheses, and render with separate rich-text fonts.
+       for(const row of targetRows){
+         const rn=Number(row.getAttribute('r'));
+         if(row.getAttribute('hidden')==='1')continue;
+         const a=textOf(cell(row,'A'));
+         if(!/^(?:Khung cửa tầng|Cửa tầng)(?:\s|\n|$)/i.test(a.trim()))continue;
+         const c=cell(row,'C'),raw=textOf(c),following=byRow.get(rn+1);
+         const nextC=following?.getAttribute('hidden')==='1'?cell(following,'C'):null;
+         const followingEN=textOf(nextC).trim();
+         if(!c||!/SUS\s*430J1L|Stainless steel|E-102/i.test(raw))continue;
+         const candidates=raw.split(/\r?\n/),viPart=(candidates[0]||'').trim();
+         let enPart=followingEN&&/(?:Stainless steel|E-102|thickness)/i.test(followingEN)
+           ?followingEN : candidates.slice(1).join(' ').trim();
+         if(!enPart)continue;
+         enPart=enPart.replace(/^\s*\(+/,'').replace(/\)+\s*\.?\s*$/,'')
+           .replace(/\bdày\s*(\d+(?:[.,]\d+)?\s*mm)/gi,'thickness $1')
+           .replace(/[.\s]+$/,'').trim();
+         if(!enPart||/[À-ỹ]/.test(enPart))continue;
+         const th=/\bthickness\s+(\d+(?:[.,]\d+)?\s*mm)/i.exec(enPart);
+         let vi=viPart;
+         if(th&&!/\bdày\s*\d/i.test(vi))
+           vi=vi.replace(/[.;]\s*$/,'').trimEnd()+', dày '+th[1]+'.';
+         for(const child of Array.from(c.children).filter(el=>['v','f','is'].includes(el.localName)))child.remove();
+         c.setAttribute('t','inlineStr');
+         const inline=x.createElementNS(n,'is');
+         const base=styleXfs[Number(c.getAttribute('s')||0)]||styleXfs[0];
+         const font=styleFonts[Number(base?.getAttribute('fontId')||0)]||styleFonts[0];
+         const fontSize=all(font,'sz')[0]?.getAttribute('val')||'11';
+         const append=(body,isEN)=>{
+           const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+           const face=x.createElementNS(n,'rFont');face.setAttribute('val','Arial');pr.appendChild(face);
+           const size=x.createElementNS(n,'sz');size.setAttribute('val',fontSize);pr.appendChild(size);
+           if(isEN)pr.appendChild(x.createElementNS(n,'i'));
+           const color=x.createElementNS(n,'color');color.setAttribute('rgb',isEN?'FF245A86':'FF000000');pr.appendChild(color);
+           run.appendChild(pr);
+           const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=body;run.appendChild(t);
+           inline.appendChild(run);
+         };
+         append(vi+'\n',false);append(enPart+'.',true);c.appendChild(inline);
+         entranceFixed++;
+       }
+     }
+     // Re-evaluate the short spec/dimension rows in Excel. Previous source
+     // templates set 36/63/79 pt even for short bilingual values. Derive
+     // physical lines independently per cell and shrink, NEVER add rows or
+     // touch 0pt / hidden continuation rows. Feature and print remain intact.
+     const painter=(typeof document!=='undefined')?document.createElement('canvas').getContext('2d'):null;
+     function physicalLines(source,pixels){
+       const paragraphs=String(source||'').replace(/\r/g,'').split('\n');
+       if(!painter)return paragraphs.reduce((sum,p)=>sum+Math.max(1,Math.ceil(p.length/(pixels/7.5))),0);
+       painter.font='11pt Arial';const space=painter.measureText(' ').width;
+       let total=0;
+       for(const p of paragraphs){
+         if(!p.trim()){total++;continue;}
+         let used=0;total++;
+         for(const word of p.trim().split(/\s+/)){
+           const w=painter.measureText(word).width;
+           if(used>0&&used+space+w>pixels){total++;used=0;}
+           if(w>pixels){
+             const n=Math.ceil(w/pixels);
+             if(used>0){total++;used=0;}
+             total+=n-1;used=w%pixels||pixels;
+           }else used=used?used+space+w:w;
+         }
+       }
+       return Math.max(1,total);
+     }
+     // Final physical width of Excel columns A/B/C from factory workbook.
+     const widths={A:20.5546875,B:25.5546875,C:70.5546875};
+     const pixelsFor=col=>Math.max(55,Math.floor(widths[col]*7+5)-16);
+     // Preserve existing vertical merge geometry when fitting; a spanning label
+     // is already displayed across multiple rows and must not be counted twice.
+     const mergedStarts=new Map();
+     for(const m of all(x,'mergeCell')){
+       const match=/^([A-C])(\d+):([A-C])(\d+)$/.exec(m.getAttribute('ref')||'');
+       if(match)mergedStarts.set(match[1]+match[2],{start:match[1],end:match[3],endRow:+match[4]});
+     }
+     const columnOrder=['A','B','C'];
+     const fittingRow=(row)=>{
+       const rn=Number(row.getAttribute('r'));
+       if(row.getAttribute('hidden')==='1'||Number(row.getAttribute('ht')??13.8)===0)return false;
+       if(model==='MRL')return rn>=12&&rn<=54;
+       return rn>=51&&rn<=57;
+     };
+     for(const row of targetRows){
+       if(!fittingRow(row))continue;
+       const rn=Number(row.getAttribute('r'));
+       const a=textOf(cell(row,'A'));
+       if(/^\s*(?:I|II|III|IV|V)\.\s/.test(a))continue;
+       // Do not compress extra motor/ride-comfort/noise tables or long prose:
+       // they contain complex mixed styles and long wrapped sentences.
+       if(model==='MRL'&&rn>=36&&rn<=44)continue;
+       const previous=Number(row.getAttribute('ht')??13.8);
+       if(previous<28)continue;
+       let lineCount=1,any=false;
+       for(const col of columnOrder){
+         const c=cell(row,col),body=textOf(c).trim();if(!body)continue;
+         const m=mergedStarts.get(col+rn);
+         if(m&&m.endRow>rn)continue;
+         any=true;
+         const covered=m?columnOrder.slice(columnOrder.indexOf(col),columnOrder.indexOf(m.end)+1):[col];
+         const width=covered.reduce((sum,v)=>sum+pixelsFor(v),0);
+         lineCount=Math.max(lineCount,physicalLines(body,width));
+       }
+       if(!any)continue;
+       // 11pt Arial, 14.8pt line step, 4pt total breathing room; min 20pt.
+       const required=Math.min(280,Math.max(20,Math.ceil(lineCount*14.0+3)));
+       if(previous>required+1){
+         row.setAttribute('ht',String(required));row.setAttribute('customHeight','1');rowsReduced++;
+       }
+     }
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_238_AUDIT__={model,entranceFixed,rowsReduced};
+   }
+   // v5.8.239 — FIX excess whitespace across sections I–IV (XLSX only).
+   // Use final visible content, do not count vertically merged labels twice,
+   // preserve hidden 0pt rows and preserve V. Features exactly as generated.
+   {
+     const sd=parse(await zip.file('xl/styles.xml').async('string'));
+     const xfs=all(all(sd,'cellXfs')[0],'xf'),fonts=all(all(sd,'fonts')[0],'font');
+     const sheetRows=all(x,'row');
+     const siPart=zip.file('xl/sharedStrings.xml');
+     const si=siPart?all(parse(await siPart.async('string')),'si').map(el=>all(el,'t').map(t=>t.textContent||'').join('')):[];
+     const at=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const textOf=c=>!c?'':c.getAttribute('t')==='s'?si[+(all(c,'v')[0]?.textContent||0)]||'':c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join(''):all(c,'v')[0]?.textContent||'';
+     const cells=['A','B','C'],widths={A:20.5546875,B:25.5546875,C:70.5546875};
+     const mergeStarts=new Map();
+     for(const m of all(x,'mergeCell')){
+       const p=/^([A-C])(\d+):([A-C])(\d+)$/.exec(m.getAttribute('ref')||'');
+       if(p)mergeStarts.set(p[1]+p[2],{first:p[1],last:p[3],endRow:+p[4]});
+     }
+     const ctx=(typeof document!=='undefined')?document.createElement('canvas').getContext('2d'):null;
+     const countLines=(source,pixels,fontSize,slack)=>{
+       const parts=String(source||'').replace(/\r/g,'').split('\n');
+       if(!ctx)return parts.reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/(pixels/7))),0);
+       ctx.font=fontSize+'pt Arial';let total=0;
+       for(const part of parts){
+         let used=0;total++;
+         if(!part.trim())continue;
+         for(const word of part.trim().split(/\s+/)){
+           const width=ctx.measureText(word).width;
+           const space=ctx.measureText(' ').width;
+           if(used>0&&used+space+width>pixels*slack){total++;used=0;}
+           if(width>pixels*slack){
+             if(used){total++;used=0;}
+             total+=Math.ceil(width/(pixels*slack))-1;
+             used=width%(pixels*slack)||pixels*slack;
+           }else used=used?used+space+width:width;
+         }
+       }
+       return total;
+     };
+     const sectionV=sheetRows.find(row=>/^V\.\s/.test(textOf(at(row,'A')).trim()))?.getAttribute('r');
+     const beforeV=sectionV?Number(sectionV):999;
+     let rowsTuned=0;const samples=[];
+     for(const row of sheetRows){
+       const rn=+row.getAttribute('r');
+       if(rn<11||rn>=beforeV||rn>310||row.getAttribute('hidden')==='1')continue;
+       const old=Number(row.getAttribute('ht')??13.8);
+       if(old===0)continue;
+       const a=textOf(at(row,'A')).trim();
+       if(/^\s*(?:I|II|III|IV|V)\.\s/.test(a))continue;
+       if(![...cells].some(col=>textOf(at(row,col)).trim()))continue;
+       let neededLines=1;
+       for(const col of cells){
+         const cell=at(row,col),text=textOf(cell).trim();if(!text)continue;
+         const merge=mergeStarts.get(col+rn);
+         if(merge&&merge.endRow>rn)continue; // height is shared across merged block
+         const start=cells.indexOf(col),end=merge?cells.indexOf(merge.last):start;
+         const pixelWidth=cells.slice(start,end+1).reduce((sum,k)=>sum+Math.floor(widths[k]*7+5),0)-10;
+         const xf=xfs[Number(cell.getAttribute('s')||0)]||xfs[0];
+         const font=fonts[Number(xf.getAttribute('fontId')||0)]||fonts[0];
+         const size=Math.max(9,Math.min(12,Number(all(font,'sz')[0]?.getAttribute('val')||11)));
+         // Excel's text metrics differ slightly from browser canvas. Apply
+         // small font-width slack to short A/B labels to avoid false wraps.
+         const slack=col==='C'?1.02:1.17;
+         neededLines=Math.max(neededLines,countLines(text,pixelWidth,size,slack));
+       }
+       const target=Math.max(20,Math.min(330,Math.ceil(neededLines*14.7+3)));
+       // Only compact oversized rows, do not undo intentional custom Feature heights.
+       if(old>target+1.5){
+         row.setAttribute('ht',String(target));row.setAttribute('customHeight','1');
+         rowsTuned++;
+         if(samples.length<25)samples.push([rn,old,target,neededLines]);
+       }
+     }
+     // v5.8.240 — Excel-only: prevent Hall indicators text from overlapping
+     // the following floor block. Earlier compact passes reduced tall C cells
+     // to 77pt even when Vietnamese, English, and quantity occupy >=5 visual
+     // lines. Always perform this FINAL fit after every I-IV shrink pass.
+     // No row insertion, border change, or PDF formatting is involved.
+     let mrHallRowsFitted=0;
+     const mrHallFitSamples=[];
+     if(model==='MR'){
+       const headingIV=sheetRows.find(rr=>/^IV\.\s/.test(textOf(at(rr,'A')).trim()));
+       const afterIV=headingIV?Number(headingIV.getAttribute('r')):0;
+       const availablePx=Math.floor(widths.C*7+5)-24;
+       for(const row of sheetRows){
+         const rn=Number(row.getAttribute('r'));
+         if(rn<=afterIV||rn>=beforeV||row.getAttribute('hidden')==='1')continue;
+         const old=Number(row.getAttribute('ht')??13.8);
+         if(old<1)continue; // keep collapsed continuation rows collapsed
+         const c=at(row,'C'),desc=textOf(c).trim();
+         if(!/Hiển thị\s*&\s*nút gọi tầng|Hall indicators\s*&\s*buttons/i.test(desc))continue;
+         // Arial 11pt, wrapping in the ACTUAL width of column C. Conservative
+         // 6% width reserve protects native Excel layout vs browser canvas.
+         const lines=countLines(desc,availablePx,11,0.94);
+         const fitted=Math.min(320,Math.max(24,Math.ceil(lines*17.2+10)));
+         if(fitted>old+0.5){
+           row.setAttribute('ht',String(fitted));
+           row.setAttribute('customHeight','1');
+           mrHallRowsFitted++;
+         }
+         mrHallFitSamples.push({row:rn,lines,from:old,to:Math.max(old,fitted)});
+       }
+     }
+     // MR row 32 is a technical CWT rail designation, not a bilingual
+     // translation. Reuse the plain black, non-italic styles of row 31.
+     let plainRail=false;
+     if(model==='MR'){
+       const row31=sheetRows.find(r=>+r.getAttribute('r')===31);
+       const row32=sheetRows.find(r=>+r.getAttribute('r')===32);
+       if(row31&&row32){
+         for(const col of ['B','C']){
+           const source=at(row31,col),target=at(row32,col);
+           if(source&&target){target.setAttribute('s',source.getAttribute('s')||'0');plainRail=true;}
+         }
+       }
+     }
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_240_AUDIT__={model,rowsTuned,samples,plainRail,mrHallRowsFitted,mrHallFitSamples};
+   }
+   // v5.8.241 — Excel-only: fix detailed MRL CBV bilingual text in column C.
+   // Detail mode used to append `(Model CBV..., button diameter Ø33 mm)`
+   // to the Vietnamese sentence as a black, non-italic run.  Rewrite only
+   // those malformed cells as genuine in-cell bilingual rich text; do not
+   // insert rows, alter merges, change standard exports, or modify PDF.
+   {
+     let mrlCopBilingualFixed=0;
+     const correctedRows=[];
+     if(model==='MRL'){
+       const sd=parse(await zip.file('xl/styles.xml').async('string'));
+       const xfs=all(all(sd,'cellXfs')[0],'xf');
+       const fonts=all(all(sd,'fonts')[0],'font');
+       const tableRows=all(x,'row');
+       const sharedPart=zip.file('xl/sharedStrings.xml');
+       const shared=sharedPart?all(parse(await sharedPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+       const cAt=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+       const txt=c=>!c?'':c.getAttribute('t')==='s'?(shared[+(all(c,'v')[0]?.textContent||0)]||''):
+         c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join(''):(all(c,'v')[0]?.textContent||'');
+       const ctx=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
+       function physicalLines(source,pixels){
+         const paragraphs=String(source||'').replace(/\r/g,'').split('\n');
+         if(!ctx)return paragraphs.reduce((v,t)=>v+Math.max(1,Math.ceil(t.length/(pixels/7))),0);
+         ctx.font='11pt Arial';const space=ctx.measureText(' ').width;
+         let lines=0;
+         for(const paragraph of paragraphs){
+           lines++;let used=0;
+           for(const word of paragraph.trim().split(/\s+/)){
+             if(!word)continue;
+             const px=ctx.measureText(word).width;
+             if(used>0&&used+space+px>pixels){lines++;used=0;}
+             if(px>pixels){
+               if(used){lines++;used=0;}
+               lines+=Math.ceil(px/pixels)-1;used=px%pixels||pixels;
+             }else used=used?used+space+px:px;
+           }
+         }
+         return lines;
+       }
+       for(const row of tableRows){
+         if(row.getAttribute('hidden')==='1')continue;
+         const c=cAt(row,'C'),source=txt(c);
+         if(!c||!/\bCBV1?-/i.test(source)||!/đường kính nút bấm\s*Ø33\s*mm/i.test(source))continue;
+         const [firstLine,...remaining]=source.replace(/\r/g,'').split('\n');
+         const parts=/^(.+?)\s+\((Model\s+CBV[^\n]+?)\)\.?\s*$/i.exec(firstLine.trim());
+         if(!parts)continue;
+         const vi=parts[1].trim();
+         const en=parts[2].trim().replace(/[.\s]+$/,'')+'.';
+         const tail=remaining.join('\n').trim();
+         const base=xfs[Number(c.getAttribute('s')||0)]||xfs[0];
+         const font=fonts[Number(base?.getAttribute('fontId')||0)]||fonts[0];
+         const size=all(font,'sz')[0]?.getAttribute('val')||'11';
+         const inline=x.createElementNS(n,'is');
+         function appendRun(content,isEnglish){
+           if(!content)return;
+           const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+           const family=x.createElementNS(n,'rFont');family.setAttribute('val','Arial');pr.appendChild(family);
+           const sz=x.createElementNS(n,'sz');sz.setAttribute('val',size);pr.appendChild(sz);
+           if(isEnglish)pr.appendChild(x.createElementNS(n,'i'));
+           const color=x.createElementNS(n,'color');color.setAttribute('rgb',isEnglish?'FF245A86':'FF000000');pr.appendChild(color);
+           const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=content;
+           run.append(pr,t);inline.appendChild(run);
+         }
+         appendRun(vi+'\n',false);
+         appendRun(en+(tail?'\n':''),true);
+         appendRun(tail,false);
+         for(const child of Array.from(c.children).filter(el=>['v','f','is'].includes(el.localName)))child.remove();
+         c.setAttribute('t','inlineStr');c.appendChild(inline);
+         // The corrected English is on its own line.  Fit the actual
+         // displayed C text after all earlier compact-row passes.
+         const width=Math.floor(70.5546875*7+5)-24;
+         const lineCount=physicalLines([vi,en,tail].filter(Boolean).join('\n'),width);
+         const current=Number(row.getAttribute('ht')??13.8);
+         const fitted=Math.max(24,Math.ceil(lineCount*17.2+9));
+         if(current<fitted){row.setAttribute('ht',String(fitted));row.setAttribute('customHeight','1');}
+         correctedRows.push({row:Number(row.getAttribute('r')),lines:lineCount,from:current,to:Math.max(current,fitted)});
+         mrlCopBilingualFixed++;
+       }
+     }
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_241_AUDIT__={model,mrlCopBilingualFixed,correctedRows};
+   }
+   // v5.8.243: In-cell Rich Text for the two Control descriptions, applied
+   // after ALL legacy normalization and row-height shrink passes. This keeps
+   // English blue italic on its own line in native Excel and in the PDF print.
+   {
+     const sd=parse(await zip.file('xl/styles.xml').async('string'));
+     const xfs=all(all(sd,'cellXfs')[0],'xf');
+     const fonts=all(all(sd,'fonts')[0],'font');
+     const tableRows=all(x,'row');
+     const ctx=(typeof document!=='undefined')?document.createElement('canvas').getContext('2d'):null;
+     const pixelWidth=Math.floor(70.5546875*7+5)-22;
+     const visualLines=(body,fontSize)=>{
+       if(ctx)ctx.font=fontSize+'pt Arial';
+       const measure=word=>ctx?ctx.measureText(word).width:word.length*fontSize*.64;
+       const space=measure(' ');
+       let lines=0;
+       for(const phrase of String(body).split('\n')){
+         lines++;let used=0;
+         for(const word of phrase.trim().split(/\s+/)){
+           if(!word)continue;
+           const w=measure(word);
+           if(used&&used+space+w>pixelWidth){lines++;used=0;}
+           if(w>pixelWidth){if(used){lines++;used=0;}
+             lines+=Math.ceil(w/pixelWidth)-1;used=w%pixelWidth||pixelWidth;
+           }else used=used?used+space+w:w;
+         }
+       }
+       return lines;
+     };
+     const fitted=[];
+     for(const address of (model==='MRL'?['C26','C35']:['C35'])){
+       const source=String(doc.cells[address==='C26'?'C25':address]||'');
+       if(!source.includes('\n'))continue;
+       const chunks=source.split('\n');
+       const groupTriplet=address==='C26'&&chunks.length>=3;
+       const en=groupTriplet?chunks.slice(2).join('\n'):chunks.slice(1).join('\n');
+       if(!chunks[0]||!en)continue;
+       const contentRuns=groupTriplet?
+         [[chunks[0]+'\n',false],[chunks[1]+'\n',false],[en,true]]:
+         [[chunks[0]+'\n',false],[en,true]];
+       const cell=all(x,'c').find(c=>c.getAttribute('r')===address);
+       if(!cell)throw Error('Control bilingual export cell missing: '+address);
+       const row=tableRows.find(r=>+r.getAttribute('r')===Number(address.slice(1)));
+       if(!row)throw Error('Control bilingual export row missing: '+address);
+       const oldStyle=xfs[Number(cell.getAttribute('s')||0)]||xfs[0];
+       const font=fonts[Number(oldStyle?.getAttribute('fontId')||0)]||fonts[0];
+       const size=Number(all(font,'sz')[0]?.getAttribute('val')||11);
+       for(const child of Array.from(cell.children).filter(e=>['v','is','f'].includes(e.localName)))child.remove();
+       cell.setAttribute('t','inlineStr');
+       const inline=x.createElementNS(n,'is');
+       for(const [content,english] of contentRuns){
+         const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+         const family=x.createElementNS(n,'rFont');family.setAttribute('val','Arial');pr.appendChild(family);
+         const sz=x.createElementNS(n,'sz');sz.setAttribute('val',String(size));pr.appendChild(sz);
+         if(english)pr.appendChild(x.createElementNS(n,'i'));
+         const color=x.createElementNS(n,'color');color.setAttribute('rgb',english?'FF245A86':'FF000000');pr.appendChild(color);
+         const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=content;
+         run.append(pr,t);inline.appendChild(run);
+       }
+       cell.appendChild(inline);
+       const newXf=oldStyle.cloneNode(true);
+       let alignment=Array.from(newXf.children).find(e=>e.localName==='alignment');
+       if(!alignment){alignment=sd.createElementNS(n,'alignment');newXf.appendChild(alignment);}
+       alignment.setAttribute('wrapText','1');alignment.setAttribute('vertical','center');
+       newXf.setAttribute('applyAlignment','1');
+       const stylesRoot=all(sd,'cellXfs')[0];const id=all(stylesRoot,'xf').length;
+       stylesRoot.appendChild(newXf);stylesRoot.setAttribute('count',String(id+1));
+       cell.setAttribute('s',String(id));
+       // Measure actual display lines, then reserve a small safety margin.
+       const lines=visualLines(source,size);
+       const desired=Math.min(310,Math.ceil(lines*size*1.40+7));
+       const previous=Number(row.getAttribute('ht')||13.8);
+       if(desired>previous){row.setAttribute('ht',String(desired));row.setAttribute('customHeight','1');}
+       fitted.push({address,lines,height:Math.max(previous,desired)});
+     }
+     zip.file('xl/styles.xml',serial(sd));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_243_AUDIT__={model,controlCells:fitted};
    }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.

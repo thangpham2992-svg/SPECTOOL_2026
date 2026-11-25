@@ -499,7 +499,12 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   const twoGateWithoutRail=model==='MRL'&&field==='D65'
     &&String(value('SpecForm','D64').value||'').trim()==='Not supplied'
     &&String(selected.value||'').trim()==='No';
-  if(!names.includes(String(selected.value??'').trim())&&!isBEDHandrail&&!twoGateWithoutRail)issue('Source!'+tab,field,
+  // Empty MR D68 is valid when D67 is Not supplied: Excel's conditional
+  // formatting intentionally hatches this location field in that state.
+  const unusedMRLocation=model==='MR'&&field==='D68'
+    &&String(value('SpecForm','D67').value||'').trim()==='Not supplied'
+    &&!String(selected.value??'').trim();
+  if(!names.includes(String(selected.value??'').trim())&&!isBEDHandrail&&!twoGateWithoutRail&&!unusedMRLocation)issue('Source!'+tab,field,
    tab==='TblK32_Handrail'?'Mã tay vịn chưa được cho phép trong Excel nguồn.':'Vị trí tay vịn không hợp lệ trong Excel nguồn.');
   else verified.push('SpecForm!'+field+' — '+tab);
  }
