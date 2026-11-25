@@ -742,6 +742,28 @@ body .workspace > .leadtime-check {background-color:#fff;}
 }
 
 
+/* v5.8.203: quiet reference-grade notes, MR only, anchored in the right column. */
+#fields .spec-section[data-section="III"] .car-design-line:has(.car-design-standard-note){position:relative}
+#fields .spec-section[data-section="III"] .car-design-standard-note{
+  grid-column:3;grid-row:1;justify-self:end;align-self:center;
+  font-size:10px;font-weight:400;color:#8190a0;line-height:1.25;
+  white-space:normal;text-align:right;padding-right:4px;
+}
+#fields .spec-section[data-section="III"] .car-design-line:has(.car-design-standard-note):not(:has(.car-design-no-variant)) .car-design-standard-note{
+  grid-row:2;justify-self:end;
+}
+@media(max-width:680px){
+ #fields .spec-section[data-section="III"] .car-design-standard-note{
+   grid-column:2;grid-row:3!important;justify-self:start;text-align:left;padding:0;
+ }
+}
+
+
+/* v5.8.204 — unobtrusive landing jamb / door default-grade notes. */
+#fields .spec-section[data-section="III"] .landing-standard-note{
+ display:block;font-size:10px;font-weight:400;line-height:1.25;
+ color:#8190a0;text-align:right;margin-top:3px;padding-right:4px;
+}
 /* v5.8.28 — concise mobile UI, validation remains in Check Spec. */
 /* Hide descriptive notes, keep image previews, controls, validation and error messages. */
 #fields .cwt-minimum-hint,
@@ -1509,14 +1531,14 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
 <script src="feature-v02.js?v=5.8.79"></script>
 <script src="mirror-rules.js?v=5.8.79"></script>
 <script src="jamb-depth.js?v=5.8.94"></script>
-<script src="export-engine.js?v=5.8.138"></script>
-<script src="print-layout.js?v=5.8.130"></script>
+<script src="export-engine.js?v=5.8.206"></script>
+<script src="print-layout.js?v=5.8.206"></script>
 <script src="design-guide.js?v=5.8.79"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script src="material-finish.js?v=5.8.79"></script>
 <script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=5.8.200"></script>
+<script src="app.js?v=5.8.207"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

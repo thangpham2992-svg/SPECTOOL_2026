@@ -97,6 +97,30 @@
    // The workbook has heading texts in A but often does not define A:C merged cells
    // for individual feature groups. Merge these visual rows in the PDF/print view only.
    // Keep the exported XLSX's native merge structure and all regular data rows intact.
+   // Preserve bilingual emphasis in PDF. The old renderer flattened OOXML
+   // rich text to a plain string, losing italics in Flooring/COP/Handrail rows.
+   const englishDescription=part=>{
+     const trimmed=String(part||'').trim().replace(/^\(|\)$/g,'');
+     return !/[À-ỹ]/.test(trimmed) && trimmed.length>12 &&
+       /\b(?:car|floor|flooring|operation|operating|panel|button|handrail|rear|side|wall|supply|supplied|stainless|steel|hairline|glass|granite|wheelchair|model|landing|door|mirror|frame|ceiling|flooring|with|without|material|weight|provided|braille|design)\b/i.test(trimmed);
+   };
+   function printableDescription(text,col){
+     if(col!==3)return esc(text).replace(/\r\n|\r|\n/g,'<br>');
+     return String(text??'').split(/\r\n|\r|\n/).map(line=>{
+       const full=line.trim();
+       if(englishDescription(full))return '<em>'+esc(line)+'</em>';
+       // Embedded English translation after Vietnamese is italic, while
+       // material codes and short model tokens remain untouched.
+       const re=/\((?:[^()]|\([^()]*\))*\)/g;
+       let out='',last=0,match;
+       while((match=re.exec(line))){
+         out+=esc(line.slice(last,match.index));
+         out+=englishDescription(match[0])?'<em>'+esc(match[0])+'</em>':esc(match[0]);
+         last=re.lastIndex;
+       }
+       return out+esc(line.slice(last));
+     }).join('<br>');
+   }
    const groupTitle=/^\s*[-–]\s*Tính năng\b/i;
    for(const [rn] of visibleRows){
      const a=String(cells.get('A'+rn)?.value||'');
@@ -192,7 +216,7 @@
        // Explicit inline background prevents theme tint and browser print defaults
        // from suppressing the original pale-blue I/II/III/IV section headers.
        if(blueRomanRows.has(rowNum))style+=';background-color:#d9edf7;color:#173c56;font-weight:700';
-       rowCells.push('<td'+extra+vextra+' data-cell="'+key+'" style="'+style+'">'+esc(val.value).replace(/\r\n|\r|\n/g,'<br>')+'</td>');
+       rowCells.push('<td'+extra+vextra+' data-cell="'+key+'" style="'+style+'">'+printableDescription(val.value,col)+'</td>');
      }
      // Excel's explicit row heights are respected as minimums; text-heavy wrapped cells can expand.
      const customHeight=attr(row,'ht')!=='';

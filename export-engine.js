@@ -227,18 +227,20 @@
      cells['C'+ceilingOutputRow]=`Trần phòng thang kiểu ${ceilingName}, ${mirror?'inox gương':'inox sọc nhuyễn'} (${ceilingFinish}).`;
      cells['C'+(ceilingOutputRow+1)]=`(Car ceiling model ${ceilingName}, ${mirror?'mirror-finish':'hairline-finish'} stainless steel ceiling (${ceilingFinish})).`;
    }
-   // Per-component material override: special glass door assemblies are SUS304,
-   // independent of the global SUS Standard selection. Never promote Jamb,
-   // Transom or Front return to SUS304 unless the global SUS304 option is chosen.
-   // The source formulas already handle DSJ1 and Large window; include DS1 here.
-   if(model==='MRL'){
+   // Factory exception for both models: DSJ1, DS1 and Window door assemblies
+   // use SUS304, independent of the other car/landing-door finishes.
+   // Only the door's own bilingual export text changes; never affect jambs,
+   // transom panels, or front returns.
+   {
      const read=addr=>text(eng.safe('SpecForm',addr).value);
-     for(const [input,exportRows] of [['D46',[49,50]],['E73',[72,73]],['E74',[74,75]]]){
-       const selected=read(input);
-       if(window.SPEC_NY40_RULES?.isGlassDoor(selected) && /^SUS-HL/i.test(selected)){
-         for(const row of exportRows){const key='C'+row;
-           cells[key]=text(cells[key]).replace(/SUS430J1L|SUS430/gi,'SUS304');
-         }
+     const doorInputs=model==='MRL'?
+       [['D46',[49,50]],['E73',[72,73]],['E74',[74,75]]]:
+       [['D50',[50,51]],['E76',[72,73]],['E77',[74,75]]];
+     for(const [input,rows] of doorInputs){
+       if(!/\b(?:DSJ1|DS1|WINDOW)\b/i.test(read(input)))continue;
+       for(const row of rows){
+         const key='C'+row;
+         cells[key]=text(cells[key]).replace(/SUS430J1L|SUS430/gi,'SUS304');
        }
      }
    }
@@ -499,6 +501,52 @@
        .replace(/suốt khoảng\s*1800\s*mm\s*/gi,'')
        .replace(/cover a door height of approximately\s*1800\s*mm\s*/gi,'are arranged along the door height ')
        .replace(/\(Overhead height\)/gi,'(Overhead)');
+   }
+   // v5.8.203: the standard COP and wheelchair COP boxes are
+   // SUS430 hairline stainless steel. The grade becomes SUS304 ONLY when
+   // the global SUS selection is SUS304 and every relevant cabin material uses
+   // the SUS-HL finish. Apply regardless of the optional details checkbox,
+   // so Excel and PDF generated from these cells always agree.
+   if(model==='MR'||model==='MRL'){
+     const materialNames=['K23_WallFinish','K24_CarDoorFinish','K25_CarTransomFinish','K26_CarFrontFinish'];
+     const readName=name=>{
+       const addr=nameAddr(db,'SpecForm',name);
+       return addr?text(eng.safe('SpecForm',addr).value).trim():'';
+     };
+     const allSUS304=readName('K22_SUSType').toUpperCase()==='SUS304'&&
+       materialNames.every(name=>/^SUS-HL$/i.test(readName(name)));
+     const grade=allSUS304?'SUS304':'SUS430';
+     for(const row of model==='MR'?[60]:[59,60]){
+       const label=text(cells['A'+row]).trim();
+       const key='C'+row,source=text(cells[key]).trim();
+       if(!/(?:bảng điều khiển|car operat(?:ing|ion) panel|wheelchair COP|người khuyết tật)/i.test(label))continue;
+       if(!source||/\b(?:Not supplied|Không cung cấp)\b/i.test(source))continue;
+       // Replace only an existing explicit COP-box material; retain models,
+       // buttons, thickness and other technical descriptions unchanged.
+       const withoutOld=source.replace(/\n?Vật liệu hộp COP(?:\/COP Wheelchair)?:[^\n]*/gi,'')
+         .replace(/\n?\(COP(?:\/wheelchair COP)? box material:[^\n]*\)/gi,'')
+         .replace(/\n?Bề mặt inox sọc nhuyễn SUS(?:430|304)\.?/gi,'').trim();
+       // Concise material note for COP and wheelchair COP; omit duplicate
+       // bilingual material wording while retaining the model description.
+       cells[key]=withoutOld+'\nBề mặt inox sọc nhuyễn '+grade+'.';
+     }
+   }
+   // v5.8.204: explicitly identify the standard SUS430 ceiling material
+   // in exported MR/MRL specifications. Other colors/materials are unchanged.
+   {
+     const readCeiling=name=>{
+       const addr=nameAddr(db,'SpecForm',name);
+       return addr?text(eng.safe('SpecForm',addr).value).trim().toUpperCase():'';
+     };
+     const ceiling=readCeiling('K22_CeilingModel');
+     const ceilingColor=readCeiling('K22_CeilingColor');
+     const standardCeiling=(model==='MR'&&/^(?:L210S|L200S|N300S)(?:$|[-\s])/.test(ceiling))||
+       (model==='MRL'&&ceilingColor==='SUS-HL');
+     if(standardCeiling){
+       const viKey='C'+(model==='MR'?45:46),enKey='C'+(model==='MR'?46:47);
+       if(cells[viKey]&&!/SUS430/i.test(text(cells[viKey])))cells[viKey]=text(cells[viKey]).trimEnd()+' — Inox sọc nhuyễn SUS430.';
+       if(cells[enKey]&&!/SUS430/i.test(text(cells[enKey])))cells[enKey]=text(cells[enKey]).trimEnd()+' (SUS430 hairline stainless steel).';
+     }
    }
    cells['C'+(model==='MR'?11:12)]='MITSUBISHI ELECTRIC';
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
@@ -1574,7 +1622,7 @@
      const isEnglishDescription=value=>{
        const str=String(value||'').trim().replace(/^\(/,'').replace(/\)$/,'').trim();
        if(!str||/[À-ỹ]/.test(str)||/^[0-9]+\s*hộp\s*\//i.test(str))return false;
-       return /\b(?:provided|not supplied|not provided|stainless|steel|hairline|glass|aluminum|aluminium|ceiling|door|floor|hall|indicators?|buttons?|emergency|ventilation|lighting|model|car|motor|frame|painted|granite|with|without|landing|machine|power|traction|safety|panel|handrail|mirror|fireproof|sensor|finish|material|side|operation|supply)\b/i.test(str);
+       return /\b(?:provided|not supplied|not provided|stainless|steel|hairline|glass|aluminum|aluminium|ceiling|door|floor|hall|indicators?|buttons?|emergency|ventilation|lighting|model|car|motor|frame|painted|granite|with|without|landing|machine|power|traction|safety|panel|handrail|mirror|fireproof|sensor|finish|material|side|operation|supply|flooring|handrails?|operating|buttons|braille|marble|stainless|steel|wheelchair)\b/i.test(str);
      };
      for(const [rn,row] of afterSplit){
        const next=afterSplit.get(rn+1);

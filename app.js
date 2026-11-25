@@ -1341,6 +1341,7 @@ function row(field,displayName='',compact=false){
    }
    syncDropdownOptions();
    if(field.name==='K24_CarDoorFinish')syncLandingFinishFromCar();
+   if(field.name==='K24_CarDoorFinish')mountLandingMaterialStandardNotes();
    if(/^K36_(?:PIV|HBV|PIH_PID)(?:TopFloor|MainFloor|OtherFloor)$/.test(field.name)){
     hallManualSelections.add(field.cell);hallAutoSelections.delete(field.cell);
     autoFillHallSiblingFields(field);
@@ -1351,6 +1352,9 @@ function row(field,displayName='',compact=false){
    refreshLocks();
    if(field.cell==='D14'){refreshCarDesignStates();renderFeatures();}
    if(field.name==='K24_CarDoorFinish')renderFeatures();
+   if(field.name==='K24_CarDoorFinish')refreshCarDesignStates();
+   if(/^K(?:22|23|24|25|26)_/.test(field.name))refreshCarDesignStates();
+   if(/^K36_(?:Jamb(?:Main|Other)FloorMaterial|DoorFinish(?:Main|Other)FloorMaterial)$/.test(field.name))mountLandingMaterialStandardNotes();
    refreshJambDepthFields();
    refreshDesignHints();
    updateFinishPreviews();
@@ -1803,7 +1807,10 @@ function buildCarDesignLines(){
    // Keep advisory in the material cell: variants is hidden for single-value Full SUS-HL rows.
    material.append(note);
   }
-  line.append(label,material,variants);wrapper.append(line);
+  // Material standard grades are advisory and apply only to SUS-HL finishes.
+  // The note is refreshed from the current value; never show SUS430 on Painted.
+  line.append(label,material,variants);
+  wrapper.append(line);
  }
  // Move just the car-design block, retaining all SpecForm cell IDs for Export & Check.
  grid.prepend(wrapper);grid.classList.add('car-design-section-fields');
@@ -1813,9 +1820,61 @@ function buildCarDesignLines(){
  }
  refreshCarDesignStates();
 }
+// A material-standard note is shown ONLY for a matching SUS-HL surface.
+// Window/DSJ1/DS1 SUS-HL door assemblies use SUS304 instead of SUS430J1L.
+function isSUSHLMaterial(value){return /(?:^|[^A-Z0-9])SUS[-\s]?HL(?:$|[^A-Z0-9])/i.test(String(value||''));}
+function standardMaterialForCarField(name,value,model){
+ const v=String(value||'');
+ if(name==='K22_SUSType')return /SUS\s*Standard/i.test(v)||isSUSHLMaterial(v)?'SUS430 / SUS430J1L':'';
+ if(name==='K22_CeilingModel'){
+  const colorField=current.fields.find(f=>f.name==='K22_CeilingColor');
+  const color=colorField?String(currentValue(colorField.cell)||''):'';
+  if(model==='MRL')return isSUSHLMaterial(color)?'SUS430':'';
+  // MR ceiling finishes L210S/L200S/N300S are standard SUS430 unless
+  // a different material/painted finish was explicitly selected.
+  if(/^(?:L210S|L200S|N300S)(?:$|[-\s])/i.test(v)&&!/(?:PAINTED|COLOR\s*PAINT)/i.test(color))return 'SUS430';
+  return '';
+ }
+ if(!isSUSHLMaterial(v))return '';
+ if(name==='K24_CarDoorFinish')return /\b(?:DSJ1|DS1|WINDOW)\b/i.test(v)?'SUS304':'SUS430J1L';
+ if(name==='K23_WallFinish')return 'SUS430J1L';
+ if(name==='K25_CarTransomFinish'||name==='K26_CarFrontFinish')return 'SUS430';
+ return '';
+}
+function updateStandardNote(host,cls,grade){
+ if(!host)return;
+ let note=host.querySelector('.'+cls);
+ if(!grade){note?.remove();return;}
+ if(!note){note=document.createElement('small');note.className=cls;host.append(note);}
+ note.textContent='Standard: '+grade;
+ note.title='Vật liệu tiêu chuẩn của bề mặt inox sọc nhuyễn (SUS-HL)';
+}
+function refreshCarMaterialStandardNotes(){
+ const panel=document.querySelector('.car-design-lines');if(!panel)return;
+ const model=$('model').value;
+ for(const line of panel.querySelectorAll('.car-design-line')){
+  const field=current.fields.find(f=>f.name===line.dataset.device);
+  if(!field)continue;
+  const grade=standardMaterialForCarField(field.name,currentValue(field.cell),model);
+  updateStandardNote(line,'car-design-standard-note',grade);
+ }
+}
+function mountLandingMaterialStandardNotes(){
+ for(const name of ['K36_JambMainFloorMaterial','K36_JambOtherFloorMaterial',
+                    'K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial']){
+  const f=current.fields.find(x=>x.name===name);if(!f)continue;
+  const field=activeInput(f.cell)?.closest('.field');if(!field)continue;
+  const selection=String(currentValue(f.cell)||'');
+  const isDoor=name.startsWith('K36_DoorFinish');
+  const grade=!isSUSHLMaterial(selection)?'':
+    (isDoor&&/\b(?:DSJ1|DS1|WINDOW)\b/i.test(selection)?'SUS304':'SUS430J1L');
+  updateStandardNote(field,'landing-standard-note',grade);
+ }
+}
 function refreshCarDesignStates(){
  const panel=document.querySelector('.car-design-lines');if(!panel)return;
  const model=$('model').value;
+ refreshCarMaterialStandardNotes();
  // Do not enforce SUS304: the designer retains full control of the material selection.
  const sus304Note=panel.querySelector('#ny40-sus304-advisory');
  if(sus304Note)sus304Note.hidden=!(model==='MRL'&&/^NY-40(?:[A-E])?\b/i.test(String(currentValue('D14')||'').trim()));
@@ -2265,6 +2324,7 @@ function renderAllSpecRows(){
   }
   mountMRCapacitySelector(root);
   buildCarDesignLines();
+  mountLandingMaterialStandardNotes();
  // v5.8.16: Arrange both models in wide, independently editable dimension groups.
  // Move the existing input nodes (never clone them) so Check Spec / Export bindings stay unchanged.
  {
