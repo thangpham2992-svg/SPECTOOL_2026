@@ -2149,11 +2149,21 @@ function mountHallQuantity(item,input,kind){
   const groups=baseGroups.flatMap(g=>['P15','P17','P20'].includes(g)?[g,g+'D']:[g]);
   if(!groups.length)return;
   const isDeepGroup=g=>['P15D','P17D','P20D'].includes(g);
-  const groupSourceRows=g=>{
-   const base=g.replace(/D$/,'');
-   const rows=source.filter(r=>groupName(r)===base);
-   return isDeepGroup(g)?rows.filter(r=>String(r['CWT-Position']).trim()==='Side' && Number(r.BB)>=1100 && Number(r.BB)>Number(r.AA)):rows;
+  // Stretcher/deep-car rows are a separate, mutually exclusive group, not an
+  // additional view of all P15/P17/P20 rows. The factory P15C1/C8/C10/C11
+  // codes (AA 1100/1200) belong to P15D in the grouped UI, along with the
+  // explicit P15D-2S factory code. Original factory codes remain unchanged.
+  const isDeepRow=r=>{
+   const base=groupName(r);
+   return ['P15','P17','P20'].includes(base)
+    && String(r['CWT-Position']).trim()==='Side'
+    && Number(r.BB)>=1100 && Number(r.BB)>Number(r.AA);
   };
+  const sourceGroup=r=>{
+   const base=groupName(r);
+   return isDeepRow(r)?base+'D':base;
+  };
+  const groupSourceRows=g=>source.filter(r=>sourceGroup(r)===g);
   const field=(name)=>current.fields.find(f=>f.name===name);
   const doorNative=activeInput(field('K7_DoorType')?.cell),cwtNative=activeInput(field('K14_CWTLocation')?.cell);
   const aaNative=activeInput(field('K17_CarW')?.cell),bbNative=activeInput(field('K17_CarD')?.cell),jjNative=activeInput(field('K18_CarJJ')?.cell);
@@ -2221,7 +2231,7 @@ function mountHallQuantity(item,input,kind){
    try{
     const original=source.find(r=>String(r.EleCapacityName)===sourceVal());
     const base=original||source[0];
-    const g=groups.includes(prefs.group)?prefs.group:(level===0?groupName(base):group.value)||groups[0];
+    const g=groups.includes(prefs.group)?prefs.group:(level===0?sourceGroup(base):group.value)||groups[0];
     group.value=g;
     // P6C3 is selectable within P6 through the normal Door/CWT/AA/BB/JJ filters.
     p6c3Hint.textContent='';
@@ -3293,7 +3303,7 @@ if(desktopFloatingCheck){
  if(sourceStatus&&floatingStatus&&typeof MutationObserver!=='undefined'){
   const updateFloatingStatus=()=>{
    const isFail=sourceStatus.classList.contains('fail');
-   const isPass=sourceStatus.classList.contains('pass')||sourceStatus.classList.contains('ok');
+   const isPass=sourceStatus.classList.contains('source-pass')||sourceStatus.classList.contains('pass')||sourceStatus.classList.contains('ok');
    floatingStatus.textContent=isFail?'Không đạt – xem kết quả':isPass?'Đạt / PASS':sourceStatus.classList.contains('running')?'Đang kiểm tra…':'Check Spec';
   };
   new MutationObserver(updateFloatingStatus).observe(sourceStatus,{attributes:true,childList:true,characterData:true,subtree:true});
@@ -3304,6 +3314,22 @@ if(desktopFloatingCheck){
 $('working').onclick=exportWorking;
 $('final-xlsx').onclick=exportFinalExcel;
 $('final-pdf').onclick=exportFinalPdf;
+// v5.8.231: floating quick exports must invoke the SAME validated export
+// handlers as the main toolbar (no duplicated export logic or bypass).
+for(const [quickId,sourceId] of [
+ ['desktop-export-xlsx','final-xlsx'],['desktop-export-pdf','final-pdf']
+]){
+ const quick=document.getElementById(quickId),source=document.getElementById(sourceId);
+ if(!quick||!source)continue;
+ quick.addEventListener('click',()=>source.click());
+ // Reflect actual in-progress disabled states, while keeping Check Spec validation
+ // inside exportFinalExcel/exportFinalPdf as before.
+ if(typeof MutationObserver!=='undefined'){
+  const sync=()=>{quick.disabled=source.disabled;};
+  new MutationObserver(sync).observe(source,{attributes:true,attributeFilter:['disabled']});
+  sync();
+ }
+}
 $('reset').onclick=()=>{models[$('model').value]=structuredClone(window.SPEC_EMBEDDED[$('model').value]);models[$('model').value].fields.push(...structuredClone(window.SPEC_EXTRAS[$('model').value]));delete sourceFiles[$('model').value];$('file').value='';load()};
 $('file').addEventListener('change',async(e)=>{const file=e.target.files[0];if(!file)return;
  try{status('Đang đọc Excel / Reading workbook...');const model=$('model').value;

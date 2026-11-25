@@ -115,6 +115,10 @@
        }
      }
    }
+   // v5.8.221: Correct the repeated IV heading in the MR factory template.
+   // Features follow IV. Entrance design and therefore belong to section V.
+   if(model==='MR'&&/^\s*IV\.\s*Các tính năng\b/i.test(text(cells.A84)))
+     cells.A84='V. Các tính năng (Features) :';
    // v5.8.125: use the same corrected bilingual label in MR/MRL Excel
    // and the PDF, which is generated from the same export worksheet.
    // Match the exact old heading only; do not rewrite technical fire options.
@@ -493,11 +497,27 @@
    if(window.SPEC_PROOFREAD){
      for(const addr of Object.keys(cells)){if(typeof cells[addr]==='string')cells[addr]=window.SPEC_PROOFREAD(cells[addr]);}
    }
-   // v5.8.113: remove obsolete 1800 mm MBS beam-height claim in both languages.
-   // Keep all other sensor functions and SR/MBSS incompatibility wording unchanged.
+   // v5.8.218: MBSS was removed from BOTH product models. The factory
+   // workbook still contains incompatibility footnotes mentioning MBSS;
+   // remove only that obsolete part and retain any valid SR/MBS warning.
+   function removeDiscontinuedMBSSNotes(source){
+     return String(source).replace(/\(([^()]*\bMBSS\b[^()]*)\)/gi,(original,body,offset,sourceText)=>{
+       if(!/(?:cannot be combined|không thể sử dụng|not together)/i.test(body))return original;
+       const other=body.match(/(?:\bSR(?:-?[12])?\b|\bMBS(?:3)?\b|Multi\s*-?\s*Beam\s+Door\s+Sensor|Muti\s*-?\s*Beam\s+Door\s+Sensor)/gi)||[];
+       if(!other.length)return '';
+       let cleaned=body
+         .replace(/\s*(?:,\s*|\b(?:or|hay|hoặc|and)\s+)MBSS(?:\s+(?:feature|chức năng))?/gi,'')
+         .replace(/\bMBSS(?:\s+(?:feature|chức năng))?/gi,'')
+         .replace(/\s+,/g,',').replace(/,\s*\./g,'.')
+         .replace(/\s+(?:or|hay|hoặc|and)\s*[.,;]*\s*$/i,'').replace(/[\s,;.]+$/,'').trim();
+       const outsidePeriod=/^\s*\./.test(sourceText.slice(offset+original.length));
+       const insidePeriod=/\.\s*$/.test(body);
+       return cleaned ? '('+cleaned+(insidePeriod&&!outsidePeriod?'.':'')+')' : '';
+     }).replace(/\s+\.(?=\s|$)/g,'').replace(/[ \t]{2,}/g,' ').replace(/[ \t]+\n/g,'\n');
+   }
    for(const addr of Object.keys(cells)){
      if(typeof cells[addr]!=='string')continue;
-     cells[addr]=cells[addr]
+     cells[addr]=removeDiscontinuedMBSSNotes(cells[addr])
        .replace(/suốt khoảng\s*1800\s*mm\s*/gi,'')
        .replace(/cover a door height of approximately\s*1800\s*mm\s*/gi,'are arranged along the door height ')
        .replace(/\(Overhead height\)/gi,'(Overhead)');
@@ -548,7 +568,56 @@
        if(cells[enKey]&&!/SUS430/i.test(text(cells[enKey])))cells[enKey]=text(cells[enKey]).trimEnd()+' (SUS430 hairline stainless steel).';
      }
    }
+   // v5.8.213: Export each dimension in three INDEPENDENT columns:
+   // A: Vietnamese item + English item; B: Vietnamese axes + English axes;
+   // C: actual numeric result with mm. Do not merge A:B for these four rows.
+   // Factory MR and MRL Version02 have different source row positions.
+   const dimensionRows=model==='MR'
+     ? [[37,'Kích thước phòng thang','Car internal size','R × S × C','W × D × H',3],
+        [38,'Kích thước cửa','Door size','R × C','W × H',2],
+        [39,'Kích thước hố thang','Hoistway size','R × S','W × D',2],
+        [40,'Kích thước phòng máy','Machine room size','R × S × C','W × D × H',3]]
+     : [[36,'Kích thước phòng thang','Car internal size','R × S × C','W × D × H',3],
+        [37,'Kích thước cửa','Door size','R × C','W × H',2],
+        [38,'Kích thước hố thang','Hoistway size','R × S','W × D',2],
+        [39,'Kích thước phòng máy','Machine room size','R × S × C','W × D × H',3]];
+   for(const [row,vi,en,axesVi,axesEn,axes] of dimensionRows){
+     const label='A'+row,value='C'+row;
+     if(!text(cells[label]).trim())continue;
+     cells[label]=vi+'\n'+en;
+     cells['B'+row]=axesVi+'\n'+axesEn;
+     const current=text(cells[value]).trim();
+     // Keep 'Machine roomless' unchanged; do not invent any machine room size.
+     const clean=current.replace(/\s*\b(?:mm|millimeters?)\b\s*$/i,'').trim();
+     const numeric=clean.match(/\d{2,5}(?:[.,]\d{1,2})?/g)||[];
+     if(numeric.length===axes && !/[\r\n]/.test(clean) &&
+        /[x×*]/i.test(clean) &&
+        !/\b(?:not supplied|không cung cấp|machine roomless)\b/i.test(clean)){
+       cells[value]=numeric.join('×')+' mm';
+     }
+   }
+   // Remove legacy MR header/version metadata in the FINAL XLSX export.
+   if(model==='MR'){
+     cells.A1='MITSUBISHI ELECTRIC VIETNAM CO., LTD.';
+     cells.C2=''; // Ver.: K0 (06.03.2018)
+     // The factory MR evaluator can sometimes omit the final 'd'. Keep the
+     // canonical bilingual origin in the customer-facing export in all cases.
+     cells.C12='Thái Lan\nThailand';
+   }
+   cells.C1=''; // Factory form SE-F16.02 is obsolete on both models.
    cells['C'+(model==='MR'?11:12)]='MITSUBISHI ELECTRIC';
+   // v5.8.217: MRL customer-facing wording must use the complete
+   // factory DoorTypeVN lookup, not a bare CO/2S code. Keep the model
+   // SpecForm input unchanged: this is EXPORT-PRESENTATION only.
+   if(model==='MRL'){
+     cells.C13=text(cells.C13).replace(/\bThailan\b/gi,'Thailand');
+     const doorType=text(eng.safe('SpecForm','D15').value).trim().toUpperCase();
+     const doorWording={
+       CO:'CO - Hai cánh mở ra hai bên từ trung tâm (2-panel center opening doors)',
+       '2S':'2S - Hai cánh mở về một phía (2-panel side sliding doors)'
+     };
+     if(doorWording[doorType])cells.C18=doorWording[doorType];
+   }
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
@@ -929,6 +998,14 @@
        row.setAttribute('ht',String(Math.max(base,Math.min(185,lines*16+14))));
        row.setAttribute('customHeight','1');
      }
+   }
+   // v5.8.209: Two-line merged size labels must not be clipped in Excel.
+   const dimensionLabelRows=model==='MR'?[37,38,39,40]:[36,37,38];
+   for(const rn of dimensionLabelRows){
+     if(!/\nRộng \(W\)/.test(String(doc.cells['A'+rn]||'')))continue;
+     const row=all(x,'row').find(el=>Number(el.getAttribute('r'))===rn);
+     if(row){row.setAttribute('ht',String(Math.max(33,Number(row.getAttribute('ht'))||15)));
+       row.setAttribute('customHeight','1');}
    }
    // Make the exact Model value bold in the *actual* XLSX cell, preserving the
    // workbook font family, color, size, cell borders, number format and merges.
@@ -1394,16 +1471,36 @@
        const rNode=x.createElementNS(n,'r');
        const prop=x.createElementNS(n,'rPr');
        const family=x.createElementNS(n,'rFont');family.setAttribute('val','Arial');prop.appendChild(family);
-       if(part.english)prop.appendChild(x.createElementNS(n,'i'));
+       if(part.english){
+         prop.appendChild(x.createElementNS(n,'i'));
+         const ink=x.createElementNS(n,'color');ink.setAttribute('rgb','FF245A86');prop.appendChild(ink);
+       }
        rNode.appendChild(prop);
        const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');
        t.textContent=part.text;rNode.appendChild(t);is.appendChild(rNode);
      }
    }
+   // A hall-call-box quantity can share a cell with the Vietnamese description.
+   // Color/italicize only the quantity line, leaving the Vietnamese line black.
+   for(const c of all(x,'c')){
+     if(!/^C\d+$/.test(c.getAttribute('r')||'')||c.getAttribute('t')!=='inlineStr')continue;
+     const textRuns=all(c,'t').map(t=>t.textContent||'').join('');
+     if(!/(?:^|\n)\s*\d+\s*hộp\s*\//i.test(textRuns))continue;
+     const is=child(c,'is');if(!is)continue;
+     while(is.firstChild)is.removeChild(is.firstChild);
+     for(const part of textRuns.split(/(\n)/)){
+       const isQty=/^\s*\d+\s*hộp\s*\//i.test(part);
+       const rNode=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+       const family=x.createElementNS(n,'rFont');family.setAttribute('val','Arial');pr.appendChild(family);
+       if(isQty){pr.appendChild(x.createElementNS(n,'i'));const ink=x.createElementNS(n,'color');ink.setAttribute('rgb','FF245A86');pr.appendChild(ink);}
+       rNode.appendChild(pr);
+       const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=part;rNode.appendChild(t);is.appendChild(rNode);
+     }
+   }
    // v5.8.119: split single-row bilingual descriptions into TWO Excel rows.
    // Feature descriptions already encoded as two source rows remain untouched.
    // Preserve the worksheet's original outside borders; the only new internal
-   // separator is a thin pale-grey rule above the new English row.
+   // NO internal separator is drawn between Vietnamese and English rows.
    {
      const data=all(x,'sheetData')[0];
      const stylePart=zip.file('xl/styles.xml');
@@ -1432,18 +1529,33 @@
        const baseFont=all(fonts,'font')[fontId]||all(fonts,'font')[0];
        const font=baseFont.cloneNode(true);
        if(!Array.from(font.children).some(e=>e.localName==='i'))font.appendChild(sd.createElementNS(n,'i'));
+       for(const existing of Array.from(font.children).filter(e=>e.localName==='color'))font.removeChild(existing);
+       const mutedBlue=sd.createElementNS(n,'color');mutedBlue.setAttribute('rgb','FF245A86');font.appendChild(mutedBlue);
        const nf=all(fonts,'font').length;fonts.appendChild(font);fonts.setAttribute('count',String(nf+1));
        xf.setAttribute('fontId',String(nf));xf.setAttribute('applyFont','1');
        const baseBorder=all(borders,'border')[Number(original.getAttribute('borderId')||0)]||all(borders,'border')[0];
        const b=baseBorder.cloneNode(true);
        let top=Array.from(b.children).find(e=>e.localName==='top');
        if(!top){top=sd.createElementNS(n,'top');b.appendChild(top);}
-       top.setAttribute('style','thin');while(top.firstChild)top.removeChild(top.firstChild);
-       const col=sd.createElementNS(n,'color');col.setAttribute('rgb','FFE2E7EC');top.appendChild(col);
+       top.removeAttribute('style');while(top.firstChild)top.removeChild(top.firstChild);
        const nb=all(borders,'border').length;borders.appendChild(b);borders.setAttribute('count',String(nb+1));
        xf.setAttribute('borderId',String(nb));xf.setAttribute('applyBorder','1');
        const ns=all(xfs,'xf').length;xfs.appendChild(xf);xfs.setAttribute('count',String(ns+1));
        styleCache.set(baseId,ns);return ns;
+     }
+     const hallQuantityStyleCache=new Map();
+     function hallQuantityStyle(baseId){
+       if(hallQuantityStyleCache.has(baseId))return hallQuantityStyleCache.get(baseId);
+       const original=all(xfs,'xf')[baseId]||all(xfs,'xf')[0],xf=original.cloneNode(true);
+       const originalFont=all(fonts,'font')[Number(original.getAttribute('fontId')||0)]||all(fonts,'font')[0];
+       const font=originalFont.cloneNode(true);
+       if(!Array.from(font.children).some(e=>e.localName==='i'))font.appendChild(sd.createElementNS(n,'i'));
+       for(const existing of Array.from(font.children).filter(e=>e.localName==='color'))font.removeChild(existing);
+       const ink=sd.createElementNS(n,'color');ink.setAttribute('rgb','FF245A86');font.appendChild(ink);
+       const fontId=all(fonts,'font').length;fonts.appendChild(font);fonts.setAttribute('count',String(fontId+1));
+       xf.setAttribute('fontId',String(fontId));xf.setAttribute('applyFont','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);xfs.setAttribute('count',String(id+1));
+       hallQuantityStyleCache.set(baseId,id);return id;
      }
      const content=c=>all(c,'t').map(t=>t.textContent||'').join('');
      const getCell=(row,col)=>Array.from(row?.children||[]).find(e=>e.localName==='c' && e.getAttribute('r')===col+row.getAttribute('r'));
@@ -1493,7 +1605,7 @@
        const before=rr.slice(0,idx).map(t=>t.text).join('').trim();
        const after=rr.slice(idx+1).map(t=>t.text).join('').trim();
        const en=english[0].text.trim();
-       if(!before||!/[À-ỹ]/.test(before)||!en||after)return null;
+       if(!before||!/(?:[À-ỹ]|\bthang\b|\bhop\b)/i.test(before)||!en||after)return null;
        return [before,en];
      }
      // v5.8.120: Restore the THREE actual source rows of each MRL hall group.
@@ -1539,7 +1651,7 @@
          const enCell=ensureCell(englishRow,'C');updateCell(x,enCell,parts.en);
          enCell.setAttribute('s',String(englishStyle(vietnameseStyle(baseStyle))));
          const qtyCell=ensureCell(quantityRow,'C');updateCell(x,qtyCell,parts.notes);
-         qtyCell.setAttribute('s',String(baseStyle));
+         qtyCell.setAttribute('s',String(hallQuantityStyle(baseStyle)));
          const estimate=(value,chars)=>String(value||'').split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/chars)),0);
          for(const [rr,value] of [[top,parts.vi],[englishRow,parts.en],[quantityRow,parts.notes]]){
            rr.removeAttribute('hidden');rr.setAttribute('customHeight','1');
@@ -1646,8 +1758,24 @@
        lower.setAttribute('s',String(englishStyle(Number(lower.getAttribute('s')||0))));
        upper.setAttribute('s',String(vietnameseStyle(upperBase)));
      }
+     // v5.8.210: English translations are already on a dedicated row and
+     // styled italic/navy. Remove only their OUTER translation parentheses;
+     // do not touch technical parentheses inside Vietnamese or model codes.
+     for(const [rn,row] of afterSplit){
+       const previous=afterSplit.get(rn-1);
+       if(!previous||row.getAttribute('hidden')==='1'||previous.getAttribute('hidden')==='1')continue;
+       const cell=getCell(row,'C'),above=getCell(previous,'C');
+       if(!cell||!above)continue;
+       const value=content(cell).trim(),vietnamese=content(above).trim();
+       if(!/^\([A-Za-z0-9][\s\S]*\)$/.test(value)||/[À-ỹ]/.test(value)||!/[À-ỹ]/.test(vietnamese))continue;
+       if(content(getCell(row,'A')||x.createElementNS(n,'c')).trim()||
+          content(getCell(row,'B')||x.createElementNS(n,'c')).trim())continue;
+       // English explanations may be short: (No), (1 set), (8 persons).
+       updateCell(x,cell,value.slice(1,-1).trim());
+       cell.setAttribute('s',String(englishStyle(Number(cell.getAttribute('s')||0))));
+     }
      // v5.8.123: final perimeter repair for BOTH source formats.
-     // Separate VI/EN rows use exactly one light separator BETWEEN the rows,
+     // Separate VI/EN rows have NO separator BETWEEN the rows,
      // while the bottom of the English row remains a normal black table edge.
      // Do not paint generic borders on merged regions or introduce thick rules.
      const perimeterStyles=new Map();
@@ -1682,8 +1810,14 @@
        const vi=content(getCell(upperRow,'C')||x.createElementNS(n,'c')).trim();
        const en=content(getCell(lowerRow,'C')||x.createElementNS(n,'c')).trim();
        if(!vi||!en||!/[À-ỹ]/.test(vi)||!(isEnglishDescription(en)||(/^\s*\([A-Za-z]/.test(en)&&en.length>12)))return false;
-       return !(content(getCell(lowerRow,'A')||x.createElementNS(n,'c')).trim()||
-         content(getCell(lowerRow,'B')||x.createElementNS(n,'c')).trim());
+       const aLower=content(getCell(lowerRow,'A')||x.createElementNS(n,'c')).trim();
+       const bLower=content(getCell(lowerRow,'B')||x.createElementNS(n,'c')).trim();
+       // Feature rows carry both labels separately: Vietnamese above, English below.
+       // Other description rows have no label on their English row.
+       if(!aLower&&!bLower)return true;
+       const aUpper=content(getCell(upperRow,'A')||x.createElementNS(n,'c')).trim();
+       return !bLower && /[À-ỹ]/.test(aUpper) && !/[À-ỹ]/.test(aLower) &&
+         /^\s*\(?[A-Za-z]/.test(aLower);
      }
      for(const [rn,row] of afterSplit){
        if(!hasBilingualPair(rn))continue;
@@ -1691,7 +1825,7 @@
        vi.setAttribute('s',String(perimeterStyle(Number(vi.getAttribute('s')||0),
          {left:'table',right:'table',bottom:'none'})));
        en.setAttribute('s',String(perimeterStyle(Number(en.getAttribute('s')||0),
-         {left:'table',right:'table',top:'separator',bottom:'table'})));
+         {left:'table',right:'table',top:'none',bottom:'table'})));
        // The fireproof-door label must span A:B *and* both language rows.
        // MR's source template had A88:A89 only; MRL already used A:B.
        const label=content(getCell(row,'A')||x.createElementNS(n,'c')).trim();
@@ -1763,7 +1897,7 @@
        vi.setAttribute('s',String(perimeterStyle(Number(vi.getAttribute('s')||0),
          {left:'table',right:'table',bottom:'none'})));
        en.setAttribute('s',String(perimeterStyle(Number(en.getAttribute('s')||0),
-         {left:'table',right:'table',top:'separator',bottom:'none'})));
+         {left:'table',right:'table',top:'none',bottom:'none'})));
        qty.setAttribute('s',String(perimeterStyle(Number(qty.getAttribute('s')||0),
          {left:'table',right:'table',top:'none',bottom:'table'})));
      }
@@ -1944,6 +2078,1434 @@
      }
      merges.setAttribute('count',String(all(merges,'mergeCell').length));
    }
+   // v5.8.211: FINAL presentation pass. This runs after ALL row insertions,
+   // source-model style normalization, and optional detailed rows. Earlier
+   // passes could replace styles and erase English blue/italic properties.
+   // Working from the final OOXML is shared by MR and MRL Version02, and
+   // the PDF print layout reads these very same styles/rich text runs.
+   {
+     const stylePath='xl/styles.xml',sd=parse(await zip.file(stylePath).async('string'));
+     const fonts=all(sd,'fonts')[0],xfs=all(sd,'cellXfs')[0];
+     if(!fonts||!xfs)throw Error('Export bilingual final style missing');
+     const originalStyleCount=all(xfs,'xf').length;
+     const fontCache=new Map(),alignmentCache=new Map();
+     const read=c=>all(c,'t').map(t=>t.textContent||'').join('');
+     const textCell=(row,col)=>Array.from(row.children).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const rows=all(x,'row').filter(row=>row.getAttribute('hidden')!=='1');
+     const rowMap=new Map(rows.map(row=>[+row.getAttribute('r'),row]));
+     const hasVi=v=>/[À-ỹ]/.test(String(v||''));
+     const isEnglishLine=(str)=>{
+       const v=String(str||'').trim().replace(/^\(|\)$/g,'').trim();
+       if(!v||hasVi(v)||!/[A-Za-z]/.test(v))return false;
+       // Exclude isolated engineering codes/units and bare dimensions.
+       if(/^(?:[A-Z][A-Z0-9-]{0,13}|\d+(?:[.,]\d+)?\s*(?:mm|kg|m|m\/s))$/.test(v))return false;
+       return true;
+     };
+     function normalizeEnglish(v){
+       const raw=String(v||'').trim();
+       // Only remove outer TRANSLATION parentheses. Keep parentheses inside
+       // mathematical or engineering notations, e.g. (1.0 m/s) in a sentence.
+       return /^\([\s\S]+\)$/.test(raw)?raw.slice(1,-1).trim():raw;
+     }
+     function languageStyle(baseId){
+       const key=Number(baseId)||0;
+       if(fontCache.has(key))return fontCache.get(key);
+       const base=all(xfs,'xf')[key]||all(xfs,'xf')[0],xf=base.cloneNode(true);
+       const font= (all(fonts,'font')[+(base.getAttribute('fontId')||0)]||all(fonts,'font')[0]).cloneNode(true);
+       for(const old of Array.from(font.children).filter(c=>c.localName==='color'))old.remove();
+       if(!Array.from(font.children).some(c=>c.localName==='i'))font.appendChild(sd.createElementNS(n,'i'));
+       const color=sd.createElementNS(n,'color');color.setAttribute('rgb','FF245A86');font.appendChild(color);
+       const fontId=all(fonts,'font').length;fonts.appendChild(font);
+       xf.setAttribute('fontId',String(fontId));xf.setAttribute('applyFont','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);fontCache.set(key,id);return id;
+     }
+     function middleStyle(baseId,wrap){
+       const key=String(baseId||0)+':'+(wrap?'wrap':'middle');
+       if(alignmentCache.has(key))return alignmentCache.get(key);
+       const xf=(all(xfs,'xf')[Number(baseId)||0]||all(xfs,'xf')[0]).cloneNode(true);
+       let a=Array.from(xf.children).find(e=>e.localName==='alignment');
+       if(!a){a=sd.createElementNS(n,'alignment');const before=Array.from(xf.children).find(e=>['protection','extLst'].includes(e.localName));xf.insertBefore(a,before||null);}
+       a.setAttribute('vertical','center');
+       if(wrap)a.setAttribute('wrapText','1');
+       xf.setAttribute('applyAlignment','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);alignmentCache.set(key,id);return id;
+     }
+     function asRichCell(cell,parts){
+       // Write Excel inline string runs with explicit run-level properties.
+       // Plain Vietnamese remains black; English is navy and italic.
+       for(const old of Array.from(cell.children).filter(e=>['is','v','f'].includes(e.localName)))old.remove();
+       cell.setAttribute('t','inlineStr');
+       const inline=x.createElementNS(n,'is');
+       for(const part of parts){
+         if(!part.text)continue;
+         const r=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+         const face=x.createElementNS(n,'rFont');face.setAttribute('val','Arial');pr.appendChild(face);
+         if(part.en){
+           pr.appendChild(x.createElementNS(n,'i'));
+           const color=x.createElementNS(n,'color');color.setAttribute('rgb','FF245A86');pr.appendChild(color);
+         }
+         r.appendChild(pr);
+         const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=part.text;r.appendChild(t);
+         inline.appendChild(r);
+       }
+       cell.appendChild(inline);
+     }
+     function makeMixedParts(value){
+       // Parenthetical translations are split first. A second pass then
+       // styles already line-separated translations without parentheses.
+       const original=String(value||'');
+       const prelim=bilingualRuns(original);
+       let flattened=prelim.map(p=>p.text).join('');
+       const lines=flattened.split('\n');
+       const result=[];
+       let precedingVietnamese=false;
+       for(let i=0;i<lines.length;i++){
+         const line=lines[i];
+         const en=(precedingVietnamese && isEnglishLine(line)) ||
+                  // Description-only English after a Vietnamese header can be
+                  // styled as a separated worksheet row (handled below).
+                  false;
+         if(en)result.push({text:normalizeEnglish(line),en:true});
+         else result.push({text:line,en:false});
+         if(hasVi(line))precedingVietnamese=true;
+         if(i<lines.length-1)result.push({text:'\n',en:false});
+       }
+       // If existing bilingualRuns recognized an English substring in a
+       // single physical cell, carry its language tag even for short English.
+       if(prelim.some(p=>p.english) && !result.some(p=>p.en)){
+         const rebuilt=[];
+         for(const p of prelim){
+           if(p.english)rebuilt.push({text:normalizeEnglish(p.text),en:true});
+           else rebuilt.push({text:p.text,en:false});
+         }
+         return rebuilt;
+       }
+       return result;
+     }
+     for(const row of rows){
+       const rn=+row.getAttribute('r');
+       const c=textCell(row,'C');
+       if(!c)continue;
+       // Middle align all column C data cells, preserving original horizontal
+       // alignment and wrapping. Applies to both model workbooks.
+       c.setAttribute('s',String(middleStyle(c.getAttribute('s'),false)));
+       const value=read(c).trim();
+       if(!value)continue;
+       const preceding=rowMap.get(rn-1),following=rowMap.get(rn+1);
+       const neighbor=preceding||null;
+       const previousC=neighbor?textCell(neighbor,'C'):null;
+       const nextC=following?textCell(following,'C'):null;
+       const noOwnLabel=!(textCell(row,'A')&&read(textCell(row,'A')).trim()) && !(textCell(row,'B')&&read(textCell(row,'B')).trim());
+       const adjacentVi= (previousC&&hasVi(read(previousC))) || (nextC&&hasVi(read(nextC)));
+       const qtyLine=/^\s*\d+\s*hộp\s*\//i.test(value);
+       // An entire English translation row must have its own navy italic
+       // cell XF. Short translations, such as Thailand, No or 1 set, count.
+       // Source Features sometimes store English first (in a labelled
+       // row) and Vietnamese second. Style English in those pairs too.
+       const currentA=textCell(row,'A'),followingA=following&&textCell(following,'A');
+       const englishFirstFeature=!!(nextC&&followingA&&currentA&&
+         hasVi(read(nextC))&&hasVi(read(followingA))&&!hasVi(read(currentA))&&
+         isEnglishLine(value)&&!hasVi(value));
+       const standaloneEn=(noOwnLabel&&adjacentVi&&isEnglishLine(value)&&!hasVi(value) &&
+         !/^\s*(?:I|II|III|IV|V|VI)\./.test(value))||englishFirstFeature;
+       if(standaloneEn || qtyLine){
+         if(standaloneEn){
+           const corrected=normalizeEnglish(value);
+           if(value!==corrected)updateCell(x,c,corrected);
+         }
+         c.setAttribute('s',String(languageStyle(c.getAttribute('s'))));
+         continue;
+       }
+       if(!hasVi(value))continue;
+       const mixed=makeMixedParts(value);
+       if(mixed.some(p=>p.en))asRichCell(c,mixed);
+     }
+     // In both MR and MRL the dimension labels are merged A:B. They need
+     // wrapText and enough row height; values in C retain 'mm' and are middle.
+     for(const row of rows){
+       const a=textCell(row,'A');if(!a)continue;
+       const label=read(a);
+       if(!/Rộng\s*\(W\)/i.test(label)||!/\n/.test(label))continue;
+       for(const col of ['A','B']){
+         const cell=textCell(row,col);
+         if(cell)cell.setAttribute('s',String(middleStyle(cell.getAttribute('s'),true)));
+       }
+       const c=textCell(row,'C');
+       if(c){
+         const v=read(c).trim();
+         if(/^\d[\d.,]*\s*[x×]\s*\d[\d.,]*(?:\s*[x×]\s*\d[\d.,]*)?\s*$/i.test(v))updateCell(x,c,v+' mm');
+         c.setAttribute('s',String(middleStyle(c.getAttribute('s'),true)));
+       }
+       row.setAttribute('ht',String(Math.max(43,Number(row.getAttribute('ht'))||0)));
+       row.setAttribute('customHeight','1');
+     }
+     fonts.setAttribute('count',String(all(fonts,'font').length));
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     zip.file(stylePath,serial(sd));
+   }
+   // v5.8.212: final source-aware export normalizer (MR + MRL Version 02).
+   // Critically, source feature cells use shared-string OOXML ('t=s'), so the
+   // earlier text-only pass silently skipped most factory Feature rows.
+   // Work on actual values + final layout, preserving every source feature code.
+   {
+     const sd=parse(await zip.file('xl/styles.xml').async('string'));
+     const fonts=all(sd,'fonts')[0],xfs=all(sd,'cellXfs')[0];
+     const rows=all(x,'row');
+     const rowMap=new Map(rows.map(row=>[+row.getAttribute('r'),row]));
+     const ssFile=zip.file('xl/sharedStrings.xml');
+     const strings=ssFile?all(parse(await ssFile.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const get=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     function value(c){if(!c)return '';
+       if(c.getAttribute('t')==='s')return strings[+(all(c,'v')[0]?.textContent||0)]||'';
+       if(c.getAttribute('t')==='inlineStr')return all(c,'t').map(t=>t.textContent||'').join('');
+       return all(c,'v')[0]?.textContent||'';
+     }
+     const hasVi=t=>/[À-ỹ]/.test(String(t||''));
+     const fontStyles=new Map();
+     function textStyle(id,english,wrap=false){
+       const key=String(id||0)+':'+(english?'en':'vi')+':'+wrap;
+       if(fontStyles.has(key))return fontStyles.get(key);
+       const original=all(xfs,'xf')[+id||0]||all(xfs,'xf')[0];
+       const xf=original.cloneNode(true);
+       const fontId=+(original.getAttribute('fontId')||0);
+       const font=(all(fonts,'font')[fontId]||all(fonts,'font')[0]).cloneNode(true);
+       for(const old of Array.from(font.children).filter(c=>['color','i'].includes(c.localName)))old.remove();
+       if(english){font.appendChild(sd.createElementNS(n,'i'));
+         const col=sd.createElementNS(n,'color');col.setAttribute('rgb','FF245A86');font.appendChild(col);
+       } else {
+         const col=sd.createElementNS(n,'color');col.setAttribute('rgb','FF000000');font.appendChild(col);
+       }
+       const newFontId=all(fonts,'font').length;fonts.appendChild(font);
+       xf.setAttribute('fontId',String(newFontId));xf.setAttribute('applyFont','1');
+       if(wrap){let a=Array.from(xf.children).find(el=>el.localName==='alignment');
+         if(!a){a=sd.createElementNS(n,'alignment');const tail=Array.from(xf.children).find(el=>['protection','extLst'].includes(el.localName));xf.insertBefore(a,tail||null);}
+         a.setAttribute('vertical','center');a.setAttribute('wrapText','1');xf.setAttribute('applyAlignment','1');
+       }
+       const styleId=all(xfs,'xf').length;xfs.appendChild(xf);fontStyles.set(key,styleId);return styleId;
+     }
+     const apply=(cell,text,isEnglish,wrap=false)=>{if(!cell)return;
+       updateCell(x,cell,text);
+       cell.setAttribute('s',String(textStyle(cell.getAttribute('s'),isEnglish,wrap)));
+     };
+     const sourceFeatures=new Set();
+     let featurePairs=0;
+     // The real factory templates store each Feature in two successive rows
+     // with identical D code: EN above VN. Flip TEXT only, not row positions,
+     // formula codes, hidden state, merges or border structure.
+     for(const row of rows){
+       const rn=+row.getAttribute('r');if(sourceFeatures.has(rn))continue;
+       const next=rowMap.get(rn+1);if(!next)continue;
+       const d1=value(get(row,'D')).trim(),d2=value(get(next,'D')).trim();
+       const a1=value(get(row,'A')).trim(),a2=value(get(next,'A')).trim();
+       const c1=value(get(row,'C')).trim(),c2=value(get(next,'C')).trim();
+       if(!d1||d1!==d2||!a1||!a2||!c1||!c2)continue;
+       if(hasVi(a1)||!hasVi(a2)||hasVi(c1)||!hasVi(c2))continue;
+       // Does not match general spec fields or factory section headers.
+       // Works for source features and appended ACC / NSCR-H alike.
+       for(const col of ['A','C']){
+         const first=get(row,col),second=get(next,col);
+         const upper=value(first).trim(),lower=value(second).trim();
+         apply(first,lower,false,true);
+         apply(second,upper.replace(/^\(([^()]*\S)\)$/,'$1'),true,true);
+       }
+       for(const rr of [row,next]){
+         const size=Math.max(value(get(rr,'A')).length/32,value(get(rr,'C')).length/80);
+         rr.setAttribute('ht',String(Math.max(26,Math.min(116,Math.ceil(size)*15+12))));
+         rr.setAttribute('customHeight','1');
+       }
+       sourceFeatures.add(rn);sourceFeatures.add(rn+1);featurePairs++;
+     }
+     // Ensure 'Giới hạn chịu lửa cửa tầng' spans A:B *and* both bilingual
+     // description rows. The source MR workbook merges only A vertically;
+     // source MRL may have A:B per row. Remove only these local overlaps.
+     const mergeRoot=all(x,'mergeCells')[0];
+     const mergeSet=()=>mergeRoot?Array.from(mergeRoot.children).filter(el=>el.localName==='mergeCell'):[];
+     const rangeMatch=t=>/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(t||'');
+     let fireFixed=0;
+     for(const row of rows){
+       const rn=+row.getAttribute('r'),a=get(row,'A'),txt=value(a);
+       if(!/(?:Giới hạn chịu lửa cửa tầng|Cửa chống cháy\s*\(Fireproof door\))/i.test(txt))continue;
+       const below=rowMap.get(rn+1);
+       const hasSecond=!!below && !value(get(below,'A')).trim() && !value(get(below,'B')).trim() &&
+         (!!value(get(below,'C')).trim() || mergeSet().some(m=>{const r=rangeMatch(m.getAttribute('ref'));return r&&+r[2]===rn&&+r[4]>rn;}));
+       const endRow=hasSecond?rn+1:rn;
+       // Do not overwrite another item. Both B values must be empty.
+       if(value(get(row,'B')).trim()||(hasSecond&&value(get(below,'B')).trim()))continue;
+       for(const m of mergeSet()){
+         const q=rangeMatch(m.getAttribute('ref'));if(!q)continue;
+         const c1=q[1].charCodeAt(0),c2=q[3].charCodeAt(0);
+         if(c1<=66&&c2>=65&&+q[2]<=endRow&&+q[4]>=rn)m.remove();
+       }
+       if(mergeRoot){const item=x.createElementNS(n,'mergeCell');
+         item.setAttribute('ref','A'+rn+':B'+endRow);mergeRoot.appendChild(item);
+       }
+       // Bilingual label with a line break; the EN line is blue italic.
+       if(a){
+         const parts=[
+           {text:'Giới hạn chịu lửa cửa tầng',english:false},
+           {text:'\n',english:false},
+           {text:'Entrance Fire resistance / Fire rating',english:true}
+         ];
+         for(const old of Array.from(a.children).filter(e=>['is','v','f'].includes(e.localName)))old.remove();
+         a.setAttribute('t','inlineStr');const inline=x.createElementNS(n,'is');
+         for(const part of parts){const r=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+           if(part.english){pr.appendChild(x.createElementNS(n,'i'));
+             const color=x.createElementNS(n,'color');color.setAttribute('rgb','FF245A86');pr.appendChild(color);
+           }
+           const name=x.createElementNS(n,'rFont');name.setAttribute('val','Arial');pr.appendChild(name);
+           r.appendChild(pr);const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');
+           t.textContent=part.text;r.appendChild(t);inline.appendChild(r);
+         }a.appendChild(inline);
+         a.setAttribute('s',String(textStyle(a.getAttribute('s'),false,true)));
+       }
+       for(const rr of [row,...(hasSecond?[below]:[])]){
+         rr.setAttribute('ht',String(Math.max(34,Number(rr.getAttribute('ht')||0))));
+         rr.setAttribute('customHeight','1');
+       }
+       fireFixed++;
+     }
+     // The source hall button group uses: A label merged vertically across
+     // all floors; B floor label merged across VI + EN + quantity; C remains
+     // three separate rows. Preserve those merges, and normalize the C
+     // quantity line in dark-blue italic, without inventing merged data cells.
+     const hallQuantity=/^\s*\d+\s*hộp\s*\/\s*\d+\s*thang\s*\/\s*1\s*tầng/i;
+     let quantityFixed=0;
+     for(const row of rows){const c=get(row,'C'),str=value(c).trim();
+       if(!hallQuantity.test(str))continue;
+       c.setAttribute('s',String(textStyle(c.getAttribute('s'),true,true)));
+       row.setAttribute('ht',String(Math.max(25,+row.getAttribute('ht')||0)));
+       row.setAttribute('customHeight','1');quantityFixed++;
+     }
+     // Keep the short COP finish note, but style this SUPPLEMENTARY line
+     // italic navy (user explicitly requested it). Do not duplicate text.
+     let copFinishFixed=0;
+     for(const row of rows){const c=get(row,'C');if(!c)continue;
+       const v=value(c);if(!/Bề mặt inox sọc nhuyễn\s*SUS(?:430|304)/i.test(v))continue;
+       const parts=v.split(/(Bề mặt inox sọc nhuyễn\s*SUS(?:430|304)\.?)/i);
+       if(parts.length<3)continue;
+       for(const old of Array.from(c.children).filter(e=>['v','is','f'].includes(e.localName)))old.remove();
+       c.setAttribute('t','inlineStr');const inline=x.createElementNS(n,'is');
+       for(const part of parts){if(!part)continue;const marked=/^Bề mặt inox sọc nhuyễn\s*SUS(?:430|304)/i.test(part);
+         const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+         const font=x.createElementNS(n,'rFont');font.setAttribute('val','Arial');pr.appendChild(font);
+         if(marked){pr.appendChild(x.createElementNS(n,'i'));
+           const ink=x.createElementNS(n,'color');ink.setAttribute('rgb','FF245A86');pr.appendChild(ink);
+         }run.appendChild(pr);const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');
+         t.textContent=part;run.appendChild(t);inline.appendChild(run);
+       }c.appendChild(inline);copFinishFixed++;
+       c.setAttribute('s',String(textStyle(c.getAttribute('s'),false,true)));
+     }
+     if(mergeRoot)mergeRoot.setAttribute('count',String(mergeSet().length));
+     fonts.setAttribute('count',String(all(fonts,'font').length));
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     zip.file('xl/styles.xml',serial(sd));
+     // Audit for testing, not an extra exported file or end-user dependency.
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_212_AUDIT__={model,featurePairs,fireFixed,quantityFixed,copFinishFixed};
+   }
+   // v5.8.213: Last-pass workbook-only correction for both factory models.
+   // This MUST follow v5.8.211/212 language/feature formatting to preserve
+   // PDF/XLSX parity and avoid later style writers wiping the rich text.
+   {
+     const stylesPath='xl/styles.xml';
+     const sd=parse(await zip.file(stylesPath).async('string'));
+     const fonts=all(sd,'fonts')[0],xfs=all(sd,'cellXfs')[0];
+     const ssPart=zip.file('xl/sharedStrings.xml');
+     const shared=ssPart?all(parse(await ssPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const dataRows=all(x,'row').filter(node=>node.getAttribute('hidden')!=='1');
+     const merges=all(x,'mergeCells')[0];
+     const wrapStyles=new Map();
+     const getCell=(row,col)=>Array.from(row.children).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const cellValue=c=>{if(!c)return '';
+       if(c.getAttribute('t')==='s')return shared[Number(all(c,'v')[0]?.textContent||0)]||'';
+       if(c.getAttribute('t')==='inlineStr')return all(c,'t').map(t=>t.textContent||'').join('');
+       return all(c,'v')[0]?.textContent||'';};
+     const wrapStyle=old=>{
+       const key=String(old||0);
+       if(wrapStyles.has(key))return wrapStyles.get(key);
+       const base=all(xfs,'xf')[Number(key)]||all(xfs,'xf')[0];
+       const xf=base.cloneNode(true);
+       let alignment=Array.from(xf.children).find(n=>n.localName==='alignment');
+       if(!alignment){alignment=sd.createElementNS(n,'alignment');
+         const after=Array.from(xf.children).find(node=>['protection','extLst'].includes(node.localName));
+         xf.insertBefore(alignment,after||null);}
+       alignment.setAttribute('vertical','center');
+       alignment.setAttribute('wrapText','1');
+       xf.setAttribute('applyAlignment','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);
+       wrapStyles.set(key,id);return id;
+     };
+     const richBilingual=(cell,vi,en)=>{
+       // The English portion occupies a NEW LINE, with no translation brackets.
+       // Italic and navy are explicit in the run, not dependent on cell style.
+       if(!cell)return;
+       for(const node of Array.from(cell.children).filter(node=>['v','f','is'].includes(node.localName)))node.remove();
+       cell.setAttribute('t','inlineStr');
+       const inline=x.createElementNS(n,'is');
+       for(const part of [{text:vi,en:false},{text:'\n',en:false},{text:en,en:true}]){
+         const run=x.createElementNS(n,'r'),style=x.createElementNS(n,'rPr');
+         const font=x.createElementNS(n,'rFont');font.setAttribute('val','Arial');style.appendChild(font);
+         const color=x.createElementNS(n,'color');color.setAttribute('rgb',part.en?'FF245A86':'FF000000');style.appendChild(color);
+         if(part.en)style.appendChild(x.createElementNS(n,'i'));
+         run.appendChild(style);
+         const txt=x.createElementNS(n,'t');txt.setAttribute('xml:space','preserve');
+         // XML text is a literal newline (not slash+n).
+         txt.textContent=part.text;
+         run.appendChild(txt);inline.appendChild(run);
+       }
+       cell.appendChild(inline);
+       cell.setAttribute('s',String(wrapStyle(cell.getAttribute('s'))));
+     };
+     const dimensionLabels={
+       'Car internal size':['Kích thước phòng thang','Car internal size','R × S × C','W × D × H'],
+       'Door size':['Kích thước cửa','Door size','R × C','W × H'],
+       'Hoistway size':['Kích thước hố thang','Hoistway size','R × S','W × D'],
+       'Machine room size':['Kích thước phòng máy','Machine room size','R × S × C','W × D × H']
+     };
+     // Restrict the edit to Section II. Landing/other feature labels may
+     // also contain the words "Door size" elsewhere in the source workbook.
+     const sectionRow=heading=>dataRows.find(row=>heading.test(cellValue(getCell(row,'A'))));
+     const dimStart=Number(sectionRow(/^\s*II\.\s*(?:Các kích thước|Dimensional)/i)?.getAttribute('r'))||0;
+     const dimEnd=Number(sectionRow(/^\s*III\.\s*(?:Thiết kế|Car design)/i)?.getAttribute('r'))||99999;
+     let dimensionsFixed=0;const seenDimensions=[];
+     for(const row of dataRows){
+       const num=Number(row.getAttribute('r'));
+       if(num<=dimStart||num>=dimEnd)continue;
+       const a=getCell(row,'A'),b=getCell(row,'B'),c=getCell(row,'C');
+       if(!a||!b||!c)continue;
+       const label=cellValue(a).trim();
+       const match=Object.entries(dimensionLabels).find(([english])=>label.includes(english));
+       if(!match)continue;
+       const [vi,en,viAxes,enAxes]=match[1],rn=Number(row.getAttribute('r'));
+       // Unmerge only the dimension row's A:B range, preserving all other
+       // source merges including feature headings and the travel/Pit/OH rows.
+       for(const merge of Array.from(merges?.children||[]).filter(node=>node.localName==='mergeCell')){
+         const m=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(merge.getAttribute('ref')||'');
+         if(!m)continue;
+         const col=letters=>[...letters].reduce((sum,letter)=>sum*26+letter.charCodeAt(0)-64,0);
+         if(+m[2]<=rn && +m[4]>=rn && col(m[1])<=2 && col(m[3])>=1)merge.remove();
+       }
+       richBilingual(a,vi,en);
+       richBilingual(b,viAxes,enAxes);
+       c.setAttribute('s',String(wrapStyle(c.getAttribute('s'))));
+       const content=cellValue(c).trim();
+       if(/^\d[\d.,]*\s*[x×]\s*\d[\d.,]*(?:\s*[x×]\s*\d[\d.,]*)?$/.test(content))updateCell(x,c,content+' mm');
+       // Two bilingual lines fit naturally at 35 pt in NEXIEZ-MR;
+       // the former 49 pt creates excessive empty space in rows 37-40.
+       // Find these rows by their label, not unstable worksheet row numbers.
+       row.setAttribute('ht','35');
+       row.setAttribute('customHeight','1');
+       dimensionsFixed++;seenDimensions.push(rn+':'+en);
+     }
+     if(dimensionsFixed!==4)throw Error('Dimension rows (A/B unmerge) expected 4, found '+dimensionsFixed+' in '+model+'; rows '+seenDimensions.join(',')+'; section '+dimStart+'..'+dimEnd);
+     if(merges)merges.setAttribute('count',String(Array.from(merges.children).filter(el=>el.localName==='mergeCell').length));
+     // Header is company text only. The old form code/version/date are removed.
+     for(const row of dataRows.filter(row=>+row.getAttribute('r')<=2)){
+       const rn=+row.getAttribute('r');
+       if(rn===1){
+         const a=getCell(row,'A');
+         if(model==='MR'&&a)updateCell(x,a,'MITSUBISHI ELECTRIC VIETNAM CO., LTD.');
+         const c=getCell(row,'C');if(c)updateCell(x,c,'');
+       }
+       if(model==='MR'&&rn===2){
+         const c=getCell(row,'C');if(c)updateCell(x,c,'');
+       }
+     }
+     // v5.8.214: NEXIEZ-MR export polish based on the FINAL XLSX cells.
+     // Separate technical codes (Mitsubishi Standard) from translations;
+     // restore the blue/italic English COP model and hall indicator lines,
+     // keeping the SUS304 surface statement as Vietnamese, upright, black.
+     let plainStandards=0,copModelFixed=0,hallSurfacesFixed=0,hallQuantitiesFixed=0;
+     if(model==='MR'){
+       const normalStyles=new Map();
+       function plainBlackStyle(old){
+         const key=String(old||0);
+         if(normalStyles.has(key))return normalStyles.get(key);
+         const base=all(xfs,'xf')[Number(key)]||all(xfs,'xf')[0];
+         const xf=base.cloneNode(true);
+         const fontSource=all(fonts,'font')[Number(base.getAttribute('fontId')||0)]||all(fonts,'font')[0];
+         const font=fontSource.cloneNode(true);
+         for(const child of Array.from(font.children).filter(el=>['i','color'].includes(el.localName)))child.remove();
+         const color=sd.createElementNS(n,'color');color.setAttribute('rgb','FF000000');font.appendChild(color);
+         xf.setAttribute('fontId',String(all(fonts,'font').length));
+         fonts.appendChild(font);xf.setAttribute('applyFont','1');
+         const id=all(xfs,'xf').length;xfs.appendChild(xf);normalStyles.set(key,id);return id;
+       }
+       function styledRuns(cell,parts){
+         for(const child of Array.from(cell.children).filter(el=>['v','f','is'].includes(el.localName)))child.remove();
+         cell.setAttribute('t','inlineStr');
+         const inline=x.createElementNS(n,'is');
+         for(const part of parts){
+           if(!part.text)continue;
+           const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+           const name=x.createElementNS(n,'rFont');name.setAttribute('val','Arial');pr.appendChild(name);
+           if(part.italic)pr.appendChild(x.createElementNS(n,'i'));
+           const color=x.createElementNS(n,'color');color.setAttribute('rgb',part.color||'FF000000');pr.appendChild(color);
+           run.appendChild(pr);
+           const text=x.createElementNS(n,'t');text.setAttribute('xml:space','preserve');text.textContent=part.text;run.appendChild(text);
+           inline.appendChild(run);
+         }
+         cell.appendChild(inline);
+         cell.setAttribute('s',String(wrapStyle(plainBlackStyle(cell.getAttribute('s')))));
+       }
+       const regular=(text,color='FF000000')=>({text,color,italic:false});
+       const english=text=>({text,color:'FF245A86',italic:true});
+       function vietnameseHallRuns(line){
+         // Vietnamese material finish has the same black upright style as all Vietnamese text.
+         return [regular(String(line))];
+       }
+       for(const row of dataRows){
+         const c=getCell(row,'C');if(!c)continue;
+         const value=cellValue(c).trim();if(!value)continue;
+         // Engineering standards are independent values, not English rows.
+         if(/^Mitsubishi Standard$/i.test(value)){
+           c.setAttribute('s',String(plainBlackStyle(c.getAttribute('s'))));plainStandards++;
+           continue;
+         }
+         // COP English model line (e.g. 'Model CBV1-N1010E ...') can be
+         // combined in a factory cell with Vietnamese and a short finish note.
+         const label=cellValue(getCell(row,'A'));
+         if(/Bảng điều khiển\s*\(Car operation panel\)/i.test(label)&&/\bModel\s+[A-Z0-9-]+/i.test(value)){
+           const match=/\(\s*(Model\s+[A-Z0-9-]+[^()\n]*?)\s*\)/i.exec(value);
+           const chunks=[];
+           if(match){
+             const vi=value.slice(0,match.index).trim();
+             const suffix=value.slice(match.index+match[0].length).replace(/^\s*\.?\s*/,'').trim();
+             if(vi)chunks.push(regular(vi),regular('\n'));
+             chunks.push(english(match[1].trim().replace(/\.$/,'')));
+             if(suffix){for(const ln of suffix.split(/\n/).map(v=>v.trim()).filter(Boolean)){
+               chunks.push(regular('\n'));
+               // Existing COP note is a distinct secondary note, keep its
+               // earlier blue/italic convention for consistency.
+               chunks.push(/^Bề mặt inox sọc nhuyễn\s*SUS(?:430|304)/i.test(ln)?english(ln):regular(ln));
+             }}
+           }else{
+             const lines=value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+             for(const [i,ln] of lines.entries()){
+               if(i)chunks.push(regular('\n'));
+               chunks.push(/^Model\s+/i.test(ln)?english(ln.replace(/^\((.*)\)$/,'$1')):regular(ln));
+             }
+           }
+           if(chunks.length){styledRuns(c,chunks);copModelFixed++;}
+         }
+         // Hall display description: the Vietnamese SUS304 finish is a
+         // physical/material specification, NOT an English translation.
+         if(/Hiển thị\s*(?:&|và).*nút\s*(?:gọi|bấm)\s*tầng/i.test(value) &&
+            /Hall indicators\s*&\s*buttons/i.test(value)){
+           const parts=[];
+           const lines=value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+           for(const [i,line] of lines.entries()){
+             if(i)parts.push(regular('\n'));
+             if(/^\(?\s*Hall indicators\s*&\s*buttons\b/i.test(line)){
+               const en=line.replace(/^\(([\s\S]*)\)\s*\.?$/,'$1').trim();
+               parts.push(english(en));
+             }else if(/^\d+\s*hộp\s*\//i.test(line)){
+               parts.push(english(line));hallQuantitiesFixed++;
+             }else parts.push(...vietnameseHallRuns(line));
+           }
+           styledRuns(c,parts);hallSurfacesFixed++;
+           continue;
+         }
+         // Hall quantity may be in a dedicated C row rather than appended
+         // as a third line. It is still navy + italic.
+         if(/^\d+\s*hộp\s*\/\s*\d+\s*thang\s*\/\s*\d+\s*tầng/i.test(value)){
+           styledRuns(c,[english(value)]);hallQuantitiesFixed++;
+         }
+       }
+     }
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_214_AUDIT__={model,plainStandards,copModelFixed,hallSurfacesFixed,hallQuantitiesFixed};
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     fonts.setAttribute('count',String(all(fonts,'font').length));
+     zip.file(stylesPath,serial(sd));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_213_AUDIT__={model,dimensionsFixed,headerUpdated:true};
+   }
+   // v5.8.216 - feature-pair perimeter normalizer, LAST workbook edit.
+   // Source Feature lines are A:B merged independently for VI and EN, with
+   // a single C description. Old fixes styled only A and C. Excel also
+   // inherits the B-cell edge of each A:B merge, which created misplaced
+   // horizontal lines in the actually selected/hidden feature output.
+   // Normalize the six A/B/C cells AS ONE two-row item (both models).
+   {
+     const sp='xl/styles.xml',sd=parse(await zip.file(sp).async('string'));
+     const fonts=all(sd,'fonts')[0],borders=all(sd,'borders')[0],xfs=all(sd,'cellXfs')[0];
+     const data=all(x,'sheetData')[0],mergeRoot=all(x,'mergeCells')[0];
+     const rs=Array.from(data.children).filter(el=>el.localName==='row');
+     const index=new Map(rs.map(row=>[+row.getAttribute('r'),row]));
+     const stringsPart=zip.file('xl/sharedStrings.xml');
+     const shared=stringsPart?all(parse(await stringsPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const get=(row,c)=>Array.from(row?.children||[]).find(e=>e.localName==='c'&&e.getAttribute('r')===c+row.getAttribute('r'))||null;
+     const value=c=>!c?'':c.getAttribute('t')==='s'?(shared[+(all(c,'v')[0]?.textContent||0)]||''):
+       c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join(''):(all(c,'v')[0]?.textContent||'');
+     const vi=t=>/[À-ỹ]/.test(String(t||''));
+     const styleMemo=new Map();
+     // Clone fonts, borders and cell styles without modifying the factory
+     // styles used by non-Feature rows or either technical calculation.
+     function pairStyle(oldStyle,english,column,topRow){
+       const cacheKey=[oldStyle,english,column,topRow].join(':');
+       if(styleMemo.has(cacheKey))return styleMemo.get(cacheKey);
+       const original=all(xfs,'xf')[+oldStyle||0]||all(xfs,'xf')[0];
+       const xf=original.cloneNode(true);
+       const font=(all(fonts,'font')[+(original.getAttribute('fontId')||0)]||all(fonts,'font')[0]).cloneNode(true);
+       for(const child of Array.from(font.children).filter(el=>['i','color'].includes(el.localName)))child.remove();
+       if(english)font.appendChild(sd.createElementNS(n,'i'));
+       const ink=sd.createElementNS(n,'color');ink.setAttribute('rgb',english?'FF245A86':'FF000000');font.appendChild(ink);
+       xf.setAttribute('fontId',String(all(fonts,'font').length));fonts.appendChild(font);
+       xf.setAttribute('applyFont','1');
+       const border=(all(borders,'border')[+(original.getAttribute('borderId')||0)]||all(borders,'border')[0]).cloneNode(true);
+       // Only one perimeter per two-row Feature. No rule between VI and EN.
+       const rules={left:column==='A'||column==='C',right:column==='B'||column==='C',
+         top:topRow,bottom:!topRow};
+       for(const sideName of ['left','right','top','bottom']){
+         let side=Array.from(border.children).find(el=>el.localName===sideName);
+         if(!side){side=sd.createElementNS(n,sideName);
+           const order=['left','right','top','bottom','diagonal','vertical','horizontal','start','end'];
+           const following=Array.from(border.children).find(el=>order.indexOf(el.localName)>order.indexOf(sideName));
+           border.insertBefore(side,following||null);
+         }
+         while(side.firstChild)side.removeChild(side.firstChild);
+         if(rules[sideName]){
+           side.setAttribute('style','thin');
+           const color=sd.createElementNS(n,'color');color.setAttribute('rgb','FF000000');side.appendChild(color);
+         }else side.removeAttribute('style');
+       }
+       xf.setAttribute('borderId',String(all(borders,'border').length));borders.appendChild(border);
+       xf.setAttribute('applyBorder','1');
+       let align=Array.from(xf.children).find(el=>el.localName==='alignment');
+       if(!align){align=sd.createElementNS(n,'alignment');
+         const next=Array.from(xf.children).find(el=>['protection','extLst'].includes(el.localName));
+         xf.insertBefore(align,next||null);
+       }
+       align.setAttribute('vertical','center');align.setAttribute('wrapText','1');xf.setAttribute('applyAlignment','1');
+       const sid=all(xfs,'xf').length;xfs.appendChild(xf);styleMemo.set(cacheKey,sid);return sid;
+     }
+     const merges=()=>Array.from(mergeRoot?.children||[]).filter(el=>el.localName==='mergeCell');
+     const overlappingMerge=(rn)=>merges().filter(el=>{
+       const m=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(el.getAttribute('ref')||'');
+       if(!m)return false;
+       const start=[...m[1]].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+       const end=[...m[3]].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+       return start<=2&&end>=1&&+m[2]<=rn&&+m[4]>=rn;
+     });
+     function ensureCell(row,c){
+       let cell=get(row,c);if(cell)return cell;
+       cell=x.createElementNS(n,'c');cell.setAttribute('r',c+row.getAttribute('r'));
+       const pos=c.charCodeAt(0);
+       const next=Array.from(row.children).find(el=>el.localName==='c'&&(el.getAttribute('r')||'').charCodeAt(0)>pos);
+       row.insertBefore(cell,next||null);return cell;
+     }
+     let featurePairs=0,featureStyles=0,hiddenPairs=0;
+     const processed=new Set();
+     for(const row of rs){
+       const rn=+row.getAttribute('r'),next=index.get(rn+1);
+       if(!next||processed.has(rn)||processed.has(rn+1))continue;
+       const d1=value(get(row,'D')).trim(),d2=value(get(next,'D')).trim();
+       const a1=value(get(row,'A')).trim(),a2=value(get(next,'A')).trim();
+       const c1=value(get(row,'C')).trim(),c2=value(get(next,'C')).trim();
+       if(!d1||d1!==d2||!a1||!a2||!c1||!c2)continue;
+       if(vi(a1)===vi(a2))continue;
+       // The pair is recognized from the SAME source Feature ID D,
+       // not from two adjacent visible rows after filtering.
+       const hidden1=row.getAttribute('hidden')==='1';
+       const hidden2=next.getAttribute('hidden')==='1';
+       if(hidden1!==hidden2)throw Error('Export Feature has a half-hidden bilingual pair: '+d1+' rows '+rn+'-'+(rn+1));
+       processed.add(rn);processed.add(rn+1);
+       if(hidden1){hiddenPairs++;continue;}
+       if(!vi(a1)&&vi(a2)){
+         // Legacy English-first template. Swap the text on BOTH columns.
+         // The feature code in D stays untouched.
+         for(const col of ['A','C']){
+           const upper=get(row,col),lower=get(next,col);
+           const first=value(upper),second=value(lower);
+           updateCell(x,upper,second);updateCell(x,lower,first);
+         }
+       }
+       const expected=['A'+rn+':B'+rn,'A'+(rn+1)+':B'+(rn+1)];
+       for(const rr of [rn,rn+1]){
+         const found=overlappingMerge(rr);
+         if(found.some(el=>!expected.includes(el.getAttribute('ref'))))
+           throw Error('Export Feature unexpected merge at '+d1+' row '+rr+': '+found.map(el=>el.getAttribute('ref')).join(', '));
+         if(!found.length){
+           const item=x.createElementNS(n,'mergeCell');item.setAttribute('ref','A'+rr+':B'+rr);mergeRoot.appendChild(item);
+         }
+       }
+       for(const [theRow,english,topRow] of [[row,false,true],[next,true,false]]){
+         for(const col of ['A','B','C']){
+           const cell=ensureCell(theRow,col);
+           const old=cell.getAttribute('s')||0;
+           cell.setAttribute('s',String(pairStyle(old,english,col,topRow)));featureStyles++;
+         }
+         const a=get(theRow,'A'),c=get(theRow,'C');
+         if(english){
+           for(const cell of [a,c]){
+             const str=value(cell),clean=str.replace(/^\s*\(([A-Za-z][^()]*)\)\s*$/,'$1');
+             if(clean!==str)updateCell(x,cell,clean);
+           }
+         }
+         const longest=Math.max(value(a).length/37,value(c).length/73);
+         const height=Math.max(24,Math.min(124,Math.ceil(Math.max(1,longest))*15+9));
+         theRow.setAttribute('ht',String(height));theRow.setAttribute('customHeight','1');
+       }
+       featurePairs++;
+     }
+     // Factory MRL Version 02 also contains *two physical rows* for the
+     // English translation of car-ceiling / landing-entrance material. Those
+     // entries have no D feature code, so the Feature-only font fixer above
+     // would not touch them (e.g. C48 CL2 English remained dark grey).
+     const translationStyles=new Map();let translationRows=0;
+     function translationStyle(baseId){
+       const key=String(baseId||0);if(translationStyles.has(key))return translationStyles.get(key);
+       const source=all(xfs,'xf')[+key]||all(xfs,'xf')[0],xf=source.cloneNode(true);
+       const font=(all(fonts,'font')[+(source.getAttribute('fontId')||0)]||all(fonts,'font')[0]).cloneNode(true);
+       for(const e of Array.from(font.children).filter(el=>['i','color'].includes(el.localName)))e.remove();
+       font.appendChild(sd.createElementNS(n,'i'));
+       const color=sd.createElementNS(n,'color');color.setAttribute('rgb','FF245A86');font.appendChild(color);
+       xf.setAttribute('fontId',String(all(fonts,'font').length));fonts.appendChild(font);
+       xf.setAttribute('applyFont','1');
+       let align=Array.from(xf.children).find(el=>el.localName==='alignment');
+       if(!align){align=sd.createElementNS(n,'alignment');
+         const after=Array.from(xf.children).find(el=>['protection','extLst'].includes(el.localName));
+         xf.insertBefore(align,after||null);
+       }
+       align.setAttribute('wrapText','1');align.setAttribute('vertical','center');xf.setAttribute('applyAlignment','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);translationStyles.set(key,id);return id;
+     }
+     for(const row of rs){
+       const rn=+row.getAttribute('r'),above=index.get(rn-1);
+       if(!above||processed.has(rn)||row.getAttribute('hidden')==='1'||above.getAttribute('hidden')==='1')continue;
+       const c=get(row,'C'),prior=get(above,'C');if(!c||!prior)continue;
+       const en=value(c).trim(),vietnamese=value(prior).trim();
+       const label=value(get(above,'A')).trim();
+       if(!en||!vietnamese||!vi(vietnamese)||!label||!/^\(?[A-Za-z]/.test(en)||vi(en))continue;
+       if(value(get(row,'A')).trim()||value(get(row,'B')).trim())continue;
+       // Translate rows belonging to the same vertically merged label only;
+       // prevent repainting a technical item as English (Mitsubishi Standard).
+       const coupled=overlappingMerge(rn).some(m=>{
+         const a=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m.getAttribute('ref')||'');
+         return a && +a[2]===rn-1 && +a[4]>=rn;
+       });
+       if(!coupled)continue;
+       const stripped=en.replace(/^\s*\(([\s\S]*)\)\s*\.?\s*$/,'$1').trim();
+       if(stripped!==en)updateCell(x,c,stripped);
+       c.setAttribute('s',String(translationStyle(c.getAttribute('s'))));translationRows++;
+     }
+     // Inline two-language factory cells (e.g. 'Không cung cấp (Not
+     // supplied)') also occur widely in MRL Version 02. Preserve one cell,
+     // add a literal line break and rich-text blue italic translation.
+     const mixedStyles=new Map();let mixedTranslations=0;
+     function mixedWrapStyle(baseId){
+       const id=String(baseId||0);if(mixedStyles.has(id))return mixedStyles.get(id);
+       const xf=(all(xfs,'xf')[+id]||all(xfs,'xf')[0]).cloneNode(true);
+       let a=Array.from(xf.children).find(e=>e.localName==='alignment');
+       if(!a){a=sd.createElementNS(n,'alignment');const after=Array.from(xf.children).find(e=>['protection','extLst'].includes(e.localName));xf.insertBefore(a,after||null);}
+       a.setAttribute('wrapText','1');a.setAttribute('vertical','center');xf.setAttribute('applyAlignment','1');
+       const key=all(xfs,'xf').length;xfs.appendChild(xf);mixedStyles.set(id,key);return key;
+     }
+     for(const row of rs){
+       if(row.getAttribute('hidden')==='1')continue;
+       const rn=+row.getAttribute('r');if(rn<11||rn>340)continue;
+       const c=get(row,'C');if(!c||all(c,'r').length)continue; // existing rich-text formatting wins
+       const original=value(c).trim();if(!vi(original))continue;
+       const m=/^([\s\S]*?)\s*\(([^()]*[a-z][^()]*)\)\s*\.?\s*$/.exec(original);
+       if(!m||!vi(m[1])||!m[2].trim())continue;
+       const vietnamese=m[1].trim(),english=m[2].trim();
+       // Exclude unit annotations/codes: a parenthetical with lowercase
+       // explanatory words is language; a pure code such as SUS-HL is not.
+       if(!/[a-z]{2}/.test(english))continue;
+       for(const old of Array.from(c.children).filter(e=>['v','is','f'].includes(e.localName)))old.remove();
+       c.setAttribute('t','inlineStr');const is=x.createElementNS(n,'is');
+       for(const entry of [{text:vietnamese,english:false},{text:'\n',english:false},{text:english,english:true}]){
+         const run=x.createElementNS(n,'r'),properties=x.createElementNS(n,'rPr');
+         const font=x.createElementNS(n,'rFont');font.setAttribute('val','Arial');properties.appendChild(font);
+         if(entry.english)properties.appendChild(x.createElementNS(n,'i'));
+         const color=x.createElementNS(n,'color');color.setAttribute('rgb',entry.english?'FF245A86':'FF000000');properties.appendChild(color);
+         run.appendChild(properties);const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');
+         t.textContent=entry.text;run.appendChild(t);is.appendChild(run);
+       }
+       c.appendChild(is);c.setAttribute('s',String(mixedWrapStyle(c.getAttribute('s'))));
+       // Keeping both languages in one merged/labelled item avoids inserts
+       // that would shift border and merge references downstream.
+       const estimated=Math.ceil(vietnamese.length/76)+Math.ceil(english.length/76);
+       row.setAttribute('ht',String(Math.max(+row.getAttribute('ht')||0,Math.min(98,estimated*15+7))));
+       row.setAttribute('customHeight','1');mixedTranslations++;
+     }
+     if(mergeRoot)mergeRoot.setAttribute('count',String(merges().length));
+     fonts.setAttribute('count',String(all(fonts,'font').length));
+     borders.setAttribute('count',String(all(borders,'border').length));
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     // Assertions are part of the Export: malformed borders cannot reach users.
+     for(const rn of processed){
+       const row=index.get(rn);if(row?.getAttribute('hidden')==='1')continue;
+       for(const col of ['A','B','C']){
+         const cell=get(row,col);if(!cell)throw Error('Feature border missing cell '+col+rn);
+         const style=all(xfs,'xf')[+cell.getAttribute('s')||0];
+         const border=all(borders,'border')[+style.getAttribute('borderId')||0];
+         const bottom=Array.from(border.children).find(el=>el.localName==='bottom');
+         const top=Array.from(border.children).find(el=>el.localName==='top');
+         const isLower=processed.has(rn-1) && value(get(index.get(rn-1),'D'))===value(get(row,'D'));
+         if((top?.getAttribute('style')||'')!==(isLower?'':'thin') ||
+           (bottom?.getAttribute('style')||'')!==(isLower?'thin':''))
+           throw Error('Feature border invariant broken: '+col+rn);
+         if(isLower){
+           const font=all(fonts,'font')[+style.getAttribute('fontId')||0];
+           if(!Array.from(font.children).some(el=>el.localName==='i') ||
+             !Array.from(font.children).some(el=>el.localName==='color'&&el.getAttribute('rgb')==='FF245A86'))
+             throw Error('Feature English italic/navy invariant broken: '+col+rn);
+         }
+       }
+     }
+     zip.file(sp,serial(sd));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_216_AUDIT__={model,featurePairs,featureStyles,hiddenPairs,translationRows,mixedTranslations};
+   }
+   // v5.8.217: final MRL presentation invariant, AFTER every factory
+   // conversion, feature-border and bilingual post-processor. Do not use
+   // source-XLSX styles to guess whether a surface phrase is English:
+   // "bề mặt inox sọc nhuyễn SUS304" is Vietnamese and stays upright black.
+   // English hall-panel description AND requested quantity are blue italic.
+   // This normalizer edits actual final OOXML runs, so Excel and PDF agree.
+   if(model==='MRL'){
+     const sp='xl/styles.xml',sd=parse(await zip.file(sp).async('string'));
+     const fontRoot=all(sd,'fonts')[0],xfRoot=all(sd,'cellXfs')[0];
+     const ssPart=zip.file('xl/sharedStrings.xml');
+     const shared=ssPart?all(parse(await ssPart.async('string')),'si').map(si=>all(si,'t').map(t=>t.textContent||'').join('')):[];
+     const visibleRows=all(x,'row').filter(row=>row.getAttribute('hidden')!=='1');
+     const styleCache=new Map();
+     const findCell=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const getText=c=>!c?'':c.getAttribute('t')==='s'
+       ?shared[Number(all(c,'v')[0]?.textContent||0)]||''
+       :c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join('')
+       :all(c,'v')[0]?.textContent||'';
+     function formattedStyle(baseId,english){
+       const key=String(baseId||0)+':'+(english?'en':'vi');
+       if(styleCache.has(key))return styleCache.get(key);
+       const original=all(xfRoot,'xf')[Number(baseId)||0]||all(xfRoot,'xf')[0];
+       const xf=original.cloneNode(true);
+       const fontSource=all(fontRoot,'font')[Number(original.getAttribute('fontId')||0)]||all(fontRoot,'font')[0];
+       const font=fontSource.cloneNode(true);
+       for(const node of Array.from(font.children).filter(el=>['i','color'].includes(el.localName)))node.remove();
+       if(english)font.appendChild(sd.createElementNS(n,'i'));
+       const ink=sd.createElementNS(n,'color');ink.setAttribute('rgb',english?'FF245A86':'FF000000');font.appendChild(ink);
+       xf.setAttribute('fontId',String(all(fontRoot,'font').length));xf.setAttribute('applyFont','1');fontRoot.appendChild(font);
+       let alignment=Array.from(xf.children).find(c=>c.localName==='alignment');
+       if(!alignment){alignment=sd.createElementNS(n,'alignment');
+         const next=Array.from(xf.children).find(el=>['protection','extLst'].includes(el.localName));
+         xf.insertBefore(alignment,next||null);
+       }
+       alignment.setAttribute('wrapText','1');alignment.setAttribute('vertical','center');xf.setAttribute('applyAlignment','1');
+       const id=all(xfRoot,'xf').length;xfRoot.appendChild(xf);styleCache.set(key,id);return id;
+     }
+     function rewrite(cell,segments){
+       const base=Number(cell.getAttribute('s')||0);
+       for(const el of Array.from(cell.children).filter(c=>['v','f','is'].includes(c.localName)))el.remove();
+       cell.setAttribute('t','inlineStr');const inline=x.createElementNS(n,'is');
+       for(const part of segments){
+         if(!part.text)continue;
+         const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr');
+         const face=x.createElementNS(n,'rFont');face.setAttribute('val','Arial');pr.appendChild(face);
+         if(part.english)pr.appendChild(x.createElementNS(n,'i'));
+         const color=x.createElementNS(n,'color');color.setAttribute('rgb',part.english?'FF245A86':'FF000000');pr.appendChild(color);
+         run.appendChild(pr);
+         const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=part.text;run.appendChild(t);inline.appendChild(run);
+       }
+       cell.appendChild(inline);
+       const onlyEnglish=segments.every(part=>part.english||!part.text.trim());
+       cell.setAttribute('s',String(formattedStyle(base,onlyEnglish)));
+     }
+     function styledLines(source){
+       const parts=[];
+       const lines=String(source).split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+       for(let i=0;i<lines.length;i++){
+         const original=lines[i];
+         const quantity=/^\d+\s*hộp\s*\/\s*\d+\s*thang\s*\//i.test(original);
+         const englishHall=/^\(?\s*Hall indicators\s*&\s*buttons\b/i.test(original);
+         const englishModel=/^\(?\s*Model\s+[A-Z0-9-]+/i.test(original)&&!/[À-ỹ]/.test(original);
+         const english=quantity||englishHall||englishModel;
+         const line=english&&!quantity?original.replace(/^\s*\((.+)\)\s*\.?$/,'$1').trim():original;
+         if(i)parts.push({text:'\n',english:false});
+         parts.push({text:line,english});
+       }
+       return parts;
+     }
+     let thaiFixed=0,doorFixed=0,hallFixed=0,finishFixed=0;
+     for(const row of visibleRows){
+       const rn=+row.getAttribute('r'),c=findCell(row,'C');if(!c)continue;
+       let source=getText(c),trimmed=source.trim();if(!trimmed)continue;
+       // Source evaluator may return "Thailan" (no trailing d) even when
+       // the original cached workbook has the correct "Thailand".
+       if(rn<35&&/Thái Lan\s*\(?Thailan(?:d)?\)?/i.test(trimmed)){
+         rewrite(c,[{text:'Thái Lan\n',english:false},{text:'Thailand',english:true}]);thaiFixed++;continue;
+       }
+       const label=getText(findCell(row,'A'));
+       if(rn<40&&/Loại cửa\s*\(Door type\)/i.test(label)&&/^(?:CO|2S)(?:\s*-.*)?$/i.test(trimmed)){
+         const d=trimmed.slice(0,2).toUpperCase(),desc=d==='CO'
+           ?['CO - Hai cánh mở ra hai bên từ trung tâm','2-panel center opening doors']
+           :['2S - Hai cánh mở về một phía','2-panel side sliding doors'];
+         rewrite(c,[{text:desc[0]+'\n',english:false},{text:desc[1],english:true}]);doorFixed++;continue;
+       }
+       // The hall indicator body may be one cell (VI+EN+quantity), or
+       // three source rows; both must get the same explicit font/runs.
+       if(/^(?:Hiển thị\s*&\s*nút gọi tầng|\(?Hall indicators\s*&\s*buttons|\d+\s*hộp\s*\/)/i.test(trimmed)){
+         const segments=styledLines(source);
+         // Some workbook cells contain VI+EN on the same line; rely on
+         // explicit text boundaries, not the legacy rich-run styling.
+         if(segments.length) {rewrite(c,segments);hallFixed++;}
+         continue;
+       }
+       // COP material is Vietnamese regardless of the uppercase "Bề mặt".
+       if(/Bề mặt inox sọc nhuyễn\s*SUS(?:430|304)/i.test(source)){
+         const segments=styledLines(source);
+         if(segments.length){rewrite(c,segments);finishFixed++;}
+       }
+     }
+     fontRoot.setAttribute('count',String(all(fontRoot,'font').length));
+     xfRoot.setAttribute('count',String(all(xfRoot,'xf').length));
+     zip.file(sp,serial(sd));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_217_AUDIT__={model,thaiFixed,doorFixed,hallFixed,finishFixed};
+   }
+   // v5.8.226: compact I-IV and align MR Excel masthead with MRL, Feature unchanged.
+   // (a) Feature-group headings in the V section are distinctly paler than I-V.
+   // (b) Each visible Feature row is tall enough for *all* wrapped A:B and C
+   //     content, without shifting any merged references, borders, or rows.
+   {
+     const stylePart='xl/styles.xml';const sd=parse(await zip.file(stylePart).async('string'));
+     const fills=all(sd,'fills')[0],xfs=all(sd,'cellXfs')[0];
+     const rows=all(x,'row'),rowById=new Map(rows.map(r=>[+r.getAttribute('r'),r]));
+     const ssFile=zip.file('xl/sharedStrings.xml');
+     const shared=ssFile?all(parse(await ssFile.async('string')),'si').map(item=>all(item,'t').map(t=>t.textContent||'').join('')):[];
+     const get=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'))||null;
+     const value=c=>!c?'':c.getAttribute('t')==='s'?(shared[+(all(c,'v')[0]?.textContent||0)]||''):
+       c.getAttribute('t')==='inlineStr'?all(c,'t').map(t=>t.textContent||'').join(''):(all(c,'v')[0]?.textContent||'');
+     const lightFill=sd.createElementNS(n,'fill'),pattern=sd.createElementNS(n,'patternFill');
+     pattern.setAttribute('patternType','solid');
+     const fg=sd.createElementNS(n,'fgColor');fg.setAttribute('rgb','FFEDF7FC');
+     const bg=sd.createElementNS(n,'bgColor');bg.setAttribute('indexed','64');
+     pattern.append(fg,bg);lightFill.append(pattern);
+     const lightId=all(fills,'fill').length;fills.appendChild(lightFill);
+     const fillCache=new Map();
+     function paleStyle(base){
+       const key=String(base||0);if(fillCache.has(key))return fillCache.get(key);
+       const old=all(xfs,'xf')[+key]||all(xfs,'xf')[0],xf=old.cloneNode(true);
+       xf.setAttribute('fillId',String(lightId));xf.setAttribute('applyFill','1');
+       const id=all(xfs,'xf').length;xfs.appendChild(xf);fillCache.set(key,id);return id;
+     }
+     // v5.8.220: compact Feature rows to the *actual* wrapped line count.
+     // Previous fixed (16.4 pt * lines + 10 pt) over-allocated every bilingual
+     // row, particularly English rows with one or two lines. Source Excel uses
+     // A+B as the label and C as the description; all use Arial 11 pt here.
+     const colWidths={AB:20.5546875+25.5546875,C:70.5546875};
+     const excelPx=width=>Math.floor(width*7+5);
+     const cellPx={AB:excelPx(colWidths.AB)-12,C:excelPx(colWidths.C)-12};
+     const canvas=(typeof document!=='undefined')?document.createElement('canvas'):null;
+     const ctx=canvas?.getContext('2d')||null;
+     // The same font family and size as the outgoing Feature cell styles.
+     function wrappedLines(source,pixels,english){
+       const body=String(source||'').replace(/\r/g,'');if(!body.trim())return 1;
+       if(ctx)ctx.font=(english?'italic ':'')+'11pt Arial';
+       const measure=word=>ctx?ctx.measureText(word).width:
+         Array.from(word).reduce((sum,c)=>sum+(/[MW@%]/.test(c)?9.0:/[il1'.,:;]/.test(c)?3.5:7.0),0);
+       const space=measure(' ');
+       let count=0;
+       for(const segment of body.split('\n')){
+         if(!segment.trim()){count++;continue;}
+         let used=0;count++;
+         for(const word of segment.trim().split(/\s+/)){
+           const size=measure(word);
+           if(used>0&&used+space+size>pixels){count++;used=0;}
+           if(size>pixels){
+             // Unbroken technical tokens/URLs may need multiple physical lines.
+             if(used){count++;used=0;}
+             count+=Math.ceil(size/pixels)-1;used=size%pixels||pixels;
+           }else used=used?used+space+size:size;
+         }
+       }
+       return count;
+     }
+     // MR Excel uses its own margin to prevent bottom strokes touching borders.
+     // PDF does not use these OOXML heights; MRL sizing stays unchanged.
+     const compactFeatureHeight=lines=>model==='MR'
+       ?Math.max(24,Math.min(360,Math.ceil(lines*15.2+7)))
+       :Math.max(18,Math.min(360,Math.ceil(lines*14.1+3.5)));
+     let featureRowsFitted=0,groupsShaded=0;
+     // Never use source row indices here. Earlier bilingual splits insert rows,
+     // so the final five group headings move (MR: 85/111/147/213/255;
+     // MRL: 91/117/153/220/262 as of this build). Match final cell text.
+     for(const row of rows){
+       const rn=+row.getAttribute('r');if(row.getAttribute('hidden')==='1')continue;
+       const caption=value(get(row,'A')).trim();
+       if(model==='MRL'&&/^(?:Hành trình\s*\(Travel\)|Chiều sâu Pit\s*\(Pit depth\)|Đỉnh hố thang\s*\(Overhead)/i.test(caption)){
+         row.setAttribute('ht','20');row.setAttribute('customHeight','1');
+       }
+       if(/^[-–]\s*Tính năng\b/i.test(caption)&&!value(get(row,'B')).trim()&&!value(get(row,'C')).trim()){
+         for(const col of ['A','B','C']){
+           let cell=get(row,col);
+           if(!cell){cell=x.createElementNS(n,'c');cell.setAttribute('r',col+rn);
+             const next=Array.from(row.children).find(e=>e.localName==='c'&&(e.getAttribute('r')||'').charCodeAt(0)>col.charCodeAt(0));
+             row.insertBefore(cell,next||null);
+           }
+           cell.setAttribute('s',String(paleStyle(cell.getAttribute('s'))));
+         }
+         row.setAttribute('ht','21');row.setAttribute('customHeight','1');groupsShaded++;
+       }
+       // Only actual Feature lines: D has the same identifier on a bilingual
+       // pair of consecutive source rows. Do not adjust unrelated data rows.
+       const code=value(get(row,'D')).trim(),before=rowById.get(rn-1),after=rowById.get(rn+1);
+       const beforeSame=before&&value(get(before,'D')).trim()===code;
+       const afterSame=after&&value(get(after,'D')).trim()===code;
+       if(!code||!(beforeSame||afterSame)||!value(get(row,'A')).trim())continue;
+       const a=value(get(row,'A')),c=value(get(row,'C'));
+       // Measure A:B and C independently. Use a small safety margin, but no
+       // fixed 10-point excess: one-line and two-line Feature rows can now shrink.
+       const english=/^\s*\(?[A-Za-z]/.test(a)&&!/[À-ỹ]/.test(a);
+       const lines=Math.max(wrappedLines(a,cellPx.AB,english),wrappedLines(c,cellPx.C,english));
+       const needed=compactFeatureHeight(lines);
+       row.setAttribute('ht',String(needed));row.setAttribute('customHeight','1');featureRowsFitted++;
+     }
+     // v5.8.224: refit ALL visible customer-facing Excel rows (not only Features) with safer padding.
+     // Source workbook basic/spec/car-design rows sometimes retain 13.8pt despite
+     // two bilingual lines; Excel clips the lower line even though PDF auto-wraps.
+     // Honor original column widths, merged label geometry, and font size, and
+     // enlarge only when the content cannot fit. Never alter C# calculation cells.
+     const mergeRoot=all(x,'mergeCells')[0];
+     const mergeNodes=mergeRoot?all(mergeRoot,'mergeCell'):[];
+     const mergeByStart=new Map();
+     const occupied=new Set();
+     const cellIndex=code=>Array.from(code).reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);
+     for(const m of mergeNodes){
+       const ref=String(m.getAttribute('ref')||'');
+       const match=/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
+       if(!match)continue;
+       const c1=cellIndex(match[1]),c2=cellIndex(match[3]),r1=+match[2],r2=+match[4];
+       mergeByStart.set(match[1]+r1,{cols:c2-c1+1,rows:r2-r1+1});
+       for(let rn=r1;rn<=r2;rn++)for(let col=c1;col<=c2;col++)
+         if(col<=3)occupied.add(rn+':'+col);
+     }
+     let normalRowsFitted=0,headingsMerged=0;
+     const colWidthsPx=[0,excelPx(20.5546875),excelPx(25.5546875),excelPx(70.5546875)];
+     const fontRoot=all(sd,'fonts')[0],fontRecords=fontRoot?all(fontRoot,'font'):[];
+     const existingXfs=all(xfs,'xf');
+     const romanHeading=/^\s*[IVXLCDM]+\.\s+/i;
+     const originNote=/Toàn bộ thiết bị thang máy được nhập khẩu|All main components are imported/i;
+     for(const row of rows){
+       const rn=+row.getAttribute('r');
+       if(rn<=5||rn>310||row.getAttribute('hidden')==='1')continue;
+       const a=value(get(row,'A')).trim(),b=value(get(row,'B')).trim(),c=value(get(row,'C')).trim();
+       if(originNote.test(a))continue; // source bilingual origin paragraph is already laid out
+       const roman=romanHeading.test(a)&&!b&&!c;
+       if(roman&&mergeRoot&&!occupied.has(rn+':1')&&!occupied.has(rn+':2')&&!occupied.has(rn+':3')){
+         const node=x.createElementNS(n,'mergeCell');node.setAttribute('ref','A'+rn+':C'+rn);
+         mergeRoot.appendChild(node);mergeByStart.set('A'+rn,{cols:3,rows:1});
+         for(let cc=1;cc<=3;cc++)occupied.add(rn+':'+cc);
+         headingsMerged++;
+       }
+       if(roman){
+         if((+row.getAttribute('ht')||0)<20){row.setAttribute('ht','20');row.setAttribute('customHeight','1');normalRowsFitted++;}
+         continue;
+       }
+       const code=value(get(row,'D')).trim(),prev=rowById.get(rn-1),next=rowById.get(rn+1);
+       const isFeature=code&&((prev&&value(get(prev,'D')).trim()===code)||(next&&value(get(next,'D')).trim()===code));
+       if(isFeature)continue; // compact measurements already applied above
+       const group=/^[-–]\s*Tính năng\b/i.test(a)&&!b&&!c;
+       if(group)continue; // preset 21pt, blue fill
+       let required=0,anyText=false;
+       for(const [colName,colIndex] of [['A',1],['B',2],['C',3]]){
+         const cell=get(row,colName),t=value(cell);
+         if(!t.trim())continue;
+         anyText=true;
+         const merge=mergeByStart.get(colName+rn)||{cols:1,rows:1};
+         if(merge.rows>1)continue; // rowspan is distributed over multiple rows
+         const endCol=Math.min(3,colIndex+merge.cols-1);
+         let px=0;for(let i=colIndex;i<=endCol;i++)px+=colWidthsPx[i];
+         px=Math.max(50,px-12);
+         const style=existingXfs[+(cell.getAttribute('s')||0)];
+         const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+         const sz=font?all(font,'sz')[0]:null;
+         const fontSize=sz?Math.max(8,Math.min(13,Number(sz.getAttribute('val'))||11)):11;
+         const italic=Boolean(font&&all(font,'i').length);
+         // MR needs more room in native Excel (not PDF), including rich text
+         // and short entrance descriptions; do not resize MRL rows here.
+         const lines=wrappedLines(t,px,italic);
+         const lineSpacing=model==='MR'?1.52:1.38;
+         const breathing=model==='MR'?8:6;
+         required=Math.max(required,Math.ceil(lines*(fontSize*lineSpacing)+breathing));
+       }
+       if(!anyText)continue;
+       required=Math.max(model==='MR'?25:20,Math.min(360,required));
+       const original=Number(row.getAttribute('ht')||13.8);
+       if(required>original+0.75){row.setAttribute('ht',String(required));row.setAttribute('customHeight','1');normalRowsFitted++;}
+     }
+     // Some labels span multiple physical rows (e.g. Entrance design blocks).
+     // The merged parent cell may fit in total, but if each child row is too
+     // tight the table looks visually stuck together. Guarantee enough TOTAL
+     // height for the merged text and distribute any deficit across the rows.
+     for(const [startKey,merge] of mergeByStart.entries()){
+       const m=/^([A-Z]+)(\d+)$/.exec(startKey);if(!m)continue;
+       const colName=m[1],startRn=+m[2];
+       if(startRn<=5||startRn>310||merge.rows<=1)continue;
+       if(!['A','B','C'].includes(colName))continue;
+       const row=rowById.get(startRn),cell=get(row,colName),t=value(cell).trim();
+       if(!t)continue;
+       const colIndex={A:1,B:2,C:3}[colName];
+       const endCol=Math.min(3,colIndex+merge.cols-1);
+       let px=0;for(let i=colIndex;i<=endCol;i++)px+=colWidthsPx[i];
+       px=Math.max(50,px-12);
+       const style=existingXfs[+(cell?.getAttribute('s')||0)];
+       const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+       const sz=font?all(font,'sz')[0]:null;
+       const fontSize=sz?Math.max(8,Math.min(13,Number(sz.getAttribute('val'))||11)):11;
+       const italic=Boolean(font&&all(font,'i').length);
+       const lines=wrappedLines(t,px,italic);
+       const requiredTotal=model==='MR'
+         ?Math.max(merge.rows*25,Math.ceil(lines*(fontSize*1.52)+10))
+         :Math.max(merge.rows*20,Math.ceil(lines*(fontSize*1.38)+8));
+       let currentTotal=0;const blockRows=[];
+       for(let rr=startRn;rr<startRn+merge.rows;rr++){
+         const r=rowById.get(rr); if(!r||r.getAttribute('hidden')==='1')continue;
+         const current=Math.max(0,Number(r.getAttribute('ht')||13.8));
+         currentTotal+=current;blockRows.push([r,current]);
+       }
+       if(!blockRows.length||requiredTotal<=currentTotal+0.75)continue;
+       const deficit=requiredTotal-currentTotal;
+       const share=deficit/blockRows.length;
+       for(const [r,current] of blockRows){
+         const next=Math.max(model==='MR'?25:20,Math.ceil((current+share)*2)/2);
+         if(next>current+0.24){r.setAttribute('ht',String(next));r.setAttribute('customHeight','1');normalRowsFitted++;}
+       }
+     }
+     // On MR, make sure the bilingual origin has full text and wraps. Some
+     // versions of Excel clip 'Thailand' visually when inherited wrapText=off.
+     if(model==='MR'){
+       const originCell=get(rowById.get(12),'C');
+       if(originCell){
+         const originValue=value(originCell);
+         if(/Thailan(?!d)/i.test(originValue)){
+           // Only overwrite when upstream evaluator still returns the typo.
+           updateCell(x,originCell,originValue.replace(/Thailan(?!d)/gi,'Thailand'));
+         }
+         const baseId=+(originCell.getAttribute('s')||0);
+         const base=all(xfs,'xf')[baseId]||all(xfs,'xf')[0];
+         const xf=base.cloneNode(true);
+         let align=Array.from(xf.children).find(el=>el.localName==='alignment');
+         if(!align){align=sd.createElementNS(n,'alignment');xf.appendChild(align);}
+         align.setAttribute('wrapText','1');align.setAttribute('vertical','center');
+         xf.setAttribute('applyAlignment','1');
+         const newStyleId=all(xfs,'xf').length;xfs.appendChild(xf);
+         originCell.setAttribute('s',String(newStyleId));
+         const row=rowById.get(12);
+         row.setAttribute('ht',String(Math.max(43,Number(row.getAttribute('ht')||0))));
+         row.setAttribute('customHeight','1');
+       }
+     }
+     // v5.8.226: compact ONLY sections I-IV in XLSX. Feature group V stays
+     // completely unchanged, including previous feature row heights/merges.
+     // The earlier 1.52x+8pt margin made nearly every two-line cell 42pt high.
+     // Preserve enough leading for Excel 11pt font, rich text and rowspans.
+     const introRow=rows.find(rr=>/^I\.\s*Đặc tính kỹ thuật cơ bản/i.test(value(get(rr,'A')).trim()));
+     const featuresRow=rows.find(rr=>/Các tính năng\s*\(Features\)/i.test(value(get(rr,'A')).trim()));
+     const introId=+(introRow?.getAttribute('r')||0);
+     const featuresId=+(featuresRow?.getAttribute('r')||0);
+     let compactedIIV=0;
+     if(introId && featuresId && featuresId>introId){
+       const rowsInSection=new Set();
+       for(const rr of rows){
+         const rn=+rr.getAttribute('r');
+         if(rn<=introId||rn>=featuresId||rr.getAttribute('hidden')==='1')continue;
+         const original=Number(rr.getAttribute('ht')||13.8);
+         // Zero-height continuation rows are intentionally hidden by the
+         // source entrance-design layout. Never open those rows again.
+         if(rr.hasAttribute('ht')&&original<1)continue;
+         const label=value(get(rr,'A')).trim();
+         if(/^\s*(?:I|II|III|IV)\.\s/.test(label)||/^[-–]\s*Tính năng/.test(label))continue;
+         let required=20,found=false;
+         for(const [colName,colIndex] of [['A',1],['B',2],['C',3]]){
+           const cell=get(rr,colName),v=value(cell);
+           if(!v.trim())continue;
+           found=true;
+           const merge=mergeByStart.get(colName+rn)||{cols:1,rows:1};
+           if(merge.rows>1)continue;
+           let px=0;for(let ci=colIndex;ci<=Math.min(3,colIndex+merge.cols-1);ci++)px+=colWidthsPx[ci];
+           const style=existingXfs[+(cell.getAttribute('s')||0)];
+           const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+           const fsize=Number(all(font,'sz')[0]?.getAttribute('val'))||11;
+           const ital=Boolean(font&&all(font,'i').length);
+           const lines=wrappedLines(v,Math.max(50,px-15),ital);
+           // Line leading ~14.7pt for 11pt Arial, plus vertical padding 4pt.
+           required=Math.max(required,Math.ceil(lines*fsize*1.34+4));
+         }
+         if(!found)continue;
+         required=Math.min(280,required);
+         // Do not increase already tall rows in this compacting pass;
+         // preserve extra capacity for unexpected Excel font substitutions.
+         if(original>required+1){rr.setAttribute('ht',String(required));rr.setAttribute('customHeight','1');compactedIIV++;}
+         rowsInSection.add(rn);
+       }
+       // Give vertically-merged A/B labels enough *total* height, without
+       // blindly expanding every continuation row to the old 25pt minimum.
+       for(const [startKey,merge] of mergeByStart.entries()){
+         if(merge.rows<=1)continue;
+         const match=/^([A-C])(\d+)$/.exec(startKey);if(!match)continue;
+         const colName=match[1],rn=+match[2];
+         if(rn<=introId||rn>=featuresId)continue;
+         const cell=get(rowById.get(rn),colName),v=value(cell);if(!v.trim())continue;
+         const colIndex={A:1,B:2,C:3}[colName];
+         let px=0;for(let ci=colIndex;ci<=Math.min(3,colIndex+merge.cols-1);ci++)px+=colWidthsPx[ci];
+         const style=existingXfs[+(cell.getAttribute('s')||0)];
+         const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+         const fsize=Number(all(font,'sz')[0]?.getAttribute('val'))||11;
+         const ital=Boolean(font&&all(font,'i').length);
+         const target=Math.max(20,Math.ceil(wrappedLines(v,Math.max(50,px-15),ital)*fsize*1.34+5));
+         const block=Array.from({length:merge.rows},(_,i)=>rowById.get(rn+i)).filter(Boolean);
+         const total=block.reduce((sum,rr)=>sum+Math.max(0,Number(rr.getAttribute('ht')||13.8)),0);
+         if(total+1<target){
+           const visible=block.find(rr=>Number(rr.getAttribute('ht')||13.8)>0);
+           if(visible){visible.setAttribute('ht',String(Math.ceil(Number(visible.getAttribute('ht')||13.8)+target-total)));visible.setAttribute('customHeight','1');}
+         }
+       }
+     }
+     // v5.8.229 — MR AutoFit retained. MRL uses a balanced, final-fit pass below.
+     // Excel does not reliably AutoFit complex wrapped rich text with vertically
+     // merged labels. Compute heights from the real column widths and the
+     // longest visible cell instead. Never shrink rows here; preserve Feature
+     // section V, source-hidden rows, and company header/logo for both models.
+     let autoFitIIV=0;
+     const autoFitRows=[];
+     if(model==='MR'&&introId&&featuresId){
+       for(const rr of rows){
+         const rn=+rr.getAttribute('r');
+         if(rn<=introId||rn>=featuresId||rr.getAttribute('hidden')==='1')continue;
+         if(rr.getAttribute('ht')!=null&&Number(rr.getAttribute('ht'))<1)continue;
+         const label=value(get(rr,'A')).trim();
+         if(/^\s*(?:I|II|III|IV)\.\s/.test(label))continue;
+         let target=20,measuredLines=1,hasText=false;
+         for(const [col,colIndex] of [['A',1],['B',2],['C',3]]){
+           const cell=get(rr,col),v=value(cell);
+           if(!v.trim())continue;
+           const merge=mergeByStart.get(col+rn)||{cols:1,rows:1};
+           if(merge.rows>1)continue; // accounted for as a block previously
+           hasText=true;
+           let px=0;
+           for(let ci=colIndex;ci<=Math.min(3,colIndex+merge.cols-1);ci++)px+=colWidthsPx[ci];
+           // Reserve room for native Excel rendering, cell padding and borders.
+           px=Math.max(65,px-30);
+           const style=existingXfs[+(cell.getAttribute('s')||0)];
+           const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+           const fontSize=Number(all(font,'sz')[0]?.getAttribute('val'))||11;
+           const italic=Boolean(font&&all(font,'i').length);
+           const lines=wrappedLines(v,px,italic);
+           measuredLines=Math.max(measuredLines,lines);
+           const long=lines>=3;
+           const needed=Math.ceil(lines*fontSize*(long?1.52:1.35)+(long?12:5));
+           target=Math.max(target,needed);
+         }
+         if(!hasText)continue;
+         target=Math.min(360,target);
+         const previous=Number(rr.getAttribute('ht')||13.8);
+         if(target>previous+1){
+           rr.setAttribute('ht',String(target));
+           rr.setAttribute('customHeight','1');
+           autoFitIIV++;
+           autoFitRows.push({row:rn,lines:measuredLines,before:previous,after:target});
+         }
+       }
+     }
+     // v5.8.229: MRL I-IV *balanced* row fitting. v228 only enlarged rows,
+     // so heights pre-allocated by old passes (e.g. 34pt for 1-line labels,
+     // 79pt for the control system) were never reduced. Refit from content.
+     // Keep original 0pt continuation rows, 1:V headings, feature rows, merge
+     // ranges, layout for MR and all PDF-specific formatting untouched.
+     let mrlRowsBalanced=0;
+     const mrlFitSamples=[];
+     if(model==='MRL'&&introId&&featuresId&&featuresId>introId){
+       const compactLineHeight=fontSize=>fontSize*1.34;
+       const originalLineHeight=fontSize=>fontSize*1.34;
+       // If a cell spans several rows, ensure the sum of visible row heights
+       // can accommodate its content, but never re-open any 0-height row.
+       const rowspanNeeds=[];
+       for(const rr of rows){
+         const rn=+rr.getAttribute('r');
+         if(rn<=introId||rn>=featuresId||rr.getAttribute('hidden')==='1')continue;
+         const current=Number(rr.getAttribute('ht')??13.8);
+         if(current===0)continue;
+         const label=value(get(rr,'A')).trim();
+         if(/^\s*(?:I|II|III|IV)\.\s/.test(label))continue;
+         let necessary=18.5,hasContent=false;
+         const info=[];
+         for(const [col,colIndex] of [['A',1],['B',2],['C',3]]){
+           const cell=get(rr,col),body=value(cell);
+           if(!body.trim())continue;
+           const merge=mergeByStart.get(col+rn)||{cols:1,rows:1};
+           let px=0;
+           for(let i=colIndex;i<=Math.min(3,colIndex+merge.cols-1);i++)px+=colWidthsPx[i];
+           px=Math.max(45,px-13);
+           const style=existingXfs[+(cell.getAttribute('s')||0)];
+           const font=fontRecords[+(style?.getAttribute('fontId')||0)];
+           const fsize=Number(all(font,'sz')[0]?.getAttribute('val'))||11;
+           const italic=Boolean(font&&all(font,'i').length);
+           const lines=wrappedLines(body,px,italic);
+           const height=Math.ceil(lines*compactLineHeight(fsize)+(lines>=3?5:3));
+           if(merge.rows>1){
+             rowspanNeeds.push({rn,rows:merge.rows,height,cell:col+rn});
+             continue;
+           }
+           hasContent=true;
+           necessary=Math.max(necessary,height);
+           info.push({col,lines});
+         }
+         if(!hasContent)continue;
+         necessary=Math.max(19,Math.min(250,necessary));
+         if([13,17,19,26,30,35,41,71,79,82,85].includes(rn))mrlFitSamples.push({row:rn,from:current,to:necessary,info,detail:'probe'});
+         // Only adjust when difference is meaningful: avoid jitter from half-
+         // point rounding. This fits content in both directions (not only up).
+         if(Math.abs(necessary-current)>1){
+           rr.setAttribute('ht',String(necessary));
+           rr.setAttribute('customHeight','1');
+           mrlRowsBalanced++;
+           if(mrlFitSamples.length<32||[13,19,26,35,71,79,82,85].includes(rn))
+             mrlFitSamples.push({row:rn,from:current,to:necessary,info});
+         }
+       }
+       // A vertical merge often extends into intentionally collapsed rows.
+       // Put the deficit on an already-visible row in that merged block.
+       for(const item of rowspanNeeds){
+         const span=[];
+         for(let rn=item.rn;rn<item.rn+item.rows;rn++){
+           const row=rowById.get(rn);
+           if(!row||row.getAttribute('hidden')==='1')continue;
+           span.push(row);
+         }
+         const actual=span.reduce((sum,row)=>sum+Math.max(0,Number(row.getAttribute('ht')??13.8)),0);
+         if(actual+1>=item.height)continue;
+         const visible=span.find(row=>Number(row.getAttribute('ht')??13.8)>0);
+         if(!visible)continue;
+         visible.setAttribute('ht',String(Math.ceil(Number(visible.getAttribute('ht')??13.8)+item.height-actual+2)));
+         visible.setAttribute('customHeight','1');
+         mrlRowsBalanced++;
+       }
+     }
+     // Company and address are free-standing text in the factory template.
+     // Merge the top masthead cells before the logo image (row 3 onward), so
+     // the MRL address/MEVN company name does not spill or truncate in Excel.
+     let mastheadMerged=0;
+     for(const rn of [1,2]){
+       const row=rowById.get(rn);if(!row||!value(get(row,'A')).trim())continue;
+       if(value(get(row,'B')).trim()||value(get(row,'C')).trim())continue;
+       if(!mergeRoot||[1,2,3].some(c=>occupied.has(rn+':'+c)))continue;
+       const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref','A'+rn+':C'+rn);
+       mergeRoot.appendChild(m);
+       for(let col=1;col<=3;col++)occupied.add(rn+':'+col);
+       if((+row.getAttribute('ht')||0)<20){row.setAttribute('ht','20');row.setAttribute('customHeight','1');}
+       mastheadMerged++;
+     }
+     if(mergeRoot)mergeRoot.setAttribute('count',String(all(mergeRoot,'mergeCell').length));
+     fills.setAttribute('count',String(all(fills,'fill').length));
+     xfs.setAttribute('count',String(all(xfs,'xf').length));
+     zip.file(stylePart,serial(sd));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_229_AUDIT__={model,groupsShaded,featureRowsFitted,normalRowsFitted,headingsMerged,mastheadMerged,compactedIIV,autoFitIIV,autoFitRows,mrlRowsBalanced,mrlFitSamples};
+   }
+   // v5.8.226: align MR Excel masthead exactly with the existing MRL V02
+   // layout: row1 company name, row2 address, logo over rows 3-5, title row6.
+   // This is an XLSX-only change, after feature calculations and row fitting.
+   // The PDF layout engine remains intact; technical content is untouched.
+   if(model==='MR'){
+     const data=all(x,'sheetData')[0];
+     const rows=all(data,'row');
+     const getCell=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'));
+     const first=rows.find(row=>row.getAttribute('r')==='1');
+     const second=rows.find(row=>row.getAttribute('r')==='2');
+     if(!first||!second)throw Error('MR masthead: missing first 2 rows');
+     let a1=getCell(first,'A'),a2=getCell(second,'A');
+     if(!a1){a1=x.createElementNS(n,'c');a1.setAttribute('r','A1');first.insertBefore(a1,first.firstChild);}
+     if(!a2){a2=x.createElementNS(n,'c');a2.setAttribute('r','A2');second.insertBefore(a2,second.firstChild);}
+     updateCell(x,a1,'MITSUBISHI ELECTRIC VIETNAM');
+     updateCell(x,a2,'8th Floor – Tower B – Viettel Tower, 285 Cach Mang Thang 8 Street, Hoa Hung Ward, HCMC');
+     second.setAttribute('ht','20');second.setAttribute('customHeight','1');
+     // MRL merges both its masthead lines across A:C; otherwise the address
+     // clips in native Excel even when the OOXML cell has the complete text.
+     const mastheadMerges=all(x,'mergeCells')[0];
+     if(!mastheadMerges)throw Error('MR masthead: mergeCells missing');
+     if(!all(mastheadMerges,'mergeCell').some(m=>m.getAttribute('ref')==='A2:C2')){
+       const merge=x.createElementNS(n,'mergeCell');merge.setAttribute('ref','A2:C2');
+       mastheadMerges.appendChild(merge);
+       mastheadMerges.setAttribute('count',String(all(mastheadMerges,'mergeCell').length));
+     }
+     // Match the MRL address typography instead of inheriting a bold header.
+     const st=parse(await zip.file('xl/styles.xml').async('string'));
+     const styles=all(st,'cellXfs')[0],fonts=all(st,'fonts')[0];
+     const xf=(all(styles,'xf')[+(a1.getAttribute('s')||0)]||all(styles,'xf')[0]).cloneNode(true);
+     const font=(all(fonts,'font')[+(xf.getAttribute('fontId')||0)]||all(fonts,'font')[0]).cloneNode(true);
+     for(const old of Array.from(font.children).filter(e=>['b','sz'].includes(e.localName)))old.remove();
+     const bold=st.createElementNS(n,'b'),size=st.createElementNS(n,'sz');size.setAttribute('val','9');
+     font.appendChild(bold);font.appendChild(size);
+     const fontId=all(fonts,'font').length;fonts.appendChild(font);fonts.setAttribute('count',String(fontId+1));
+     xf.setAttribute('fontId',String(fontId));xf.setAttribute('applyFont','1');
+     let align=Array.from(xf.children).find(el=>el.localName==='alignment');
+     if(!align){align=st.createElementNS(n,'alignment');xf.appendChild(align);}
+     align.setAttribute('wrapText','0');align.setAttribute('vertical','center');xf.setAttribute('applyAlignment','1');
+     const xfId=all(styles,'xf').length;styles.appendChild(xf);styles.setAttribute('count',String(xfId+1));
+     a2.setAttribute('s',String(xfId));zip.file('xl/styles.xml',serial(st));
+     // One extra row before the main title (MR title at 5 -> MRL title at 6).
+     // No formula cells remain on SpecFormExport, but preserve every merge and
+     // print range as rows are shifted so exported Excel opens without repair.
+     for(const row of rows){
+       const old=+row.getAttribute('r');if(old<5)continue;
+       row.setAttribute('r',String(old+1));
+       for(const cell of Array.from(row.children).filter(c=>c.localName==='c')){
+         const ref=cell.getAttribute('r');if(ref)cell.setAttribute('r',ref.replace(/\d+$/,String(old+1)));
+       }
+     }
+     for(const merge of all(x,'mergeCell')){
+       const ref=merge.getAttribute('ref');if(!ref)continue;
+       merge.setAttribute('ref',ref.replace(/([A-Z]+)(\d+)/g,(all,col,rn)=>col+(Number(rn)>=5?Number(rn)+1:rn)));
+     }
+     // Correct MR factory source's repeated 'IV. Features' heading without
+     // changing its Feature content, styles, merges or row heights.
+     for(const row of rows){
+       const cell=getCell(row,'A');
+       const txt=cell?all(cell,'t').map(v=>v.textContent||'').join(''):'';
+       if(/^IV\.\s*Các tính năng\s*\(Features\)/i.test(txt))updateCell(x,cell,txt.replace(/^IV\./,'V.'));
+     }
+     // The A5:C5 title moved down by one; reserve the new fifth row for the
+     // MRL-style image anchor. The original MR heading line stays unchanged.
+     for(const dn of all(workbook,'definedName')){
+       if(dn.getAttribute('name')==='_xlnm.Print_Area')
+         dn.textContent=String(dn.textContent||'').replace(/(\$[A-Z]+\$)(\d+)/g,(v,col,rn)=>col+(Number(rn)>=5?Number(rn)+1:rn));
+     }
+     for(const breakNode of all(x,'brk')){
+       const id=Number(breakNode.getAttribute('id'));
+       if(id>=5)breakNode.setAttribute('id',String(id+1));
+     }
+     // Source MRL uses this same PNG (also used in the PDF fallback); export
+     // it as a *real Excel drawing*, not a text approximation or PDF-only logo.
+     const logoBase64=window.SPEC_MITSUBISHI_LOGO_BASE64;
+     if(!logoBase64||!/^iVBOR/.test(logoBase64))throw Error('MR masthead: MRL logo unavailable');
+     const drawPath='xl/drawings/specHeaderLogo.xml',picPath='xl/media/specHeaderLogo.png';
+     const drawRid='rIdSpecHeaderLogo',pictureRid='rIdSpecHeaderImage';
+     const imageXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+       <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <xdr:twoCellAnchor editAs="oneCell">
+          <xdr:from><xdr:col>0</xdr:col><xdr:colOff>34290</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>
+          <xdr:to><xdr:col>0</xdr:col><xdr:colOff>1123950</xdr:colOff><xdr:row>4</xdr:row><xdr:rowOff>151444</xdr:rowOff></xdr:to>
+          <xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="Mitsubishi Electric logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>
+           <xdr:blipFill><a:blip r:embed="${pictureRid}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>
+           <xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/>
+        </xdr:twoCellAnchor>
+       </xdr:wsDr>`;
+     const relsImage=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${pkg}"><Relationship Id="${pictureRid}" Type="${r}/image" Target="/xl/media/specHeaderLogo.png"/></Relationships>`;
+     const relsSheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${pkg}"><Relationship Id="${drawRid}" Type="${r}/drawing" Target="/xl/drawings/specHeaderLogo.xml"/></Relationships>`;
+     zip.file(picPath,logoBase64,{base64:true});zip.file(drawPath,imageXml);
+     zip.file('xl/drawings/_rels/specHeaderLogo.xml.rels',relsImage);
+     zip.file('xl/worksheets/_rels/sheet2.xml.rels',relsSheet);
+     let drawing=all(x,'drawing')[0];
+     if(!drawing){drawing=x.createElementNS(n,'drawing');x.documentElement.appendChild(drawing);}
+     drawing.setAttributeNS(r,'r:id',drawRid);
+     const ctPath='[Content_Types].xml',types=parse(await zip.file(ctPath).async('string'));
+     const typeNS='http://schemas.openxmlformats.org/package/2006/content-types';
+     const png=Array.from(types.documentElement.children).some(t=>t.getAttribute('Extension')==='png');
+     if(!png){const node=types.createElementNS(typeNS,'Default');node.setAttribute('Extension','png');node.setAttribute('ContentType','image/png');types.documentElement.appendChild(node);}
+     const node=types.createElementNS(typeNS,'Override');node.setAttribute('PartName','/xl/drawings/specHeaderLogo.xml');
+     node.setAttribute('ContentType','application/vnd.openxmlformats-officedocument.drawing+xml');types.documentElement.appendChild(node);
+     zip.file(ctPath,serial(types));
+     if(typeof window!=='undefined')window.__SPEC_EXPORT_226_MR_HEADER__={company:true,address:true,logo:true,titleRow:6};
+   }
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
@@ -2039,23 +3601,28 @@
  // English fragments. Do not interpret short engineering codes as English.
  function bilingualRuns(source){
    const raw=String(source||'');
-   const re=/\((?:[A-Za-z][^()\r\n]*|[A-Za-z][^()\r\n]*\([^()]*\)[^()\r\n]*)\)/g;
+   const re=/\((?:[A-Za-z0-9][^()\r\n]*|[A-Za-z0-9][^()\r\n]*\([^()]*\)[^()\r\n]*)\)/g;
    const out=[];let last=0,m;
-   const englishPhrase=part=>{
+   const englishPhrase=(part,preceding)=>{
      const inside=part.slice(1,-1).trim();
-     return inside.length>=9 && /(?:\s|[-–])/.test(inside) &&
-       /\b(?:stainless|steel|hairline|provided|not supplied|passenger|hall|indicator|button|model|door|ceiling|car|floor|glass|painted|plastic|quantity|operation|landing|opening|weight|lighting|granite|emergency|round|safety|front|rear|with|without|side|frame|motor|power|finish|material|supply|sensor|travelling|traction|shaft|handrail|mirror|ventilation|fire|speed|design|structure|control|inspection|contact|automatic|type)\b/i.test(inside);
+     // Only classify explanatory text after an actual Vietnamese description.
+     // Covers short translations (No), capacities (8 persons), quantity
+     // (1 set), and speed (60 mpm - 1 m/s), which the old whitelist missed.
+     if(!/(?:[À-ỹ]|\bthang\b|\bhop\b)/i.test(preceding)||/[À-ỹ]/.test(inside))return false;
+     if(!/[A-Za-z]/.test(inside)||inside.length<2)return false;
+     if(/^\d{2,5}\s*(?:kg|mm|m)$/i.test(inside)||/^[A-Z][A-Z0-9-]{1,7}$/.test(inside))return false;
+     return true;
    };
    while((m=re.exec(raw))){
      const segment=m[0];
-     if(!englishPhrase(segment))continue;
+     if(!englishPhrase(segment,raw.slice(0,m.index)))continue;
      const prefix=raw.slice(last,m.index);
      if(prefix)out.push({text:prefix,english:false});
      const earlier=raw.slice(0,m.index);
      const currentLine=earlier.slice(earlier.lastIndexOf('\n')+1);
      // Newline if English text follows Vietnamese on the same physical line.
      if(/[À-ỹ]/.test(currentLine)&&currentLine.trim() && !/\n$/.test(prefix))out.push({text:'\n',english:false});
-     out.push({text:segment,english:true});last=m.index+segment.length;
+     out.push({text:segment.slice(1,-1).trim(),english:true});last=m.index+segment.length;
    }
    if(last<raw.length)out.push({text:raw.slice(last),english:false});
    return out.length?out:[{text:raw,english:false}];
@@ -2078,7 +3645,7 @@
    }
    let title=model==='MR'?'NEXIEZ-MR':'NEXIEZ-MRL Version2';
    return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>SPEC ${title} - A4 PDF</title><style>
-   @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
+   @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
  window.SPEC_EXPORT={exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
