@@ -114,6 +114,26 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
   return [{...r,upper:true,values:r.values.map((v,i)=>pairs[i]?.[0]??v)},
           {...r,a:'',b:'',lower:true,values:r.values.map((v,i)=>pairs[i]?.[1]??(v==null?null:''))}];
  });
+ const mr=cars[0].model==='MR';
+ function itpNotes(types){
+  const notes=[],single=new Map(),seen=new Set();
+  cars.forEach((car,i)=>{
+   const type=types[i];if(!type||seen.has(i))return;
+   const peers=cars.map((other,j)=>sameControlGroup(car,other)?j:-1).filter(j=>j>=0);
+   if(peers.length){
+    peers.forEach(j=>seen.add(j));
+    notes.push(peers.map(j=>cars[j].name).join('+')+': '+type+'/'+peers.reduce((sum,j)=>sum+liftCounts[j],0)+' thang');
+   }else{
+    const control=rows.find(r=>/Group Control Operation/i.test(r.a));
+    const size=Number((control?.values[i]||'').match(/([1-4])C[- ]/i)?.[1]||1);
+    const key=type+'/'+size+' thang';
+    if(!single.has(key))single.set(key,[]);
+    single.get(key).push(car.name);
+   }
+  });
+  for(const [text,names] of single)notes.push(names.join(', ')+': '+text);
+  return notes.join('\n');
+ }
  function bilingualBreak(i){
   const upper=body[i],lower=body[i+1];
   if(!upper||!lower||upper.heading||lower.heading)return false;
@@ -157,31 +177,38 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
   const scopeNote=scope?(labelsEnglish?'Only apply for ':'Chỉ áp dụng cho thang ')+scope.join(', '):'';
   const common=scope?[...new Set(r.values.filter(v=>v!=null&&v.trim()))]:[];
   const compare=common.length===1?cars.map(()=>common[0]):hall?r.values.map(v=>v==null?v:hallPattern(v)):r.values;
+  const rowNumber=lines.length+1;
+  const hallMergeRule=mr&&(hall||rowNumber===74||rowNumber===75);
+  function sharedDoublePanel(i,j){
+   return hall&&sameControlGroup(cars[i],cars[j])&&cars[i].operation==='2C-2BC'&&cars[j].operation==='2C-2BC'
+    &&compare[i]?.includes('{PIV:2}')&&!compare[i].includes('{PIV:1}')&&!/\b(?:HBV|PIH|PID)\d*[- ]/i.test(compare[i]);
+  }
   const values=[];
   if(index>labelEnd){
    let end=index;while(r.a&&end+1<body.length&&!body[end+1].a&&!body[end+1].heading)end++;
    const split=body.slice(index,end+1).some(item=>item.b);
    labelEnd=end;
-   values.push([0,r.a,split?1:2,'label',end-index+1,end===index?edges:15,Boolean(r.lower&&r.a&&!hasVN(r.a)),[],false,scopeNote]);
+   const note=mr&&showItpTypes&&r.itpTypes.some(Boolean)&&!body[index-1]?.itpTypes.some(Boolean)?itpNotes(r.itpTypes):'';
+   values.push([0,r.a+(note?'\n'+note:''),split?1:2,'label',end-index+1,end===index?edges:15,Boolean(r.lower&&r.a&&!hasVN(r.a)),[],false,scopeNote]);
   }
   if(r.b){
    let end=index;
    while(end<labelEnd&&!body[end+1].b)end++;
    values.push([1,r.b,1,'label',end-index+1,end===index?edges:15]);
   }
-  for(let i=0;i<cars.length;){let j=i+1;while(!separateLiftCells&&!dimension&&!r.quantity&&j<cars.length&&compare[i]!=null&&compare[i]===compare[j]&&(!groupControl||sameControlGroup(cars[i],cars[j])))j++;
+  for(let i=0;i<cars.length;){let j=i+1;while((!hallMergeRule||sharedDoublePanel(i,j))&&!(mr&&rowNumber>=56&&rowNumber<=64)&&!separateLiftCells&&!dimension&&!r.quantity&&j<cars.length&&compare[i]!=null&&compare[i]===compare[j]&&(!groupControl||sameControlGroup(cars[i],cars[j])))j++;
    let value=compare[i]??'—';
    if(perLift&&liftCounts[i]>=2&&/mm\s*$/i.test(value))value=value.trimEnd()+'/1 thang';
    if(hall){
     const lifts=liftCounts.slice(i,j).reduce((a,b)=>a+b,0);
-    value=value.replace(/\{PIV:([12])\}/g,(_,capacity)=>Math.ceil(lifts/Number(capacity))+' hộp / '+lifts+' thang / 1 tầng');
+    value=value.replace(/\{PIV:([12])\}/g,(_,capacity)=>Math.ceil(lifts/(mr&&cars[i].operation!=='2C-2BC'?1:Number(capacity)))+' hộp / '+lifts+' thang / 1 tầng');
    }
    const emphasizeIdentity=(/Manufacturer/i.test(r.a)&&value.trim()==='MITSUBISHI ELECTRIC')||
       (/Model/i.test(r.a)&&/^NEXIEZ-MRL?\b/i.test(value.trim()));
    values.push([2+i,value,j-i,(inFeatures?'feature_':'')+(r.lower||/^\s*\(/.test(r.values[i]||'')?'en':'value'),1,edges,false,r.parts[i],emphasizeIdentity]);i=j;
   }
   line(values);
-  if(showItpTypes&&r.itpTypes.some(type=>type!==null)&&!body[index+1]?.itpTypes.some(type=>type!==null)){
+  if(!mr&&showItpTypes&&r.itpTypes.some(type=>type!==null)&&!body[index+1]?.itpTypes.some(type=>type!==null)){
    const config=[[0,'Cấu hình liên lạc nội bộ (ITP configuration)',2,'label']];
    for(let i=0;i<cars.length;){
     const type=r.itpTypes[i];let span=1;

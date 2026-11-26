@@ -1,9 +1,22 @@
+// Selection shared by MR duplex members, reviewed against Features_MR and DataTable.
+const mrBankFeatures=new Set(['ITP','FER','COS','GCBK','SOHS','FSAT','MFP','EER-P','EER-S']);
+function sharedMrCode(input){
+ if($('model').value!=='MR')return '';
+ if(input.id==='itp-type')return 'ITP type';
+ const code=input.closest('.feature-line')?.querySelector('.fcode')?.textContent.trim();
+ return mrBankFeatures.has(code)?code:'';
+}
 window.addEventListener('message',async event=>{
  const data=event.data;
  if(window.parent===window||event.source!==window.parent||data?.channel!=='multi-spec')return;
  const reply={channel:'multi-result',token:data.token};
  try{
-  if(data.action==='fields'){
+  if(data.action==='snapshot'){
+   reply.result={values:{...changes},touched:[...featureTouched]};
+  }else if(data.action==='restore'){
+   changes={...data.payload.values};featureTouched=new Set(data.payload.touched);
+   renderAllSpecRows();renderFeatures();invalidateCheck();reply.result=true;
+  }else if(data.action==='fields'){
    const result=[];
    const section=data.payload.section;
    function readControls(root,featureGroup){
@@ -33,7 +46,7 @@ window.addEventListener('message',async event=>{
      if(hallItem)title=input.classList.contains('hall-qty')?hallItem+' · Số hộp':hallItem;
      if(feature)title=feature.querySelector('.fcode')?.textContent+' · '+feature.querySelector('.fdesc')?.firstChild?.textContent;
      if(input.id==='itp-type')title='ITP · Loại liên lạc nội bộ / Interphone type';
-     result.push({key,sourceCell:input.dataset.cell||input.closest('.field')?.querySelector('.mr-original-internal[data-cell]')?.dataset.cell||'',title,group,featureTable:featureGroup?activeFeatureTable:null,value:input.type==='checkbox'?(input.checked?'1':'0'):input.value,
+     result.push({sharedCode:sharedMrCode(input),key,sourceCell:input.dataset.cell||input.closest('.field')?.querySelector('.mr-original-internal[data-cell]')?.dataset.cell||'',title,group,featureTable:featureGroup?activeFeatureTable:null,value:input.type==='checkbox'?(input.checked?'1':'0'):input.value,
       locked:input.disabled||input.readOnly,options:input.options?Array.from(input.options).filter(o=>!o.disabled).map(o=>[o.value,o.textContent]):input.type==='checkbox'?[['1','Có'],['0','Không']]:null});
     }
    }
@@ -77,4 +90,13 @@ window.addEventListener('change',event=>{
  const input=event.target;
  if(window.parent!==window&&event.isTrusted&&input.dataset.cell===($('model').value==='MRL'?'D22':'D21'))
   window.parent.postMessage({channel:'summary-operation',value:input.value},'*');
+},true);
+
+window.addEventListener('change',event=>{
+ const input=event.target;
+ if(!event.isTrusted||window.parent===window||!sharedMrCode(input))return;
+ const payload={key:input.dataset.cell,value:input.type==='checkbox'?(input.checked?'1':'0'):input.value,section:'V',featureGroup:activeFeatureTable};
+ event.stopImmediatePropagation();
+ renderFeatures();
+ window.parent.postMessage({channel:'summary-feature',payload},'*');
 },true);
