@@ -3,7 +3,7 @@ const el=id=>document.getElementById(id), cars=[], pending=new Map(), openGroups
 const sections={P:'Công trình',I:'I. Thông số cơ bản',II:'II. Kích thước',III:'III. Thiết kế cabin',IV:'IV. Thiết kế cửa tầng',V:'V. Tính năng'};
 let section='I',page=0,detail=false,token=0,version=0,cache={},editing=null,created=0;
 function make(tag,text){const n=document.createElement(tag);if(text!=null)n.textContent=text;return n}
-function status(text){el('statusText').textContent=text}
+function status(text){el('statusText').textContent=text;el('desktop-check-floating-status').textContent=text}
 function request(car,action,payload){
  if(action==='set')clearErrorMarks();
  return car.ready.then(()=>new Promise((resolve,reject)=>{
@@ -251,14 +251,17 @@ function drawSection(section,cache,matrix,from,to,view){
   const group=['II','III','IV','V'].includes(section)?f.group:sections[section];
   if(!buckets.has(group))buckets.set(group,[]);buckets.get(group).push({f,row});
  }
- const summaryTable=make('table'),header=summaryTable.insertRow();header.append(make('th',section==='I'?'Tên thang':'Hạng mục'));
+ const summaryTable=make('table'),header=summaryTable.insertRow();header.append(make('th','Tên thang'));
  for(const car of view){const th=make('th');th.append(section==='I'?titleInput(car):car.name);header.append(th)}
- if(section==='I'){const groupRow=summaryTable.insertRow();const groupTitle=groupRow.insertCell();groupTitle.textContent='Nhóm điều khiển';const hint=make('small',isMRL?'1C: từng thang độc lập. 2C / 3C / 4C: đúng 2 / 3 / 4 thang trong một nhóm.':'1C: từng thang độc lập. 2C: đúng 2 thang trong một nhóm.');hint.textContent+=' Quantity là tổng số thang trong cột. Ví dụ P1,P3 · 2 thang · 2C là một nhóm riêng.';hint.style.display='block';groupTitle.append(hint);
+ summaryTable.className='name-header';matrix.append(summaryTable);
+ if(section==='I'){const groupTable=make('table'),cols=make('colgroup');
+ for(let i=0;i<=view.length;i++){const col=make('col');col.style.width=(i?72/view.length:28)+'%';cols.append(col)}
+ groupTable.append(cols);matrix.append(groupTable);const groupRow=groupTable.insertRow();const groupTitle=groupRow.insertCell();groupTitle.textContent='Nhóm điều khiển';const hint=make('small',isMRL?'1C: từng thang độc lập. 2C / 3C / 4C: đúng 2 / 3 / 4 thang trong một nhóm.':'1C: từng thang độc lập. 2C: đúng 2 thang trong một nhóm.');hint.textContent+=' Quantity là tổng số thang trong cột. Ví dụ P1,P3 · 2 thang · 2C là một nhóm riêng.';hint.style.display='block';groupTitle.append(hint);
  view.forEach((c,i)=>{
   if(c.group&&view[i-1]?.group===c.group)return;
   renderGroup(groupRow.insertCell(),c,view);
  });
- }matrix.append(summaryTable);
+ }
  if(!buckets.size){matrix.append(make('p','Không có hạng mục phù hợp.'));return}
  for(const [group,rows] of buckets){
   const details=make('section');
@@ -428,14 +431,24 @@ function checkPopup(title,failures=[],canExport=false){
  }
  if(canExport)body.append(make('p',cars.map(c=>c.name).join(' · ')+' · '+(el('only-vi').checked?'Vietnamese Only':'Song ngữ')+(el('export-tech-details').checked?' · Có trích xuất chi tiết':'')+' · A4 ngang'));
  el('confirmExport').hidden=!canExport;
- dialog.returnValue='';dialog.showModal();
+ dialog.returnValue='';if(!dialog.open)dialog.showModal();
  return new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='export'),{once:true}));
 }
-async function run(exporting){
+async function run(format){
+ let preview;
  const main=document.querySelector('main'),book=[],failures=[],groupFields=new Map();main.inert=true;clearErrorMarks();
+ const dialog=el('checkExportDialog');
+ el('checkExportTitle').textContent='Đang kiểm tra Spec';
+ el('checkExportBody').replaceChildren();
+ el('confirmExport').hidden=true;
+ el('confirmExport').textContent=format==='pdf'?'Mở bản in A4 PDF':'Xuất Excel · A4 ngang';
+ el('confirmExport').onclick=format==='pdf'?e=>{preview=window.open('','_blank');if(!preview){e.preventDefault();el('checkExportBody').textContent='Hãy cho phép mở tab để xem bản in PDF.'}else{preview.document.title='Spec Summary';preview.document.body.textContent='Đang tạo bản in A4 ngang…'}}:null;
+ dialog.returnValue='';dialog.showModal();
  try{
   for(const car of cars){
-   status('Đang kiểm tra '+car.name+'…');let errors=[];
+   if(!dialog.open)return;
+   const progress='Đang kiểm tra '+car.name+'…';
+   el('checkExportBody').textContent=progress;status(progress);let errors=[];
    try{
     await syncProject([car]);errors=await request(car,'validate');
     {const fields=await request(car,'fields',{section:'I'});groupFields.set(car,fields);
@@ -493,19 +506,27 @@ async function run(exporting){
    }
    }
   }
-  if(failures.length){await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
+  if(!dialog.open)return;
+  if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
   status('Check Spec đạt · '+cars.map(c=>c.name).join(', '));
   if(!await checkPopup('Check Spec đạt · '+cars.length+' cột thang',[],true))return;
-  exporting=true;
+
   for(const car of cars){
    try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
-  if(failures.length){await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
-  if(exporting){const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}
-  status(exporting?'Đã xuất Excel A4 ngang.':'Check Spec PASS · '+cars.map(c=>c.name).join(', '));
- }catch(e){status(e.message);main.inert=false;await checkPopup('Không thể xuất Excel',[{car:{name:''},errors:[e.message]}])}finally{main.inert=false}
+  if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
+  if(format==='pdf'){
+   const markup=await request(cars[0],'summaryPrint',book);
+   if(!preview||preview.closed)throw Error('Tab bản in đã đóng.');
+   preview.document.open();preview.document.write(markup);preview.document.close();preview.focus();
+   status('Đã mở bản in A4 ngang. Chọn In / Save as PDF để lưu.');
+  }else{const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Đã xuất Excel A4 ngang.')}
+
+ }catch(e){if(preview&&!preview.closed)preview.close();status(e.message);main.inert=false;await checkPopup('Không thể hoàn tất kiểm tra hoặc xuất file',[{car:{name:''},errors:[e.message]}])}finally{main.inert=false;if(el('checkExportTitle').textContent==='Đang kiểm tra Spec')status('Đã đóng kiểm tra Spec.')}
 }
-el('check').onclick=()=>run(false);el('exportBook').onclick=()=>run(true);
+for(const id of ['check','desktop-check-floating','m-check'])el(id).onclick=()=>run('check');
+for(const id of ['exportBook','desktop-export-xlsx','m-xlsx'])el(id).onclick=()=>run('xlsx');
+for(const id of ['exportPdf','desktop-export-pdf','m-pdf'])el(id).onclick=()=>run('pdf');
 document.querySelectorAll('main button:not(.active)').forEach(b=>b.classList.add('btn','btn-secondary'));
 for(let i=0;i<4;i++)add();el('car').selectedIndex=0;show();

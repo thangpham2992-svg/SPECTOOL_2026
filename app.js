@@ -11,6 +11,7 @@ let models={MR:structuredClone(window.SPEC_EMBEDDED.MR),MRL:structuredClone(wind
 let layouts=structuredClone(window.SPEC_LAYOUT);
 for(const k of ['MR','MRL']) models[k].fields.push(...structuredClone(window.SPEC_EXTRAS[k]));
 let sourceFiles={},current=null,changes={};
+let restoringSingleDraft=false;
 let mrlVerticalBufferCap='No';
 // Regulation is already selected in the original MRL SpecForm D26; never keep a separate default-EN81 state.
 function mrlG11Regulation(){
@@ -1318,7 +1319,7 @@ function row(field,displayName='',compact=false){
  if(summaryQty){input.type='number';input.min='1';input.step='1';}
  input.dataset.cell=field.cell;input.id='spec-'+field.cell;
  name.htmlFor=input.id;
- let value=String(field.value??'');
+ let value=String((restoringSingleDraft?changes[field.cell]:undefined)??field.value??'');
  if(input.tagName==='SELECT'){
   const options=[...choices.map(String)];if(value&&!choices.includes(value)&&!field.validation&&!supplementalListSources[field.name])options.unshift(value);
   if(!options.length)options.push('');
@@ -3427,3 +3428,82 @@ document.addEventListener('change',function(event){
   queueMicrotask(refreshMRLTravelMinimum);
  }
 });
+
+// Editable project files for the standalone specifications form.
+function singleDraftName(project,date=new Date()){
+ const name=String(project||'').normalize('NFD').replace(/\p{M}/gu,'').replace(/đ/g,'d').replace(/Đ/g,'D')
+  .replace(/[<>:"/\\|?*\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'')||'Cong trinh';
+ const two=n=>String(n).padStart(2,'0');
+ return name+' '+two(date.getDate())+two(date.getMonth()+1)+'.json';
+}
+function singleDraft(){
+ return {format:'SpecWebTool.single',version:1,model:$('model').value,values:{...changes},
+  featureTouched:[...featureTouched],hallManual:[...hallManualSelections],hallAuto:[...hallAutoSelections],hallQty:[...hallManualQuantities],
+  featureTable:activeFeatureTable,flooringManual,travelEN8172:mrlTravelEN8172,bufferCap:mrlVerticalBufferCap,
+  roomAllowance:{...mrRoomAllowance},onlyVi:$('only-vi').checked,details:$('export-tech-details').checked};
+}
+function checkSingleDraft(s){
+ const validKey=k=>typeof k==='string'&&/^[A-Z][A-Z0-9_]*$/i.test(k)&&!Object.hasOwn(Object.prototype,k);
+ if(!s||s.format!=='SpecWebTool.single'||s.version!==1||!['MR','MRL'].includes(s.model)||
+    !s.values||typeof s.values!=='object'||Array.isArray(s.values)||
+    !Object.entries(s.values).every(([k,v])=>validKey(k)&&['string','number','boolean'].includes(typeof v))||
+    !['featureTouched','hallManual','hallAuto','hallQty'].every(k=>Array.isArray(s[k])&&s[k].every(validKey))||
+    !['onlyVi','details','flooringManual'].every(k=>typeof s[k]==='boolean')||
+    !['travelEN8172','bufferCap'].every(k=>['Yes','No'].includes(s[k]))||
+    typeof s.featureTable!=='string'||!Number.isFinite(s.roomAllowance?.am)||!Number.isFinite(s.roomAllowance?.bm)||
+    (s.database!=null&&!(typeof s.database.name==='string'&&typeof s.database.base64==='string')))
+  throw Error('File chưa đúng định dạng bản nhập Form đơn được lưu bằng công cụ này.');
+}
+function restoreSingleDraft(s){
+ $('model').value=s.model;$('model').dispatchEvent(new Event('change',{bubbles:true}));
+ changes={...s.values};featureTouched=new Set(s.featureTouched);
+ hallManualSelections=new Set(s.hallManual);hallAutoSelections=new Set(s.hallAuto);hallManualQuantities=new Set(s.hallQty);
+ activeFeatureTable=s.featureTable;flooringManual=s.flooringManual;mrRoomAllowance={...s.roomAllowance};
+ mrlTravelEN8172=s.travelEN8172;mrlVerticalBufferCap=s.bufferCap;
+ restoringSingleDraft=true;
+ try{renderAllSpecRows()}finally{restoringSingleDraft=false}
+ setupSpecialOptions();syncDropdownOptions();refreshSideDrop();refreshLocks();
+ refreshNY40CopChoices();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();
+ refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();refreshMRLTravelMinimum();
+ renderFeatures();refreshHallQuantities();refreshChildVisibility();refreshLeadTime();
+ $('only-vi').checked=s.onlyVi;$('export-tech-details').checked=s.details;invalidateCheck();
+}
+if($('save-single-draft')){
+ const feedback=text=>{$('draft-feedback').textContent=text};
+ $('save-single-draft').onclick=()=>{
+  try{
+   const s=singleDraft(),source=sourceFiles[s.model];
+   if(source){const bytes=new Uint8Array(source.bytes);let binary='';
+    for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
+    s.database={name:source.name,base64:btoa(binary)};
+   }
+   const project=$('project-fields').querySelector('[data-cell]')?.value;
+   const name=singleDraftName(project),a=document.createElement('a');
+   const url=URL.createObjectURL(new Blob([JSON.stringify(s,null,2)],{type:'application/json'}));
+   a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   feedback('Đã tạo bản nhập '+name);
+  }catch(e){feedback('Lưu bản nhập chưa thành công. '+e.message)}
+ };
+ $('open-single-draft').onclick=()=>$('single-draft-file').click();
+ $('single-draft-file').onchange=async e=>{
+  const file=e.target.files[0];e.target.value='';if(!file)return;
+  const main=document.querySelector('main');main.inert=true;
+  try{
+   const s=JSON.parse((await file.text()).replace(/^\uFEFF/,''));checkSingleDraft(s);
+   const before=singleDraft(),priorModel=models[s.model],priorSource=sourceFiles[s.model];
+   try{
+    if(s.database)await applyWorkbook(s.model,s.database.name,bytesFromB64(s.database.base64),true);
+    else{
+     models[s.model]=structuredClone(window.SPEC_EMBEDDED[s.model]);models[s.model].fields.push(...structuredClone(window.SPEC_EXTRAS[s.model]));
+     delete sourceFiles[s.model];
+    }
+    restoreSingleDraft(s);
+   }catch(err){
+    models[s.model]=priorModel;if(priorSource)sourceFiles[s.model]=priorSource;else delete sourceFiles[s.model];
+    restoreSingleDraft(before);throw err;
+   }
+   feedback('Đã mở '+file.name+' · '+$('model').selectedOptions[0].text);
+  }catch(err){feedback('Chưa mở được bản nhập. '+err.message)}
+  finally{main.inert=false}
+ };
+}

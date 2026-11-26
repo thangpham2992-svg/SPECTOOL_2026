@@ -243,7 +243,7 @@
        let itpType=null;
        if(itpLabel){
          const note=c.match(/\s*\|\s*(?:Loại ITP|ITP type)\s*:\s*(.+)$/iu);
-         itpType=(note?.[1]||itpLabel[2]||'').trim();
+         itpType=String(currentValue(itpCell(model))||note?.[1]||itpLabel[2]||'').trim();
          a=itpLabel[1];
          if(note)c=c.slice(0,note.index).trimEnd();
        }
@@ -365,5 +365,43 @@
    '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Tắt “Headers and footers” trong hộp thoại in nếu được hỏi</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+
    '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
  }
- window.SPEC_PRINT_LAYOUT={fromXlsx};
+ async function summaryFromXlsx(bytes){
+   const zip=await JSZip.loadAsync(bytes);
+   const read=async path=>parse(await zip.file(path).async('string'));
+   const styles=styleBook((await read('xl/styles.xml')).documentElement);
+   const sheets=Object.keys(zip.files).filter(p=>/^xl\/worksheets\/sheet\d+\.xml$/.test(p)).sort((a,b)=>parseInt(a.match(/(\d+)\.xml$/)[1])-parseInt(b.match(/(\d+)\.xml$/)[1]));
+   const pages=[];
+   for(const path of sheets){
+     const doc=await read(path),rows=qa(doc,'row').filter(row=>attr(row,'hidden')!=='1');
+     const nums=rows.map(row=>+attr(row,'r')),covered=new Set(),spans=new Map();
+     for(const merge of qa(doc,'mergeCell')){
+       const [a,b]=attr(merge,'ref').split(':').map(addrParts),visible=nums.filter(n=>n>=a.row&&n<=b.row);
+       if(!visible.length)continue;
+       const first=visible[0],anchor=colAddr(a.col)+first;
+       spans.set(anchor,[b.col-a.col+1,visible.length]);
+       for(const n of visible)for(let c=a.col;c<=b.col;c++)if(n!==first||c!==a.col)covered.add(colAddr(c)+n);
+     }
+     const widths=[];
+     for(const c of qa(doc,'col'))for(let i=+attr(c,'min');i<=+attr(c,'max');i++)widths[i-1]=+attr(c,'width');
+     const total=widths.reduce((a,b)=>a+b,0);
+     const cols='<colgroup>'+widths.map(w=>'<col style="width:'+w/total*100+'%">').join('')+'</colgroup>';
+     let pre='',head='',body='';
+     for(const row of rows){
+       const n=+attr(row,'r');
+       if(n===3||n===4||n===6)continue;
+       const cells=new Map(Array.from(row.children).map(c=>[attr(c,'r'),c]));
+       let tr='<tr'+(n===5?' class="title"':'')+'>';
+       for(let col=1;col<=widths.length;col++){
+         const key=colAddr(col)+n;if(covered.has(key))continue;
+         const cell=cells.get(key),[w,h]=spans.get(key)||[1,1];
+         const content=readInlineRichHtml(cell)||esc(readText(cell,[])).replace(/\n/g,'<br>');
+         tr+='<td colspan="'+w+'" rowspan="'+h+'" style="'+formatStyle(+attr(cell,'s',0),styles)+'">'+content+'</td>';
+       }
+       tr+='</tr>';if(n<9)pre+=tr;else if(n===9)head+=tr;else body+=tr;
+     }
+     pages.push('<section><img class="logo" alt="Mitsubishi Electric" src="'+FALLBACK_LOGO+'"><table>'+cols+'<tbody>'+pre+'</tbody></table><table>'+cols+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></section>');
+   }
+   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · A4 ngang</title><style>@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:279mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:2px 4px;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}</style><nav>Spec Summary · A4 ngang &nbsp; <button onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+'</html>';
+ }
+ window.SPEC_PRINT_LAYOUT={fromXlsx,summaryFromXlsx};
 })();

@@ -37,6 +37,7 @@ function displayRuns(value,english,mixed,hints){
  let rest=source;
  function plain(chunk){
   for(const part of chunk.split(/\r?\n/)){
+   if(/\/\d+\s*thang$/i.test(part)){add(part,false);continue}
    const pair=labelParts(part);
    if(pair){add(pair[0],false);add(pair[1],true)}
    else add(part,runs.length>0&&hasVN(source)&&!hasVN(part)&&/[a-z]{2}/i.test(part)&&!/^Mitsubishi Standard$/i.test(part.trim()));
@@ -51,7 +52,7 @@ function displayRuns(value,english,mixed,hints){
  plain(rest);return runs;
 }
 function sameControlGroup(a,b){return a?.groupId!=null&&a.groupId===b?.groupId}
-function groupSheet(template,cars,featureNotes,showItpTypes){
+function groupSheet(template,cars,featureNotes){
  const last=String.fromCharCode(66+cars.length),width=108/cars.length,merges=[],lines=[],carry=new Map();
  function line(values,kind='value'){
   const n=lines.length+1;const headingArea=n<=8;
@@ -119,23 +120,18 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
  });
  const mr=cars[0].model==='MR';
  function itpNotes(types){
-  const notes=[],single=new Map(),seen=new Set();
+  const configs=new Map();
   cars.forEach((car,i)=>{
-   const type=types[i];if(!type||seen.has(i))return;
-   const peers=cars.map((other,j)=>sameControlGroup(car,other)?j:-1).filter(j=>j>=0);
-   if(peers.length){
-    peers.forEach(j=>seen.add(j));
-    notes.push(peers.map(j=>cars[j].name).join('+')+': '+type+'/'+peers.reduce((sum,j)=>sum+liftCounts[j],0)+' thang');
-   }else{
-    const control=rows.find(r=>/Group Control Operation/i.test(r.a));
-    const size=Number((control?.values[i]||'').match(/([1-4])C[- ]/i)?.[1]||1);
-    const key=type+'/'+size+' thang';
-    if(!single.has(key))single.set(key,[]);
-    single.get(key).push(car.name);
-   }
+   const type=types[i];if(!type)return;
+   const size=parseInt(car.operation,10)||1;
+   const config=type+'/'+size+' thang';
+   if(!configs.has(config))configs.set(config,[]);
+   const peers=cars.filter((other,j)=>sameControlGroup(car,other)&&types[j]===type);
+   if(peers.length&&peers[0]!==car)return;
+   configs.get(config).push(peers.length?peers.map(c=>c.name).join('+'):car.name);
   });
-  for(const [text,names] of single)notes.push(names.join(', ')+': '+text);
-  return notes.join('\n');
+  if(configs.size===1&&types.every(Boolean))return configs.keys().next().value;
+  return [...configs].map(([config,names])=>names.join(', ')+': '+config).join('\n');
  }
  function bilingualBreak(i){
   const upper=body[i],lower=body[i+1];
@@ -162,6 +158,7 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
   const groupControl=basicSection&&/group control operation|điều khiển (vận hành )?nhóm/i.test(r.key);
   if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].bankLabel?v+' · '+cars[i].bankLabel:v);
   if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].groupId!=null?v+' · '+cars.filter(c=>sameControlGroup(c,cars[i])).map(c=>c.name).join(' + '):v);
+  const cop=/Car operation panel|Bảng điều khiển/i.test(r.key+' '+r.a);
   const dimension=/Car internal size|Door size|Hoistway size|Machine room size/i.test(r.a);
   const perLift=/Hoistway size|Machine room size/i.test(r.a);
   const hall=/Hall indicators & buttons|Hiển thị và nút bấm/i.test(r.key);
@@ -195,7 +192,7 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
    let end=index;while(r.a&&end+1<body.length&&!body[end+1].a&&!body[end+1].heading)end++;
    const split=body.slice(index,end+1).some(item=>item.b);
    labelEnd=end;
-   const note=mr&&showItpTypes&&r.itpTypes.some(Boolean)&&!body[index-1]?.itpTypes.some(Boolean)?itpNotes(r.itpTypes):'';
+   const note=r.itpTypes.some(Boolean)&&!body[index-1]?.itpTypes.some(Boolean)?itpNotes(r.itpTypes):'';
    values.push([0,r.a+(note?'\n'+note:''),split?1:2,'label',end-index+1,end===index?edges:15,Boolean(r.lower&&r.a&&!hasVN(r.a)),[],false,scopeNote]);
   }
   if(r.b){
@@ -203,7 +200,7 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
    while(end<labelEnd&&!body[end+1].b)end++;
    values.push([1,r.b,1,'label',end-index+1,end===index?edges:15]);
   }
-  for(let i=0;i<cars.length;){let j=i+1;while(!keepEachLift&&(!hallMergeRule||sharedDoublePanel(i,j))&&!(mr&&rowNumber>=56&&rowNumber<=64)&&!separateLiftCells&&!dimension&&!r.quantity&&j<cars.length&&compare[i]!=null&&compare[i]===compare[j]&&(!groupControl||sameControlGroup(cars[i],cars[j])))j++;
+  for(let i=0;i<cars.length;){let j=i+1;while(!cop&&!keepEachLift&&(!hallMergeRule||sharedDoublePanel(i,j))&&!(mr&&rowNumber>=56&&rowNumber<=64)&&!separateLiftCells&&!dimension&&!r.quantity&&j<cars.length&&compare[i]!=null&&compare[i]===compare[j]&&(!groupControl||sameControlGroup(cars[i],cars[j])))j++;
    let value=compare[i]??'—';
    if(perLift&&liftCounts[i]>=2&&/mm\s*$/i.test(value))value=value.trimEnd()+'/1 thang';
    if(hall){
@@ -215,16 +212,7 @@ function groupSheet(template,cars,featureNotes,showItpTypes){
    values.push([2+i,value,j-i,(inFeatures?'feature_':'')+(r.lower||/^\s*\(/.test(r.values[i]||'')?'en':'value'),1,edges,false,r.parts[i],emphasizeIdentity]);i=j;
   }
   line(values);
-  if(!mr&&showItpTypes&&r.itpTypes.some(type=>type!==null)&&!body[index+1]?.itpTypes.some(type=>type!==null)){
-   const config=[[0,'Cấu hình liên lạc nội bộ (ITP configuration)',2,'label']];
-   for(let i=0;i<cars.length;){
-    const type=r.itpTypes[i];let span=1;
-    while(type&&sameControlGroup(cars[i],cars[i+span])&&type===r.itpTypes[i+span])span++;
-    config.push([2+i,type||'—',span,'feature_value']);
-    i+=span;
-   }
-   line(config);
-  }
+
  }
  return template.replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="25" customWidth="1"/><col min="2" max="2" width="15" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
 }
@@ -232,13 +220,11 @@ async function buildPairBook(cars){
  const zip=await JSZip.loadAsync(pairTemplate,{base64:true}),read=p=>zip.file(p).async('string');
  const template=await read('xl/worksheets/sheet1.xml'),wb='xl/workbook.xml',rels='xl/_rels/workbook.xml.rels',types='[Content_Types].xml';
  let relationships=await read(rels),content=await read(types),sheets='',titles='',start=0;
- const featureNotes=new Map(),itpTypes=new Set();
+ const featureNotes=new Map();
  for(const row of alignedRows(cars)){
-  for(const type of row.itpTypes)if(type!==null)itpTypes.add(type);
   const names=cars.filter((car,index)=>Boolean(row.values[index]?.trim())).map(car=>car.name);
   if(names.length&&names.length<cars.length)featureNotes.set(row.key,names);
  }
- const showItpTypes=itpTypes.size>1;
  const count=Math.ceil(cars.length/4);
  for(let i=0;start<cars.length;i++){
   let size=Math.min(4,Math.ceil((cars.length-start)/Math.max(1,count-i)));
@@ -249,7 +235,7 @@ async function buildPairBook(cars){
    else while(sameControlGroup(cars[start+size-1],cars[start+size]))size--;
   }
   const group=cars.slice(start,start+size),n=i+1,id=i?'rIdCar'+n:'rId1',name='Spec '+(start+1)+'-'+(start+size),path='xl/worksheets/sheet'+n+'.xml';
-  let sheetXml=groupSheet(template,group,featureNotes,showItpTypes);
+  let sheetXml=groupSheet(template,group,featureNotes);
   if(cars[0].onlyVi){
    const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
    await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
