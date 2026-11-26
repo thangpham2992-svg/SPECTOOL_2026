@@ -216,7 +216,7 @@ function groupSheet(template,cars,featureNotes){
  }
  return template.replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="25" customWidth="1"/><col min="2" max="2" width="15" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
 }
-async function buildPairBook(cars){
+async function buildPairBook(cars,compactHidden=true){
  const zip=await JSZip.loadAsync(pairTemplate,{base64:true}),read=p=>zip.file(p).async('string');
  const template=await read('xl/worksheets/sheet1.xml'),wb='xl/workbook.xml',rels='xl/_rels/workbook.xml.rels',types='[Content_Types].xml';
  let relationships=await read(rels),content=await read(types),sheets='',titles='',start=0;
@@ -238,8 +238,8 @@ async function buildPairBook(cars){
   let sheetXml=groupSheet(template,group,featureNotes);
   const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
   if(cars[0].onlyVi)await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
+  await window.SPEC_EXPORT.normalizeExportPunctuation(zip,sheet);
   await window.SPEC_EXPORT.emphasizeExportCodes(zip,sheet);
-  sheetXml=new XMLSerializer().serializeToString(sheet);
   if(i){
    const drawingPath='xl/drawings/drawing'+n+'.xml';
    zip.file(drawingPath,await read('xl/drawings/drawing1.xml'));
@@ -247,6 +247,8 @@ async function buildPairBook(cars){
    zip.file('xl/worksheets/_rels/sheet'+n+'.xml.rels',(await read('xl/worksheets/_rels/sheet1.xml.rels')).replace('drawing1.xml','drawing'+n+'.xml'));
    content=content.replace('</Types>','<Override PartName="/'+drawingPath+'" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
   }
+  if(compactHidden)await window.SPEC_EXPORT.compactHiddenExport(zip,sheet,path);
+  sheetXml=new XMLSerializer().serializeToString(sheet);
   zip.file(path,sheetXml);
   sheets+='<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="'+name+'" sheetId="'+n+'" r:id="'+id+'"/>';
   titles+='<definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+name.replace(/^(.+)$/,"'$1'")+'!$9:$9</definedName>';

@@ -86,11 +86,11 @@ window.addEventListener('message',async event=>{
   }else   if(data.action==='pairRows'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');
    const x=await buildFinalExport(Boolean(data.payload?.includeTechDetails),false);reply.result=await window.SPEC_PRINT_LAYOUT.fromXlsx(x.data,x.model,true);
-  }else if(data.action==='summaryPrint'){const book=await buildPairBook(data.payload);reply.result=await window.SPEC_PRINT_LAYOUT.summaryFromXlsx(await book.arrayBuffer());
+  }else if(data.action==='summaryPrint'){const book=await buildPairBook(data.payload,false);reply.result=await window.SPEC_PRINT_LAYOUT.summaryFromXlsx(await book.arrayBuffer());
   }else if(data.action==='pairBook'){reply.result=await buildPairBook(data.payload);
   }else if(data.action==='excel'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');
-   reply.result=(await buildFinalExport()).data;
+   reply.result=(await buildFinalExport(undefined,undefined,true)).data;
   }else if(data.action==='zip'){
    const archive=new JSZip();
    for(const file of data.payload)archive.file(file.name,file.bytes);

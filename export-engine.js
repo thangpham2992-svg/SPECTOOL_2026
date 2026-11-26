@@ -987,6 +987,73 @@
    const patterns=[String.raw`NEXIEZ-MRL(?:\s+(?:Version\s*0?2|Ver\.?\s*0?2))?|NEXIEZ-MR`,String.raw`SUS\s*(?:430J1L|430|304)(?:\s*\/\s*(?:SUS\s*)?(?:430J1L|430|304))*`,String.raw`(?:EN\s*81[-–]\s*58|BS[-–]?476)(?:\s*[\[(]II[\])])?|EN81-20/50`,String.raw`[1-8]C\s*[-–]?\s*(?:2BC|SAI[-–]?\d+[A-Z]*|[A-Z][A-Z0-9-]+)`,String.raw`(?:PIV|HBV|PIH|PID|HIP|HPI|HOP|HLV|HLH|COP)\d*[-–]?[A-Z]?\d+[A-Z0-9]*(?:-[A-Z0-9]+)*|CBV[1-6]`,String.raw`Y[HZ]\s*[-–]?\s*\d+[A-Z0-9]*|NY-40[A-E]`,String.raw`(?:C|N|M|P|F)\d{3,4}[A-Z]*`,String.raw`(?:Y\d{3}[A-Z]?|(?:CP|LA|ML)\d+[A-Z0-9]*)`,String.raw`(?:CL[12]|DL[567])-[CW]`,String.raw`[Ll][Aa][Rr][Gg][Ee]\s+[Ww][Ii][Nn][Dd][Oo][Ww]`,String.raw`EXIT SWITCH`,literal];
    return new RegExp('(?<![A-Za-z0-9])(?:'+patterns.join('|')+')(?![A-Za-z0-9])','g');
  };
+ // R73: normalize customer-facing description punctuation, without touching labels,
+ // floor identifiers, numerical specifications, or the source/working workbook.
+ function normalizeExportPunctuation(zip,x){
+   return (async()=>{
+     const sf=zip.file('xl/sharedStrings.xml');
+     const shared=sf?all(parse(await sf.async('string')),'si'):[];
+     const source=c=>c?.getAttribute('t')==='s'?shared[+child(c,'v')?.textContent]:child(c,'is');
+     const value=c=>all(source(c),'t').map(t=>t.textContent).join('');
+     const noDotLabel=/^(?:mã hiệu|tên model|model|hãng sản xuất|manufacturer|xuất xứ|origin|tải trọng|capacity|số lượng|quantity|tốc độ|speed|số điểm dừng|stops and opens|tầng (?:không )?phục vụ|(?:non[- ]?)?service floors?|danh sách tầng|kích thước|(?:car internal|door|hoistway|machine room) size|hành trình|travel|chiều sâu pit|pit depth|đỉnh hố thang|overhead|khối lượng|decoration weight|nguồn điện|power supply|lighting supply|tên thang|elev name|công trình|project|hạng mục|item)(?:\b|\s|$)/iu;
+     const standalone=s=>{
+       const v=s.replace(/\.+$/,'').trim();
+       if(/^(?:[-–—]+|N\/A|Mitsubishi Standard)$/i.test(v))return true;
+       if(/^\d[\d.,\s×x+\-/]*(?:\s*(?:mm|kg|m\/s|mpm|m\/phút|m\/giây|kW|Hz|V|A|thang|sets?|persons?|người))$/i.test(v)||/^\d+(?:[.,]\d+)?$/.test(v))return true;
+       const rest=v.replace(exportCodePattern(),'').replace(/[\s()/,+–-]/g,'');
+       return !rest;
+     };
+     let section='',label='';
+     for(const row of all(x,'row')){
+       const rn=row.getAttribute('r'),cells=Array.from(row.children).filter(c=>c.localName==='c');
+       const a=value(cells.find(c=>c.getAttribute('r')==='A'+rn)).trim();
+       const heading=/^([IVXLCDM]+)\.\s/.exec(a);
+       if(heading){section=heading[1];label='';continue;}
+       if(!section)continue;
+       if(a)label=a;
+       if(/^\s*[-–]\s*Tính năng/i.test(a))continue;
+       const exclude=noDotLabel.test(label);
+       for(const c of cells){
+         if(!/^(?:[C-Z]|[A-Z]{2,})\d+$/.test(c.getAttribute('r')||'')||child(c,'f'))continue;
+         let src=source(c);if(!src)continue;
+         let nodes=all(src,'t');const full=nodes.map(t=>t.textContent).join('');if(!full.trim())continue;
+         const edits=[];let offset=0;
+         for(const line of full.split('\n')){
+           const trimmed=line.trimEnd(),s=trimmed.trimStart();const end=offset+trimmed.length;
+           if(s&& !/^(?:Chỉ áp dụng cho thang|Only apply for|\d+\s*hộp\s*\/)/i.test(s)){
+             const trailing=/\.+$/.exec(s);
+             if(exclude||standalone(s)){
+               if(trailing)edits.push({at:end-trailing[0].length,del:trailing[0].length,insert:''});
+             }else if(/[\p{L}\p{N})\]]$/u.test(s)){
+               // Preserve punctuation already inside a parenthesized translation.
+               if(!/^[\s]*\(.*[.!?]\)$/u.test(s))edits.push({at:end,del:0,insert:'.'});
+             }else if(trailing&&trailing[0].length>1){edits.push({at:end-trailing[0].length,del:trailing[0].length,insert:'.'});}
+           }
+           offset+=line.length+1;
+         }
+         if(!edits.length)continue;
+         if(c.getAttribute('t')==='s'){
+           const inline=x.createElementNS(n,'is');for(const el of Array.from(src.children))inline.appendChild(x.importNode(el,true));
+           child(c,'v')?.remove();c.setAttribute('t','inlineStr');c.appendChild(inline);src=inline;nodes=all(src,'t');
+         }
+         // Edit backwards in original run coordinates. Appended punctuation inherits
+         // the preceding run's language/style; existing rich formatting is preserved.
+         for(const edit of edits.reverse()){
+           let pos=0;
+           for(const t of nodes){const v=t.textContent,next=pos+v.length;
+             if(edit.at<=next&&(edit.at>pos||pos===0)){
+               const local=edit.at-pos;let remaining=edit.del;const remove=Math.min(remaining,v.length-local);remaining-=remove;
+               t.textContent=v.slice(0,local)+edit.insert+v.slice(local+remove);
+               for(let j=nodes.indexOf(t)+1;remaining>0&&j<nodes.length;j++){const w=nodes[j].textContent,k=Math.min(remaining,w.length);nodes[j].textContent=w.slice(k);remaining-=k;}
+               t.setAttribute('xml:space','preserve');break;
+             }pos=next;
+           }
+         }
+       }
+     }
+   })();
+ }
+
  async function emphasizeExportCodes(zip,x){
    const sd=parse(await zip.file('xl/styles.xml').async('string'));
    const fonts=all(child(sd.documentElement,'fonts'),'font');
@@ -1208,6 +1275,108 @@
    }
  }
 
+ // R72: physically remove hidden rows and columns from customer Excel only.
+ // All source formula evaluation and presentation styling are completed first.
+ async function compactHiddenExport(zip,ws,worksheetPath,definedNames=[]){
+   const hidden=node=>['1','true'].includes(node.getAttribute('hidden'));
+   const data=child(ws.documentElement,'sheetData');
+   const rows=Array.from(data.children).filter(e=>e.localName==='row');
+   const cols=all(child(ws.documentElement,'cols'),'col');
+   const removedRows=new Set(rows.filter(hidden).map(e=>+e.getAttribute('r')));
+   const removedCols=new Set();
+   for(const c of cols.filter(hidden))for(let k=+c.getAttribute('min');k<=+c.getAttribute('max');k++)removedCols.add(k);
+   if(!removedRows.size&&!removedCols.size)return {rows:0,cols:0};
+   const number=s=>Array.from(s).reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+   const letters=k=>{let s='';for(;k>0;k=Math.floor((k-1)/26))s=String.fromCharCode(65+(k-1)%26)+s;return s;};
+   const mapAxis=(removed,max)=>{const map=[0];let next=0;for(let i=1;i<=max;i++)map[i]=removed.has(i)?0:++next;return map;};
+   const rowMax=Math.max(1,...rows.map(e=>+e.getAttribute('r')),...removedRows);
+   const rm=mapAxis(removedRows,rowMax);
+   const cm=mapAxis(removedCols,16384);
+   const rowAt=k=>k<=rowMax?rm[k]:k-removedRows.size;
+   const colAt=k=>cm[k];
+   const span=(a,b,at)=>{while(a<=b&&!at(a))a++;while(b>=a&&!at(b))b--;return a<=b?[at(a),at(b)]:null;};
+   const address=s=>{const m=/^(\$?)([A-Z]{1,3})(\$?)([1-9]\d*)$/.exec(s||'');return m?{c:number(m[2]),r:+m[4],ca:m[1],ra:m[3]}:null;};
+   const fmt=(p,c,r)=>p.ca+letters(c)+p.ra+r;
+   const range=s=>{
+     const [a,b]=String(s).split(':');const p=address(a),q=address(b||a);
+     if(p&&q){const cc=span(p.c,q.c,colAt),rr=span(p.r,q.r,rowAt);if(!cc||!rr)return null;const first=fmt(p,cc[0],rr[0]),last=fmt(q,cc[1],rr[1]);return first===last?first:first+':'+last;}
+     const onlyRows=/^(\$?)(\d+):(\$?)(\d+)$/.exec(s);
+     if(onlyRows){const rr=span(+onlyRows[2],+onlyRows[4],rowAt);return rr?onlyRows[1]+rr[0]+':'+onlyRows[3]+rr[1]:null;}
+     const onlyCols=/^(\$?)([A-Z]+):(\$?)([A-Z]+)$/.exec(s);
+     if(onlyCols){const cc=span(number(onlyCols[2]),number(onlyCols[4]),colAt);return cc?onlyCols[1]+letters(cc[0])+':'+onlyCols[3]+letters(cc[1]):null;}
+     return s;
+   };
+   // Final sheets are values-only. Do not shift unfrozen formulas silently.
+   for(const row of rows){
+     const rn=+row.getAttribute('r');if(!rowAt(rn))continue;
+     for(const c of Array.from(row.children).filter(e=>e.localName==='c')){
+       const p=address(c.getAttribute('r'));if(p&&colAt(p.c)&&child(c,'f'))throw Error('R72: unexpected formula in visible cell '+c.getAttribute('r'));
+     }
+   }
+   // Remove references to deleted cells. Shrink merges to the surviving rectangle;
+   // retained cells keep their existing rich text and styles without reformatting.
+   const merges=child(ws.documentElement,'mergeCells');
+   if(merges){for(const m of all(merges,'mergeCell')){
+     const ref=m.getAttribute('ref'),next=range(ref);
+     if(!next||!next.includes(':'))m.remove();else m.setAttribute('ref',next);
+   }const count=all(merges,'mergeCell').length;if(count)merges.setAttribute('count',String(count));else merges.remove();}
+   let lastRow=1,lastCol=1;
+   for(const row of rows){
+     const rn=rowAt(+row.getAttribute('r'));if(!rn){row.remove();continue;}
+     row.setAttribute('r',String(rn));row.removeAttribute('spans');row.removeAttribute('hidden');lastRow=Math.max(lastRow,rn);
+     for(const c of Array.from(row.children).filter(e=>e.localName==='c')){
+       const p=address(c.getAttribute('r'));if(!p)continue;const cc=colAt(p.c);
+       if(!cc){c.remove();continue;}c.setAttribute('r',letters(cc)+rn);lastCol=Math.max(lastCol,cc);
+     }
+   }
+   for(const c of cols){
+     if(hidden(c)){c.remove();continue;}
+     const cc=span(+c.getAttribute('min'),+c.getAttribute('max'),colAt);
+     if(!cc){c.remove();continue;}c.setAttribute('min',String(cc[0]));c.setAttribute('max',String(cc[1]));c.removeAttribute('hidden');
+   }
+   const colRoot=child(ws.documentElement,'cols');if(colRoot&&!colRoot.children.length)colRoot.remove();
+   const dim=child(ws.documentElement,'dimension');if(dim)dim.setAttribute('ref','A1:'+letters(lastCol)+lastRow);
+   // Move sheet-local ranges; references wholly inside deleted cells are removed.
+   for(const [tag,attr] of [['autoFilter','ref'],['conditionalFormatting','sqref'],['dataValidation','sqref'],['hyperlink','ref'],['protectedRange','sqref'],['ignoredError','sqref'],['sortState','ref'],['sortCondition','ref']]){
+     for(const el of all(ws,tag))if(el.hasAttribute(attr)){
+       const mapped=el.getAttribute(attr).split(/\s+/).map(range).filter(Boolean).join(' ');
+       if(mapped)el.setAttribute(attr,mapped);else el.remove();
+     }
+   }
+   for(const [tag,item] of [['dataValidations','dataValidation'],['hyperlinks','hyperlink'],['protectedRanges','protectedRange'],['ignoredErrors','ignoredError']]){
+     const root=child(ws.documentElement,tag);if(!root)continue;const count=all(root,item).length;if(!count)root.remove();else if(root.hasAttribute('count'))root.setAttribute('count',String(count));
+   }
+   for(const el of all(ws,'selection')){el.setAttribute('activeCell','A1');el.setAttribute('sqref','A1');}
+   for(const el of all(ws,'sheetView'))if(el.hasAttribute('topLeftCell'))el.setAttribute('topLeftCell',range(el.getAttribute('topLeftCell'))||'A1');
+   // Break ids and drawing markers are zero-based positions between cells.
+   const boundary=(removed,k)=>k-Array.from(removed).filter(v=>v<=k).length;
+   for(const [tag,deleted,orthogonal] of [['rowBreaks',removedRows,removedCols],['colBreaks',removedCols,removedRows]]){
+     const root=child(ws.documentElement,tag);if(!root)continue;const seen=new Set();
+     for(const br of all(root,'brk')){const id=boundary(deleted,+br.getAttribute('id'));if(id<=0||seen.has(id)){br.remove();continue;}seen.add(id);br.setAttribute('id',String(id));for(const a of ['min','max'])if(br.hasAttribute(a))br.setAttribute(a,String(boundary(orthogonal,+br.getAttribute(a))));}
+     const items=all(root,'brk');if(!items.length)root.remove();else{root.setAttribute('count',String(items.length));root.setAttribute('manualBreakCount',String(items.filter(e=>e.getAttribute('man')==='1').length));}
+   }
+   for(const dn of definedNames){
+     const value=dn.textContent,at=value.lastIndexOf('!');if(at<0)continue;
+     if(!['_xlnm.Print_Area','_xlnm.Print_Titles'].includes(dn.getAttribute('name')))continue;
+     const mapped=range(value.slice(at+1));if(mapped)dn.textContent=value.slice(0,at+1)+mapped;else dn.remove();
+   }
+   // Only the drawing(s) belonging to this worksheet may be shifted.
+   const sheetRel=worksheetPath.replace(/([^/]+)$/,'_rels/$1.rels');
+   if(zip.file(sheetRel)){
+     const relDoc=parse(await zip.file(sheetRel).async('string'));
+     for(const rel of all(relDoc,'Relationship').filter(e=>/\/drawing$/.test(e.getAttribute('Type')||''))){
+       const target=rel.getAttribute('Target')||'';
+       const stack=[];for(const seg of (target.startsWith('/')?target.slice(1):worksheetPath.replace(/[^/]+$/,'')+target).split('/')){if(seg==='..')stack.pop();else if(seg&&seg!=='.')stack.push(seg);}
+       const path=stack.join('/');if(!zip.file(path))continue;
+       const drawing=parse(await zip.file(path).async('string'));
+       for(const marker of [...all(drawing,'from'),...all(drawing,'to')])for(const [tag,removed] of [['row',removedRows],['col',removedCols]]){
+         const e=child(marker,tag);if(e)e.textContent=String(boundary(removed,+e.textContent));
+       }
+       zip.file(path,serial(drawing));
+     }
+   }
+   return {rows:removedRows.size,cols:removedCols.size};
+ }
  async function xlsxFromModel(zip, model, db, doc){
    const workbookXML=await zip.file('xl/workbook.xml').async('string');
    const relsXML=await zip.file('xl/_rels/workbook.xml.rels').async('string');
@@ -4493,7 +4662,9 @@
        throw Error('Unexpected content in section II merged C'+rn);
    }
    if(doc.onlyVi)await vietnameseSheet(zip,x,3);
+   await normalizeExportPunctuation(zip,x);
    await emphasizeExportCodes(zip,x);
+   if(doc.compactHidden)doc.compacted=await compactHiddenExport(zip,x,finalpath,all(workbook,'definedName'));
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
@@ -4636,5 +4807,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
+ window.SPEC_EXPORT={normalizeExportPunctuation,compactHiddenExport,emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();

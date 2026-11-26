@@ -3242,12 +3242,12 @@ function download(bytes,name,type){
  const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),120000);
 }
-async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked),onlyVi=Boolean($('only-vi')?.checked)){
+async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked),onlyVi=Boolean($('only-vi')?.checked),compactHidden=false){
   const model=$('model').value,db=workbookEngineData();
   // Source validation MUST pass before any export side effect.
   const evaluation=window.SPEC_EXPORT.exportModel(model,changes,db);
   // Optional presentation-only detail rows; defaults OFF for both models.
-  evaluation.includeTechDetails=includeTechDetails; evaluation.onlyVi=onlyVi;
+  evaluation.includeTechDetails=includeTechDetails; evaluation.onlyVi=onlyVi; evaluation.compactHidden=compactHidden;
   window.SPEC_EXPORT.attachMRMaterialThickness?.(model,changes,db,evaluation);
   const bytes=sourceFiles[model]?.bytes||bytesFromB64(window.SPEC_WORKBOOKS[model]);
   const zip=await JSZip.loadAsync(bytes);
@@ -3279,9 +3279,9 @@ async function exportFinalExcel(){
  if(!canExportBriefly())return;
  const button=$('final-xlsx');button.disabled=true;
  try{status('Đang tạo SpecFormExport từ logic Tool.exe / Building final export...');
-  const result=await buildFinalExport();
+  const result=await buildFinalExport(undefined,undefined,true);
   download(result.data,result.filename+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  status('Đã xuất Excel SpecFormExport theo source C# / Excel ready. '+result.evaluation.includedFeatures.length+' features applied; '+result.evaluation.removedFeatures.length+' removed; '+result.evaluation.hiddenHall+' hall rows hidden; '+result.evaluation.totalFormulaUnresolved+' formula(s) excluded in unused feature rows.','ok');
+  status('Đã xuất Excel SpecFormExport theo source C# / Excel ready. '+result.evaluation.includedFeatures.length+' features applied; '+result.evaluation.removedFeatures.length+' removed; '+(result.evaluation.compacted?.rows||0)+' hidden rows and '+(result.evaluation.compacted?.cols||0)+' hidden columns deleted; '+result.evaluation.totalFormulaUnresolved+' formula(s) excluded in unused feature rows.','ok');
  }catch(error){console.error('Excel Export:',error);alert('Không thể xuất Excel. Chi tiết: '+(error?.message||String(error)))}
  finally{button.disabled=false;}
 }
