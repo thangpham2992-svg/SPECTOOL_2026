@@ -1378,7 +1378,83 @@ body{background:#f5f2ed}.workspace{max-width:1324px;padding:26px 24px 90px}.work
 #overview .matrix :is(input,select).inactive-value:not(.has-spec-error):not(:disabled){background:#fafbfc!important;border-color:#97b7d3!important;color:#223f57!important}
 #overview .matrix :is(input,select).inactive-value:disabled:not(.has-spec-error){background:#dce0e4!important;border-color:#c7cdd3!important;color:#5b6570!important;cursor:not-allowed}
 #overview .matrix .empty-slot,#overview .matrix h3.inactive-group{background:#f2f3f4;color:#65707a}
-</style><style>#overview .matrix select.inactive-value:not(:disabled){cursor:pointer}#overview .matrix select.inactive-value:disabled{appearance:none!important;background-image:none!important}</style></head><body><header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span id="modelBadge" class="brand-side">NEXIEZ-MR</span></header>
+</style><style>#overview .matrix select.inactive-value:not(:disabled){cursor:pointer}#overview .matrix select.inactive-value:disabled{appearance:none!important;background-image:none!important}</style><script>
+(() => {
+  if (window.top !== window.self) return;
+  const phone = matchMedia('(max-width: 740px) and (pointer: coarse), (max-height: 500px) and (max-width: 960px) and (pointer: coarse)');
+  const viewport = document.querySelector('meta[name="viewport"]');
+  const initialViewport = viewport.content;
+  const manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = 'mobile.webmanifest';
+  function updateMobileMode() {
+    if (phone.matches) {
+      if (!manifest.isConnected) document.head.append(manifest);
+      viewport.content = initialViewport + ', viewport-fit=cover';
+    } else {
+      manifest.remove();
+      viewport.content = initialViewport;
+    }
+  }
+  updateMobileMode();
+  phone.addEventListener('change', updateMobileMode);
+  document.addEventListener('DOMContentLoaded', () => {
+    const button = document.querySelector('.phone-fullscreen');
+    const installed = matchMedia('(display-mode: fullscreen)');
+    const standalone = matchMedia('(display-mode: standalone)');
+    function refresh() {
+      const active = Boolean(document.fullscreenElement);
+      button.hidden = !phone.matches || !document.fullscreenEnabled || (installed.matches && !active);
+      button.title = active ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+      button.setAttribute('aria-label', button.title);
+      button.setAttribute('aria-pressed', String(active));
+    }
+    button.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch {
+        alert('Trình duyệt chưa cho phép bật toàn màn hình.');
+      }
+    });
+    const summary = document.querySelector('.summary-tab');
+    if (summary) summary.addEventListener('click', event => {
+      if (phone.matches && (installed.matches || standalone.matches || document.fullscreenElement)) {
+        event.preventDefault();
+        location.assign(summary.href);
+      }
+    });
+    phone.addEventListener('change', refresh);
+    installed.addEventListener('change', refresh);
+    document.addEventListener('fullscreenchange', refresh);
+    refresh();
+  });
+})();
+</script>
+<style>
+@media (max-width: 740px) and (pointer: coarse), (max-height: 500px) and (max-width: 960px) and (pointer: coarse) {
+  .site-header {
+    height:auto!important; min-height:48px; box-sizing:border-box;
+    padding:calc(5px + env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) 5px max(8px,env(safe-area-inset-left,0px))!important;
+    gap:5px; flex-wrap:wrap;
+  }
+  .site-header .brand {gap:5px!important;min-width:0;flex:1 1 120px}
+  .site-header .brand-text {font-size:10.7px!important;line-height:1.18;white-space:normal}
+  .brand-country {display:block}
+  .site-header .brand-sub {font-size:7px!important;line-height:1.12}
+  .site-header .brand-side {display:none}
+  .site-header .header-tools,.site-header .summary-group {gap:4px!important}
+  .site-header .summary-group {padding:2px 4px!important}
+  .summary-group .summary-note {font-size:8px!important;line-height:1.12!important}
+  .summary-group .summary-tab {display:inline-flex;align-items:center;white-space:nowrap;min-width:0!important;
+    min-height:26px!important;height:auto!important;padding:3px 5px!important;font-size:10px!important;line-height:1.1}
+  .phone-fullscreen:not([hidden]) {display:inline-grid;place-items:center;width:28px;height:32px;padding:0;
+    border:0;background:transparent;color:#53667a;font:20px/1 Arial;cursor:pointer}
+  .site-header:has(.summary-group) .brand {flex-basis:118px}
+  .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
+}
+</style>
+</head><body><header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span id="modelBadge" class="brand-side">NEXIEZ-MR</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 
 <main class="workspace"><section class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><span class="label-top">Model</span><strong id="summaryModel">NEXIEZ-MR ALPHA</strong></div></section><section id="part-P" class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="sharedProject" class="project-grid"></div></section><section class="action-panel"><label class="tech-export-choice" for="only-vi"><input id="only-vi" type="checkbox"><span><strong>Vietnamese Only</strong></span></label><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="controls" id="cars"><select id="car" aria-label="Chọn thang"></select><button id="addCar">+ Thêm thang</button><button id="renameCar">Đổi mã</button><button id="deleteCar">Xóa thang</button><button id="detail">Form đơn</button><button id="check">Kiểm tra Spec</button><button class="btn btn-secondary branded-export branded-excel" id="exportBook" type="button" title="Xuất Excel · A4 ngang"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2.8h7.6L20 8.2V21H7V2.8Z"/><path d="M14.5 2.8v5.5H20M10 12h7M10 15.5h7M10 19h7M13.5 11v8"/><path d="M4 8.6h8v11H4z"/><path d="m6 12 4 5m0-5-4 5"/></svg></span><span class="export-button-label">Xuất Excel · A4 ngang</span></button></div>
 <p role="status" id="statusText" class="check-top">Chưa kiểm tra</p></section><div id="overview" class="box"><nav class="sections"></nav><div class="controls"><input id="search" placeholder="Tìm hạng mục" aria-label="Tìm hạng mục"><label><input id="diff" type="checkbox"> Chỉ xem khác biệt</label><select id="featureGroup" hidden aria-label="Nhóm tính năng"></select></div><div class="pager"><button id="prev">‹</button><span id="range"></span><button id="next">›</button></div><section id="carErrors" hidden aria-live="polite"></section><div class="matrix"></div></div>

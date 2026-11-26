@@ -18,7 +18,7 @@ window.SPEC_DESIGN_GUIDE={
   mirror:[
    {code:'YZ-52A',title:'YZ-52A',subtitle:'Gương nửa thân / Half-size',desc:'Gương một mảng tại vách sau, kích thước nửa thân.',images:['assets/design/mrl_yz52a.png']},
    {code:'YZ-53A',title:'YZ-53A',subtitle:'Bộ 2 gương / 2-mirror set',desc:'Bố trí hai mảng gương theo ảnh minh họa.',images:['assets/design/mrl_yz53a.png']},
-   {code:'YZ-55SN',title:'YZ-55SN',subtitle:'Gương toàn chiều cao / Full height',desc:'Gương kéo dài theo chiều cao cabin như ảnh mẫu.',images:['assets/design/mrl_yz55sn.png']}
+   {code:'YZ-55SN',title:'YZ-55SN',subtitle:'Gương toàn chiều cao / Full height',desc:'Gương kéo dài theo chiều cao cabin như ảnh mẫu.',images:['assets/design/mr_yz55sn.png']}
   ]
  },
  MR:{

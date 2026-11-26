@@ -1341,9 +1341,85 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
  .mobile-actions #m-pdf{background:var(--pdf-deep);border-color:var(--pdf-deep);color:#fff}
 }
 </style>
-<style>.project-box{display:none!important}</style></head>
+<style>.project-box{display:none!important}</style><script>
+(() => {
+  if (window.top !== window.self) return;
+  const phone = matchMedia('(max-width: 740px) and (pointer: coarse), (max-height: 500px) and (max-width: 960px) and (pointer: coarse)');
+  const viewport = document.querySelector('meta[name="viewport"]');
+  const initialViewport = viewport.content;
+  const manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = 'mobile.webmanifest';
+  function updateMobileMode() {
+    if (phone.matches) {
+      if (!manifest.isConnected) document.head.append(manifest);
+      viewport.content = initialViewport + ', viewport-fit=cover';
+    } else {
+      manifest.remove();
+      viewport.content = initialViewport;
+    }
+  }
+  updateMobileMode();
+  phone.addEventListener('change', updateMobileMode);
+  document.addEventListener('DOMContentLoaded', () => {
+    const button = document.querySelector('.phone-fullscreen');
+    const installed = matchMedia('(display-mode: fullscreen)');
+    const standalone = matchMedia('(display-mode: standalone)');
+    function refresh() {
+      const active = Boolean(document.fullscreenElement);
+      button.hidden = !phone.matches || !document.fullscreenEnabled || (installed.matches && !active);
+      button.title = active ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+      button.setAttribute('aria-label', button.title);
+      button.setAttribute('aria-pressed', String(active));
+    }
+    button.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch {
+        alert('Trình duyệt chưa cho phép bật toàn màn hình.');
+      }
+    });
+    const summary = document.querySelector('.summary-tab');
+    if (summary) summary.addEventListener('click', event => {
+      if (phone.matches && (installed.matches || standalone.matches || document.fullscreenElement)) {
+        event.preventDefault();
+        location.assign(summary.href);
+      }
+    });
+    phone.addEventListener('change', refresh);
+    installed.addEventListener('change', refresh);
+    document.addEventListener('fullscreenchange', refresh);
+    refresh();
+  });
+})();
+</script>
+<style>
+@media (max-width: 740px) and (pointer: coarse), (max-height: 500px) and (max-width: 960px) and (pointer: coarse) {
+  .site-header {
+    height:auto!important; min-height:48px; box-sizing:border-box;
+    padding:calc(5px + env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) 5px max(8px,env(safe-area-inset-left,0px))!important;
+    gap:5px; flex-wrap:wrap;
+  }
+  .site-header .brand {gap:5px!important;min-width:0;flex:1 1 120px}
+  .site-header .brand-text {font-size:10.7px!important;line-height:1.18;white-space:normal}
+  .brand-country {display:block}
+  .site-header .brand-sub {font-size:7px!important;line-height:1.12}
+  .site-header .brand-side {display:none}
+  .site-header .header-tools,.site-header .summary-group {gap:4px!important}
+  .site-header .summary-group {padding:2px 4px!important}
+  .summary-group .summary-note {font-size:8px!important;line-height:1.12!important}
+  .summary-group .summary-tab {display:inline-flex;align-items:center;white-space:nowrap;min-width:0!important;
+    min-height:26px!important;height:auto!important;padding:3px 5px!important;font-size:10px!important;line-height:1.1}
+  .phone-fullscreen:not([hidden]) {display:inline-grid;place-items:center;width:28px;height:32px;padding:0;
+    border:0;background:transparent;color:#53667a;font:20px/1 Arial;cursor:pointer}
+  .site-header:has(.summary-group) .brand {flex-basis:118px}
+  .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
+}
+</style>
+</head>
 <body>
-<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC VIETNAM<span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span></header>
+<header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 <main class="workspace">
 <div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model" disabled><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select><script>if(new URLSearchParams(location.search).get('model')==='MRL')document.getElementById('model').value='MRL';</script></div></div>
 <details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
@@ -1924,7 +2000,7 @@ window.SPEC_MIRROR_RULES={weights,source,models,allOptions,adjustment,fixDatabas
 </script>
 <script src="export-engine.js?v=244-R52"></script>
 <script src="print-layout.js?v=244-R45"></script>
-<script src="design-guide.js?v=5.8.79"></script>
+<script src="design-guide.js?v=R53"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script>/* v5.8.25 — material finish rules. User-approved per-model codes only. */
 (function(){'use strict';
