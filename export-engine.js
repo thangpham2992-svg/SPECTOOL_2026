@@ -683,6 +683,23 @@
    const mrl=model==='MRL';
    const isUnavailable=v=>/^(?:Not suppl(?:ied|y)|Không cung cấp)(?:\s*\(Not supplied\))?\.?$/i.test(text(v).trim());
    const endsWithThickness=v=>/(?:\bdày\s*\d+(?:[.,]\d+)?\s*mm|\bthickness\s*\d+(?:[.,]\d+)?\s*mm)/i.test(v);
+   // The glass specification follows the selected door at each location.
+   const glazedRows=new Set();
+   const doors=mrl?[['D46',49],['E73',72],['E74',74]]:[['D50',50],['E76',72],['E77',74]];
+   for(const [input,row] of doors){
+     const option=read(input);
+     const dsj=/\bDSJ1\b/i.test(option);
+     if(!dsj&&!/large\s+window/i.test(option))continue;
+     const name=dsj?'DSJ1':'Large window';
+     const openingSize=!dsj&&/W?(\d+)\s*[x×]\s*H?(\d+)/i.exec(option);
+     const size=doc.includeTechDetails&&openingSize?' '+openingSize[1]+'×'+openingSize[2]+' mm':'';
+     const glass=dsj?'8 mm, 4+4 mm':'10 mm, 5+5 mm';
+     const vi=text(doc.cells['C'+row]).split(/,\s*(?:kính quan sát|cửa sổ quan sát)|\s+với (?:kính|cửa sổ) quan sát/i)[0];
+     const en=text(doc.cells['C'+(row+1)]).replace(/^\(/,'').split(/,\s*(?:see-through|large observation window)|\s+with (?:see-through|large observation window)/i)[0];
+     doc.cells['C'+row]=vi+', '+name+size+(doc.includeTechDetails?', kính trong '+glass:'')+'.';
+     doc.cells['C'+(row+1)]='('+en+', '+name+size+(doc.includeTechDetails?', clear laminated glass '+glass:'')+'.)';
+     glazedRows.add(row);
+   }
    // Panel/model descriptions in Section IV: 1.5 mm, only in detailed Export.
    // MR: separate PIV/HBV/PIH rows; MRL: consolidated 3-floor blocks.
    // Keep the standard Export descriptions unchanged when detail is disabled.
@@ -785,8 +802,6 @@
    const fire=/EN81[-\s]*58\s*\(II\)/i.test(read(mrl?'D84':'D83'));
    const hhk=hh+(fire?10:0);
    const opening=read(mrl?'D15':'D14').toUpperCase();
-   const windowType=[read(mrl?'D46':'D50'),read(mrl?'D48':'D52'),read('D50'),read('D51')].join(' ');
-   const hasWindow=/DSJ1|DS1|LARGE\s*WINDOW/i.test(windowType);
    const material=v=>{
      const t=text(v).toUpperCase();
      if(/LAMINATED|LAMINATE/.test(t))return 'LAMINATED';
@@ -806,7 +821,7 @@
      return (mrl?{'PP':1.2}:{'PP':1.2,'SUS-HE':1.2,'SUS-M':1.5,'PPS':0.8})[m]??null;
    };
    const carDoorThickness=m=>{
-     if(hasWindow)return 1.5;
+
      if(mrl)return ({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null;
      if(['PP','SUS-HL','SUS-HE'].includes(m)){
        if(hhk>=2100&&hhk<2401)return 1.2;
@@ -818,7 +833,7 @@
    const transomThickness=m=>mrl?({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null:({'PP':1.2,'SUS-HL':1.2,'SUS-HE':1.2,'SUS-M':1.5,'PPS':0.8})[m]??null;
    const frontThickness=m=>mrl?({'PP':1.2,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null:({'PP':1.2,'SUS-HL':1.2,'SUS-M':1.5})[m]??null;
    const entranceThickness=m=>{
-     if(hasWindow)return 1.5;
+
      if(fire){if(opening==='CO')return 1.5;if(opening==='2S')return 1.2;return null;}
      if(mrl)return ({'PP':1.6,'SUS-HL':1.2,'LAMINATED':1.2})[m]??null;
      return ({'PP':1.2,'SUS-HL':1.2,'SUS-HE':1.5,'SUS-M':1.5,'PPS':0.8})[m]??null;
@@ -863,11 +878,18 @@
        const style=read(mrl?(name.endsWith('main')?'D71':'D72'):(name.endsWith('main')?'D74':'D75'));
        if(style&&!/E-102|WITHOUT\s*TP|W\/O\s*TP/i.test(style))continue;
      }
-     const mat=material(raw),thickness=mat?fn(mat):null;
+     const mat=material(raw),isDoor=fn===carDoorThickness||fn===entranceThickness;
+     const windowPanel=isDoor&&(glazedRows.has(viRow)||/\bDS1\b/i.test(raw));
+     const thickness=mat?(windowPanel?1.5:fn(mat)):null;
      doc.materialThicknessResults.push({name,material:mat,thickness,k});
      const unverified=name==='Car wall'&&mat==='SUS-HL'&&thickness===null&&Number.isFinite(k);
      const unverifiedLam=name==='Car wall'&&mrl&&mat==='LAMINATED'&&thickness===null&&Number.isFinite(k);
      if(!Number.isFinite(thickness)&&!(unverified||unverifiedLam))continue;
+     if(glazedRows.has(viRow)){
+       doc.cells['C'+viRow]=doc.cells['C'+viRow].replace(/\.$/,'')+'. Tấm cửa dày '+thickness.toFixed(1)+' mm.';
+       doc.cells['C'+enRow]=doc.cells['C'+enRow].replace(/\.\)$/,'')+'. Door panel thickness '+thickness.toFixed(1)+' mm.)';
+       continue;
+     }
      supplement('C'+viRow,thickness,false,unverified||unverifiedLam);
      supplement('C'+enRow,thickness,true,unverified||unverifiedLam);
    }
