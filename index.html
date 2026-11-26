@@ -811,12 +811,21 @@ body .workspace > .leadtime-check {background-color:#fff;}
 #fields .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note strong{font-weight:800;color:#583700}
 #fields .car-design-line[data-device="K22_SUSType"] .car-design-variants:has(.ny40-sus304-note:not([hidden]))::after{content:none!important}
 
-/* v5.8.108 — Keep SUS304 recommendation visible even when the third column is hidden. */
-#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note:not([hidden]){
- display:block!important;margin-top:8px;color:#805400;background:#fff7e5;
- border-left:3px solid #d59a28;border-radius:4px;padding:9px 11px;font-size:12px;line-height:1.5;
+/* R65 — SUS304 advisory and reference grade share the right-hand cell. */
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .car-design-variants{
+ display:flex!important;align-items:center;gap:8px;min-width:0;
 }
-#fields .car-design-line[data-device="K22_SUSType"] .car-design-material .ny40-sus304-note strong{font-weight:800;color:#583700}
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note:not([hidden]){
+ flex:1;min-width:0;margin:0;padding:4px 7px;font-size:11px;line-height:1.25;overflow-wrap:anywhere;
+}
+#fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .car-design-standard-note{
+ flex:0 1 118px;min-width:0;padding:0;font-size:10px;text-align:right;
+}
+@media(max-width:680px){
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .car-design-variants{flex-wrap:wrap;gap:3px;}
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .ny40-sus304-note:not([hidden]){flex-basis:100%;font-size:10px;}
+ #fields .spec-section[data-section="III"] .car-design-line[data-device="K22_SUSType"] .car-design-standard-note{flex-basis:100%;text-align:left;}
+}
 #features .mbs-natural-light-note,.mbs-natural-light-note{
  display:block;margin:0 0 9px 0;padding:9px 12px;color:#805400;background:#fff7e5;
  border-left:3px solid #d59a28;border-radius:4px;font-size:12px;line-height:1.5;
@@ -1417,15 +1426,33 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
   .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
 }
 </style>
-<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style><style>.draft-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.draft-actions span{font-size:12px;color:#375975}</style></head>
+<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style><style>.draft-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.draft-actions span{font-size:12px;color:#375975}</style><style>
+.flat-head{background:#fff;border:1px solid #d8e4ef;border-radius:6px;margin:0 0 12px;padding:0 16px;color:#203f5c}
+.flat-row{display:flex;align-items:center;gap:14px;min-height:52px;padding:7px 0}
+.flat-row+.flat-row{border-top:1px solid #e2e9ef}
+.flat-row .intro-title{font-size:23px}.flat-title,.flat-row .project-grid{flex:1}
+.flat-head .model-control{width:min(34%,330px);min-width:0;margin:0}
+.flat-head .project-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.flat-head .project-grid :is(.field,label:has(>input)){display:flex;align-items:center;flex-direction:row;gap:8px;min-width:0;font-size:13px;font-weight:650}
+.flat-head .project-grid .nm{white-space:nowrap}.flat-head .project-grid input{min-width:0;flex:1}
+.flat-head .flat-etd{display:flex;gap:5px;align-items:baseline;font-size:13px;font-weight:700;white-space:nowrap}
+.flat-head .flat-status{flex:1;min-width:0}.flat-head .check-top{margin:0;padding:3px 0;background:transparent;border:0}
+.flat-actions{gap:6px;flex-wrap:wrap}.flat-menu{position:relative;margin:0}
+.flat-menu>summary{cursor:pointer;list-style:none;padding:8px 12px;border:1px solid #c6d6e4;background:white;border-radius:4px;font-weight:650;font-size:13px}
+.flat-menu>summary::-webkit-details-marker{display:none}.flat-menu>summary::after{content:' ▾';color:#45627b}
+.flat-menu[open]>summary{background:#edf5fc}.flat-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:81;min-width:185px;background:white;border:1px solid #c7d6e3;border-radius:5px;box-shadow:0 4px 12px #182c4021;padding:8px;display:grid;gap:5px}
+.flat-pop .btn{width:100%;text-align:left}.flat-pop .tech-export-choice{width:100%;margin:0;padding:6px;border:0;background:transparent}.flat-pop .export-buttons{display:flex;flex-wrap:nowrap;gap:5px}.flat-pop.export-pop{width:min(305px,80vw)}
+.flat-head .branded-excel{background:#217346!important;color:#fff!important}.flat-head .branded-pdf{background:#bd3435!important;color:#fff!important}
+.flat-actions #check{background:#bd2331;color:white;border:0;border-radius:4px;padding:9px 14px;font-weight:700}.flat-head #car{width:auto;min-width:64px}
+.flat-head #draft-feedback:empty,.flat-head #check-issues:empty,.flat-head #leadtime-reasons:empty{display:none}
+.flat-head #leadtime-reasons{font-size:12px}.flat-head #draft-feedback{display:block;font-size:12px}
+@media(min-width:851px){body.flat-top-visible .desktop-check-float{display:none!important}}
+@media(max-width:850px){.flat-head{padding:0 9px}.flat-row{min-height:40px;gap:6px;flex-wrap:wrap}.flat-row .intro-title{font-size:16px}.flat-head .model-control{width:48%}.flat-head .project-grid{gap:7px}.flat-head .project-grid :is(.field,label:has(>input)){flex-direction:column;align-items:stretch;gap:2px}.flat-head .flat-status{flex-basis:100%}.flat-menu:first-of-type .flat-pop{left:0;right:auto}.flat-actions{justify-content:flex-end}}
+</style></head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><div class="header-tools" style="display:flex;align-items:center;gap:8px"><div class="summary-group" style="display:inline-flex;align-items:center;gap:8px;padding:3px 6px;border:1px solid #aabdd2;border-radius:3px"><span class="summary-note" style="font-size:.5625rem;line-height:1.2;white-space:nowrap;color:#8b292d">Đang phát triển,<br>không nghịch nhé! ^^</span><a class="summary-tab btn btn-secondary" style="background:#eaeced;border-color:#c6c9cd;color:#363a40" href="multi.html" target="multi-spec-mr">Spec Summary</a></div><span class="brand-side">SPEC ENGINEERING</span></div><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 <main class="workspace">
-<div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select></div></div>
-<details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
-<section class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="project-fields" class="project-grid"></div></section>
-<section class="leadtime-check" id="product-leadtime" aria-live="polite"><div class="leadtime-label">Product Lead Time (ETD)</div><div class="leadtime-main"><strong id="leadtime-days">—</strong><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div></div></section>
-<section class="action-panel"><div class="draft-actions"><button type="button" class="btn btn-secondary" id="save-single-draft">Lưu bản nhập</button><button type="button" class="btn btn-secondary" id="open-single-draft">Mở bản nhập</button><input type="file" id="single-draft-file" accept=".json,application/json" hidden><span role="status" id="draft-feedback"></span></div><label class="tech-export-choice" for="only-vi"><input id="only-vi" type="checkbox"><span><strong>Vietnamese Only</strong></span></label><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="toolbar"><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec / Check Spec</button><i class="toolbar-sep" aria-hidden="true"></i><div class="export-buttons"><button class="btn btn-secondary branded-export branded-excel" id="final-xlsx" type="button" title="Xuất Excel (.xlsx)"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2.8h7.6L20 8.2V21H7V2.8Z"/><path d="M14.5 2.8v5.5H20M10 12h7M10 15.5h7M10 19h7M13.5 11v8"/><path d="M4 8.6h8v11H4z"/><path d="m6 12 4 5m0-5-4 5"/></svg></span><span class="export-button-label">Xuất Excel (.xlsx)</span></button><button class="btn btn-secondary branded-export branded-pdf" id="final-pdf" type="button" title="Xuất A4 PDF"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 2.5h9l5 5V21.5H5zM14 2.5v5h5"/><path d="M8 17.5c2.2-2.8 3.7-5.8 4.6-8.1.4 3 1.4 5.4 3.1 7.3-2.8-1-5.5-1-7.7.8Z"/></svg></span><span class="export-button-label">Xuất A4 PDF</span></button></div></div><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div><div id="check-issues" aria-live="polite"></div></section>
+<section class="flat-head"><div class="flat-row"><div class="flat-title"><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1></div><div class="model-control"><select aria-label="Chọn model" id="model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select></div></div><div class="flat-row"><div id="project-fields" class="project-grid"></div><div id="product-leadtime" class="flat-etd">ETD <strong id="leadtime-days">—</strong></div></div><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div><div class="flat-row flat-actions"><div class="flat-status"><div id="check-top" class="check-top" aria-live="polite" role="status">Chưa kiểm tra / Not checked</div></div><details class="flat-menu"><summary>Lưu tệp</summary><div class="flat-pop "><button type="button" class="btn btn-secondary" id="save-single-draft">Lưu bản nhập (.json)</button><button type="button" class="btn btn-secondary" id="open-single-draft">Mở bản nhập (.json)</button></div></details><button class="btn btn-primary" id="check" type="button">✓ Kiểm tra Spec</button><details class="flat-menu"><summary>Xuất file</summary><div class="flat-pop export-pop"><label class="tech-export-choice" for="only-vi"><input id="only-vi" type="checkbox"><span><strong>Vietnamese Only</strong></span></label><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="export-buttons"><button class="btn btn-secondary branded-export branded-excel" id="final-xlsx" type="button" title="Xuất Excel (.xlsx)"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2.8h7.6L20 8.2V21H7V2.8Z"></path><path d="M14.5 2.8v5.5H20M10 12h7M10 15.5h7M10 19h7M13.5 11v8"></path><path d="M4 8.6h8v11H4z"></path><path d="m6 12 4 5m0-5-4 5"></path></svg></span><span class="export-button-label">Xuất Excel (.xlsx)</span></button><button class="btn btn-secondary branded-export branded-pdf" id="final-pdf" type="button" title="Xuất A4 PDF"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 2.5h9l5 5V21.5H5zM14 2.5v5h5"></path><path d="M8 17.5c2.2-2.8 3.7-5.8 4.6-8.1.4 3 1.4 5.4 3.1 7.3-2.8-1-5.5-1-7.7.8Z"></path></svg></span><span class="export-button-label">Xuất A4 PDF</span></button></div></div></details></div><input type="file" hidden accept=".json,application/json" id="single-draft-file"><span role="status" id="draft-feedback"></span><div id="check-issues" aria-live="polite"></div></section><details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
 <nav class="spec-nav" id="spec-nav" aria-label="Điều hướng nhóm thông số / Sections"></nav>
 <div class="fields-root" id="fields"></div>
 <section class="features-panel"><h2 class="section-heading">V. Các tính năng / Features</h2><div id="feature-tabs" class="feature-tabs"></div><div class="feature-list" id="features"></div></section>
@@ -2091,7 +2118,7 @@ patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 </script>
 <script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=R62"></script>
+<script src="app.js?v=R65"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
@@ -2105,6 +2132,14 @@ function updateSummaryLink(){
 }
 document.getElementById('model').addEventListener('change',updateSummaryLink);
 updateSummaryLink();
+</script><script>
+(()=>{const head=document.querySelector('.flat-head'),menus=[...head.querySelectorAll('.flat-menu')];
+const shut=()=>menus.forEach(m=>m.open=false);
+head.addEventListener('click',e=>{const toggle=e.target.closest('summary');if(toggle){for(const m of menus)if(m!==toggle.parentElement)m.open=false}else if(e.target.closest('button'))shut()});
+document.addEventListener('click',e=>{if(!e.target.closest('.flat-menu'))shut()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const m=menus.find(x=>x.open);if(m){m.open=false;m.querySelector('summary').focus()}}});
+if('IntersectionObserver' in window)new IntersectionObserver(([r])=>document.body.classList.toggle('flat-top-visible',r.isIntersecting)).observe(head.querySelector('.flat-actions'));
+})();
 </script></body></html>
 
 <!-- 5.8.195: EN81-72 and BufferCap remain hidden until re-enabled. -->

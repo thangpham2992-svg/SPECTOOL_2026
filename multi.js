@@ -25,11 +25,15 @@ window.addEventListener('message',async e=>{
   await request(car,'set',{key:controlKey,value:car.group.mode});status(err.message);
  }finally{main.inert=false;await refresh()}
 });
+function createFrame(name,frameModel){
+ const frame=make('iframe');frame.title=name;frame.hidden=true;
+ const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
+ frame.src='spec.html?model='+frameModel;document.querySelector('main').append(frame);
+ return {name,frame,ready};
+}
 function add(){
  clearErrorMarks();
- let name;do{name='P'+(++created)}while(cars.some(c=>c.name===name));const frame=make('iframe');frame.title=name;frame.hidden=true;
- const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.src='spec.html?model='+model;
- cars.push({name,frame,ready});document.querySelector('main').append(frame);el('car').add(new Option(name));el('car').selectedIndex=cars.length-1;
+ let name;do{name='P'+(++created)}while(cars.some(c=>c.name===name));const car=createFrame(name,model);cars.push(car);el('car').add(new Option(name));el('car').selectedIndex=cars.length-1;
 }
 function current(){return cars[el('car').selectedIndex]}
 function show(){
@@ -47,14 +51,14 @@ async function refresh(){
  draw();
  }catch(e){if(revision===version)status(e.message)}
 }
-const isMRL=new URLSearchParams(location.search).get('model')==='MRL';
-const model=isMRL?'MRL':'MR';
-const modelName=isMRL?'NEXIEZ-MRL Version2':'NEXIEZ-MR';
-el('modelBadge').textContent=modelName;
-el('summaryModel').textContent=modelName+' ALPHA';
-document.title='Spec Summary · '+modelName;
-const controlKey=isMRL?'D22':'D21';
-const speedKey=isMRL?'D17':'D15', stopsKey=isMRL?'D18':'D16', floorsKey=isMRL?'D19':'D17';
+let model,isMRL,controlKey,speedKey,stopsKey,floorsKey;
+function setSummaryModel(value){
+ model=value;isMRL=model==='MRL';controlKey=isMRL?'D22':'D21';speedKey=isMRL?'D17':'D15';
+ stopsKey=isMRL?'D18':'D16';floorsKey=isMRL?'D19':'D17';
+ const name=isMRL?'NEXIEZ-MRL Version2':'NEXIEZ-MR';
+ el('modelBadge').textContent=name;el('summaryModel').textContent=name+' ALPHA';document.title='Spec Summary · '+name;
+}
+setSummaryModel(new URLSearchParams(location.search).get('model')==='MRL'?'MRL':'MR');
 const MAX_STOP_DIFFERENCE=1;
 function titleInput(car){
  const input=make('input');input.value=car.name;input.title='Sửa mã thang';input.setAttribute('aria-label','Mã thang '+car.name);
@@ -530,3 +534,64 @@ for(const id of ['exportBook','desktop-export-xlsx','m-xlsx'])el(id).onclick=()=
 for(const id of ['exportPdf','desktop-export-pdf','m-pdf'])el(id).onclick=()=>run('pdf');
 document.querySelectorAll('main button:not(.active)').forEach(b=>b.classList.add('btn','btn-secondary'));
 for(let i=0;i<4;i++)add();el('car').selectedIndex=0;show();
+
+function summaryDraftGroups(){
+ return [...new Set(cars.map(c=>c.group).filter(Boolean))].map(bank=>({
+  mode:bank.mode,members:bank.map(c=>cars.indexOf(c))
+ }));
+}
+function validateSummaryDraft(d){
+ const invalid=()=>{throw Error('File chưa đúng định dạng bản nhập Spec Summary.')};
+ if(!d||d.format!=='SpecWebTool.summary'||d.version!==1||!['MR','MRL'].includes(d.model)||
+  !Array.isArray(d.cars)||!d.cars.length||!Array.isArray(d.groups)||!Array.isArray(d.project)||
+  !d.project.every(x=>Array.isArray(x)&&['C7','C8'].includes(x[0])&&typeof x[1]==='string')||
+  !d.cars.every(c=>c&&typeof c.name==='string'&&c.name.trim()&&c.input?.model===d.model)||
+  typeof d.onlyVi!=='boolean'||typeof d.details!=='boolean')invalid();
+ const used=new Set();
+ for(const g of d.groups){
+  if(!g||!['2C-2BC',...(d.model==='MRL'?['3C-SAI-2200C','4C-SAI-2200C']:[])].includes(g.mode)||
+     !Array.isArray(g.members)||g.members.length<2||g.members.length>parseInt(g.mode))invalid();
+  for(const i of g.members){if(!Number.isInteger(i)||!d.cars[i]||used.has(i))invalid();used.add(i)}
+ }
+}
+async function saveSummaryDraft(){
+ const inputs=await Promise.all(cars.map(c=>request(c,'draft')));
+ const d={format:'SpecWebTool.summary',version:1,model,project:[...project],onlyVi:el('only-vi').checked,
+  details:el('export-tech-details').checked,groups:summaryDraftGroups(),selected:cars.indexOf(current()),
+  cars:cars.map((c,i)=>({name:c.name,input:inputs[i]}))};
+ const name=await request(cars[0],'draftName',project.get('C7')||'Cong trinh');
+ const url=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));
+ const a=make('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);el('draft-feedback').textContent='Đã tạo bản nhập '+name;
+}
+async function openSummaryDraft(file){
+ const d=JSON.parse((await file.text()).replace(/^\uFEFF/,''));validateSummaryDraft(d);
+ const next=[];
+ try{
+  for(const c of d.cars){
+   const car=createFrame(c.name,d.model);next.push(car);await request(car,'openDraft',c.input);
+   for(const [key,value] of d.project)await request(car,'set',{section:'P',key,value});
+  }
+  for(const g of d.groups){const bank=g.members.map(i=>next[i]);bank.mode=g.mode;for(const car of bank)car.group=bank}
+  const nextCache={};
+  for(const id of Object.keys(sections))nextCache[id]=await Promise.all(next.map(c=>request(c,'fields',{section:id,group:'all'})));
+  ++version;const old=cars.splice(0,cars.length,...next);for(const car of old)car.frame.remove();
+  setSummaryModel(d.model);cache=nextCache;created=cars.length;
+ }catch(e){for(const c of next)if(!cars.includes(c))c.frame.remove();throw e}
+ project.clear();for(const [k,v] of d.project)project.set(k,v);
+ el('car').replaceChildren(...cars.map(c=>new Option(c.name)));
+ const selected=Number.isInteger(d.selected)&&cars[d.selected]?d.selected:0;
+ el('car').selectedIndex=selected;page=Math.floor(selected/4);section='I';detail=false;
+ el('detail').textContent='Form đơn';el('overview').hidden=false;el('featureGroup').value='all';el('featureGroup').hidden=true;
+ el('diff').checked=false;el('search').value='';el('only-vi').checked=d.onlyVi;el('export-tech-details').checked=d.details;
+ document.querySelectorAll('nav.sections button').forEach(btn=>btn.classList.toggle('active',btn.textContent===sections.I));
+ lastFailures=[];clearErrorMarks();draw();status('Chưa kiểm tra');
+ el('draft-feedback').textContent='Đã mở '+file.name+' · '+cars.length+' cột thang.';
+}
+async function handleSummaryFile(action){
+ const main=document.querySelector('main');main.inert=true;
+ try{await action()}catch(e){el('draft-feedback').textContent='Chưa hoàn tất. '+e.message}finally{main.inert=false}
+}
+el('save-summary-draft').onclick=()=>handleSummaryFile(saveSummaryDraft);
+el('open-summary-draft').onclick=()=>el('summary-draft-file').click();
+el('summary-draft-file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleSummaryFile(()=>openSummaryDraft(f))};

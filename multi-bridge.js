@@ -11,7 +11,10 @@ window.addEventListener('message',async event=>{
  if(window.parent===window||event.source!==window.parent||data?.channel!=='multi-spec')return;
  const reply={channel:'multi-result',token:data.token};
  try{
-  if(data.action==='snapshot'){
+  if(data.action==='draft'){reply.result=singleDraft();
+  }else if(data.action==='draftName'){reply.result=singleDraftName(data.payload);
+  }else if(data.action==='openDraft'){checkSingleDraft(data.payload);restoreSingleDraft(data.payload);reply.result=true;
+  }else if(data.action==='snapshot'){
    reply.result={values:{...changes},touched:[...featureTouched],hallManual:[...hallManualSelections],hallAuto:[...hallAutoSelections],hallQty:[...hallManualQuantities]};
   }else if(data.action==='restore'){
    changes={...data.payload.values};featureTouched=new Set(data.payload.touched);

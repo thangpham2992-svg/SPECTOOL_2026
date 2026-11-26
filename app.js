@@ -1861,16 +1861,16 @@ function buildCarDesignLines(){
    const nm=fieldNode.querySelector('.nm');if(nm)nm.textContent=kind==='paint'?'Màu sơn / Paint color':'Hoa văn / Pattern';
    variants.append(fieldNode);
   }
-  // v5.8.107: advisory only for MRL Version02 NY-40 observation cars.
+  // R64: general SUS304 document-check advisory (non-blocking).
   if(parentName==='K22_SUSType'){
    const note=document.createElement('small');
    note.className='ny40-sus304-note';
    note.id='ny40-sus304-advisory';
    note.setAttribute('role','note');
-   note.hidden=true;
-   note.innerHTML='Thang máy quan sát, khuyến nghị nên chọn <strong>SUS304</strong> do yếu tố ánh sáng, môi trường, tăng khả năng chống ăn mòn.';
-   // Keep advisory in the material cell: variants is hidden for single-value Full SUS-HL rows.
-   material.append(note);
+   note.hidden=false;
+   note.innerHTML='Lưu ý: Kiểm tra kỹ bản vẽ (mặt bằng, cửa tầng...) và hồ sơ yêu cầu xem có đề cập đến <strong>SUS304</strong> hay không.';
+   // R65: place advisory beside the material selector.
+   variants.append(note);
   }
   // Material standard grades are advisory and apply only to SUS-HL finishes.
   // The note is refreshed from the current value; never show SUS430 on Painted.
@@ -1921,7 +1921,7 @@ function refreshCarMaterialStandardNotes(){
   const field=current.fields.find(f=>f.name===line.dataset.device);
   if(!field)continue;
   const grade=standardMaterialForCarField(field.name,currentValue(field.cell),model);
-  updateStandardNote(line,'car-design-standard-note',grade);
+  updateStandardNote(field.name==='K22_SUSType'?line.querySelector('.car-design-variants'):line,'car-design-standard-note',grade);
  }
 }
 function mountLandingMaterialStandardNotes(){
@@ -1941,15 +1941,14 @@ function refreshCarDesignStates(){
  const model=$('model').value;
  refreshCarMaterialStandardNotes();
  // Do not enforce SUS304: the designer retains full control of the material selection.
- const sus304Note=panel.querySelector('#ny40-sus304-advisory');
- if(sus304Note)sus304Note.hidden=!(model==='MRL'&&/^NY-40(?:[A-E])?\b/i.test(String(currentValue('D14')||'').trim()));
+ // R64: advisory remains visible whenever Full SUS-HL is present.
  for(const line of panel.querySelectorAll('.car-design-line')){
   const parent=current.fields.find(f=>f.name===line.dataset.device);if(!parent)continue;
   const value=String(currentValue(parent.cell)||'');
   const usePaint=paintedMaterial(value),usePattern=patternedMaterial(value);
   const variants=line.querySelector('.car-design-variants');
   const hasVariant=!!variants?.querySelector('.field');
-  if(variants)variants.classList.toggle('car-design-no-variant',!hasVariant||(!usePaint&&!usePattern && parent.name!=='K22_CeilingModel'));
+  if(variants)variants.classList.toggle('car-design-no-variant',parent.name!=='K22_SUSType'&&(!hasVariant||(!usePaint&&!usePattern && parent.name!=='K22_CeilingModel')));
   for(const box of variants?.querySelectorAll('.field')||[]){
    const input=box.querySelector('[data-cell]');if(!input)continue;
    const isCeiling=parent.name==='K22_CeilingModel';
