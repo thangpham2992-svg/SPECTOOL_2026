@@ -53,14 +53,15 @@ function displayRuns(value,english,mixed,hints){
 }
 function sameControlGroup(a,b){return a?.groupId!=null&&a.groupId===b?.groupId}
 function groupSheet(template,cars,featureNotes){
- const last=String.fromCharCode(66+cars.length),width=108/cars.length,merges=[],lines=[],carry=new Map();
+ const portrait=cars[0].orientation!=='landscape',labelA=portrait?20:25,labelB=portrait?12:15;
+ const last=String.fromCharCode(66+cars.length),width=(portrait?76:108)/cars.length,merges=[],lines=[],carry=new Map();
  function line(values,kind='value'){
   const n=lines.length+1;const headingArea=n<=8;
   let height=headingArea?([17,16,2,2,47,3,27,27][n-1]):21,cells=[];
   for(const [col,value,span=1,style=kind,depth=1,edges=15,englishLabel=false,hints=[],bold=false,scopeNote=''] of values){
    const letter=String.fromCharCode(65+col);
    if(span>1||depth>1)merges.push('<mergeCell ref="'+letter+n+':'+String.fromCharCode(64+col+span)+(n+depth-1)+'"/>');
-   const capacity=headingArea?Array.from({length:span},(_,offset)=>[25,15][col+offset]??width).reduce((a,b)=>a+b,0)-2:col<2?(span>1?42:24):width*span-2;
+   const capacity=headingArea?Array.from({length:span},(_,offset)=>[labelA,labelB][col+offset]??width).reduce((a,b)=>a+b,0)-2:col<2?(span>1?labelA+labelB-2:labelA-1):width*span-2;
    const english=englishLabel||style==='en'||style==='feature_en';
    const mixed=['label','title','section','feature_heading','project','value','feature_value'].includes(style)||(style==='header'&&col===0);
    const dims=style==='label'&&col===1&&/^R[^\n]*\nW[^\n]*$/.test(value);
@@ -214,7 +215,7 @@ function groupSheet(template,cars,featureNotes){
   line(values);
 
  }
- return template.replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="25" customWidth="1"/><col min="2" max="2" width="15" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
+ return template.replace(/orientation="landscape"/, 'orientation="'+(portrait?'portrait':'landscape')+'"').replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="'+labelA+'" customWidth="1"/><col min="2" max="2" width="'+labelB+'" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
 }
 async function buildPairBook(cars,compactHidden=true){
  const zip=await JSZip.loadAsync(pairTemplate,{base64:true}),read=p=>zip.file(p).async('string');

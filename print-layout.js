@@ -372,7 +372,8 @@
    '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Tắt “Headers and footers” trong hộp thoại in nếu được hỏi</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+
    '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
  }
- async function summaryFromXlsx(bytes){
+ async function summaryFromXlsx(bytes,orientation){
+   const portrait=orientation!=='landscape',paper=portrait?'A4 dọc':'A4 ngang';
    const zip=await JSZip.loadAsync(bytes);
    const read=async path=>parse(await zip.file(path).async('string'));
    const styles=styleBook((await read('xl/styles.xml')).documentElement);
@@ -408,7 +409,7 @@
      }
      pages.push('<section><img class="logo" alt="Mitsubishi Electric" src="'+FALLBACK_LOGO+'"><table>'+cols+'<tbody>'+pre+'</tbody></table><table>'+cols+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></section>');
    }
-   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · A4 ngang</title><style>@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:279mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:2px 4px;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}</style><nav>Spec Summary · A4 ngang &nbsp; <button onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+'</html>';
+   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · '+paper+'</title><style>@page{size:A4 '+(portrait?'portrait':'landscape')+';margin:9mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:'+(portrait?'192':'279')+'mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:'+(portrait?'2px 2px':'2px 4px')+';overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}</style><nav>Spec Summary · '+paper+' &nbsp; <button onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+'</html>';
  }
  window.SPEC_PRINT_LAYOUT={fromXlsx,summaryFromXlsx};
 })();

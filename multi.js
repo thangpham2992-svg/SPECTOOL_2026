@@ -433,10 +433,10 @@ function checkPopup(title,failures=[],canExport=false){
    body.append(node);
   }
  }
- if(canExport)body.append(make('p',cars.map(c=>c.name).join(' · ')+' · '+(el('only-vi').checked?'Vietnamese Only':'Song ngữ')+(el('export-tech-details').checked?' · Có trích xuất chi tiết':'')+' · A4 ngang'));
- el('confirmExport').hidden=!canExport;
+ if(canExport)body.append(make('p',cars.map(c=>c.name).join(' · ')+' · '+(el('only-vi').checked?'Vietnamese Only':'Song ngữ')+(el('export-tech-details').checked?' · Có trích xuất chi tiết':'')+' · Chọn khổ giấy và định dạng xuất'));
+ for(const id of ['confirmExport','confirmPdf','exportOrientation'])el(id).hidden=!canExport;
  dialog.returnValue='';if(!dialog.open)dialog.showModal();
- return new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='export'),{once:true}));
+ return new Promise(resolve=>dialog.addEventListener('close',()=>resolve(canExport?dialog.returnValue:''),{once:true}));
 }
 async function run(format){
  let preview;
@@ -444,9 +444,8 @@ async function run(format){
  const dialog=el('checkExportDialog');
  el('checkExportTitle').textContent='Đang kiểm tra Spec';
  el('checkExportBody').replaceChildren();
- el('confirmExport').hidden=true;
- el('confirmExport').textContent=format==='pdf'?'Mở bản in A4 PDF':'Xuất Excel · A4 ngang';
- el('confirmExport').onclick=format==='pdf'?e=>{preview=window.open('','_blank');if(!preview){e.preventDefault();el('checkExportBody').textContent='Hãy cho phép mở tab để xem bản in PDF.'}else{preview.document.title='Spec Summary';preview.document.body.textContent='Đang tạo bản in A4 ngang…'}}:null;
+ for(const id of ['confirmExport','confirmPdf','exportOrientation'])el(id).hidden=true;
+ el('confirmPdf').onclick=e=>{preview=window.open('','_blank');if(!preview){e.preventDefault();el('checkExportBody').append(make('p','Hãy cho phép mở tab để xem bản in PDF.'));}else{preview.document.title='Spec Summary';preview.document.body.textContent='Đang tạo bản in…'}};
  dialog.returnValue='';dialog.showModal();
  try{
   for(const car of cars){
@@ -513,10 +512,12 @@ async function run(format){
   if(!dialog.open)return;
   if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
   status('Check Spec đạt · '+cars.map(c=>c.name).join(', '));
-  if(!await checkPopup('Check Spec đạt · '+cars.length+' cột thang',[],true))return;
+  const choice=await checkPopup('Check Spec đạt · '+cars.length+' cột thang',[],true);
+  if(!['xlsx','pdf'].includes(choice))return;
+  format=choice;const orientation=el('exportOrientation').value==='landscape'?'landscape':'portrait';const paper=orientation==='portrait'?'A4 dọc':'A4 ngang';
 
   for(const car of cars){
-   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
   if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
@@ -524,8 +525,8 @@ async function run(format){
    const markup=await request(cars[0],'summaryPrint',book);
    if(!preview||preview.closed)throw Error('Tab bản in đã đóng.');
    preview.document.open();preview.document.write(markup);preview.document.close();preview.focus();
-   status('Đã mở bản in A4 ngang. Chọn In / Save as PDF để lưu.');
-  }else{const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Đã xuất Excel A4 ngang.')}
+   status('Đã mở bản in '+paper+'. Chọn In / Save as PDF để lưu.');
+  }else{const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Đã xuất Excel '+paper+'.')}
 
  }catch(e){if(preview&&!preview.closed)preview.close();status(e.message);main.inert=false;await checkPopup('Không thể hoàn tất kiểm tra hoặc xuất file',[{car:{name:''},errors:[e.message]}])}finally{main.inert=false;if(el('checkExportTitle').textContent==='Đang kiểm tra Spec')status('Đã đóng kiểm tra Spec.')}
 }
