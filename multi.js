@@ -406,7 +406,7 @@ async function run(exporting){
   }
   if(failures.length){await reportErrors(failures);return}
   if(exporting)for(const car of cars){
-   try{book.push({model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+   try{book.push({onlyVi:el('only-vi').checked,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
   if(failures.length){await reportErrors(failures);return}

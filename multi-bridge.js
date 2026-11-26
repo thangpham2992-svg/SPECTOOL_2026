@@ -72,7 +72,7 @@ window.addEventListener('message',async event=>{
    reply.result=issues?.length?orderedCheckErrors(issues).map(e=>({message:e.message||'Vui lòng kiểm tra thông số.',cell:e.cell||''})):messages.map(message=>({message,cell:''}));
   }else   if(data.action==='pairRows'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');
-   const x=await buildFinalExport(Boolean(data.payload?.includeTechDetails));reply.result=await window.SPEC_PRINT_LAYOUT.fromXlsx(x.data,x.model,true);
+   const x=await buildFinalExport(Boolean(data.payload?.includeTechDetails),false);reply.result=await window.SPEC_PRINT_LAYOUT.fromXlsx(x.data,x.model,true);
   }else if(data.action==='pairBook'){reply.result=await buildPairBook(data.payload);
   }else if(data.action==='excel'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');

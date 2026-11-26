@@ -163,6 +163,9 @@
          // Match the feature code in the export block to prevent leakage of Option X.
          for(let er=xrange[0];er<=305;er++)if(text(cells['D'+er]).trim()===code)featureRows.push(er);
        }
+       if(/^(?:MBS|Multi\s*-\s*Beam Door Sensor)$/i.test(code)){
+         for(const er of featureRows)if(/^Multi\s*-\s*Beam Door Sensor$/i.test(text(cells['A'+er]).trim()))cells['A'+er]='(MBS) Multi - Beam Door Sensor';
+       }
        if(!featureRows.length)continue; // Code has no export row in this workbook.
        if(present){visibleCount++;includedFeatures.push({group,code,row,option:text(option.value),exportRows:featureRows});}
        else{removedFeatures.push({group,code,row});for(const er of featureRows)hiddenRows.add(er);}
@@ -224,6 +227,9 @@
    // Override only ceiling bilingual description rows; leave all paint colors intact.
    const finishCell=model==='MR'?'D46':'D42',ceilingCell=model==='MR'?'D45':'D41';
    const ceilingName=text(eng.safe('SpecForm',ceilingCell).value).trim();
+   if(window.SPEC_CEILING_EXIT.sized(model,ceilingName)){
+     cells.C64='Trên trần phòng thang kích thước 500x700mm (Provided on the ceiling 500x700mm)';
+   }
    const ceilingFinish=text(eng.safe('SpecForm',finishCell).value).trim().toUpperCase();
    const ceilingOutputRow=model==='MR'?46:45;
    if(ceilingName && /^(SUS-HL|SUS-M)$/.test(ceilingFinish)){
@@ -268,12 +274,15 @@
    // MR FE-Hongkong (FE-C30): the historical template omits a dedicated row.
    // In this variant the existing FE bilingual export slot represents FE-C30.
    // Avoid adding rows to the XLSX layout or mislabeling standard FE.
-   if(model==='MR' && ['1','TRUE','V','✓'].includes(text(changes.FE_C30).toUpperCase())){
+   if(model==='MR' && window.SPEC_CEILING_EXIT.c30Selected(changes)){
+     const heading=nameAddr(db,'SpecFormExport','K37_Title_EmergencyFeatures');
+     if(heading)hiddenRows.delete(cellRow(heading));
      hiddenRows.delete(93);hiddenRows.delete(94);
+     cells.D93='FE-C30';cells.D94='FE-C30';
      cells.A93='(FE-C30) FE-Hongkong with MELCO switch';
-     cells.C93='Firefighter emergency operation — Hong Kong configuration with MELCO switch (FE-C30).';
+     cells.C93=window.SPEC_CEILING_EXIT.en;
      cells.A94='Vận hành khẩn cấp chữa cháy FE Hongkong (FE-C30)';
-     cells.C94='Vận hành cứu hỏa theo cấu hình FE Hongkong, sử dụng công tắc MELCO (FE-C30).';
+     cells.C94=window.SPEC_CEILING_EXIT.vi;
      includedFeatures.push({group:'Emergency',code:'FE-C30',row:null,option:'A',exportRows:[93,94]});
    }
    // Hidden/manual-only Version02 feature definitions are used for source checks and
@@ -919,6 +928,184 @@
    const inline=document.createElementNS(n,'is'),t=document.createElementNS(n,'t');
    c.setAttribute('t','inlineStr');if(/^\s|\s$|\n/.test(String(v)))t.setAttribute('xml:space','preserve');t.textContent=String(v);inline.appendChild(t);c.appendChild(inline);
  }
+ // Project the final, styled sheet so Form đơn, PDF and Spec Summary share the same language rules.
+ async function vietnameseSheet(zip,x,lastDataColumn){
+   const styles=parse(await zip.file('xl/styles.xml').async('string'));
+   const fonts=all(child(styles.documentElement,'fonts'),'font');
+   const xfs=all(child(styles.documentElement,'cellXfs'),'xf');
+   const ss=zip.file('xl/sharedStrings.xml');
+   const strings=ss?all(parse(await ss.async('string')),'si'):[];
+   // Match Vietnamese vowels and tone marks. Ø (diameter) and × are engineering symbols.
+   const vn=t=>/[đĐ]|[aeiouy][\u0300\u0301\u0302\u0303\u0306\u0309\u031b\u0323]/i.test(t.normalize('NFD'));
+   const detailTranslation=t=>!vn(t)&&/\b(?:display floor and direction|hall indicators?|handrail|button diameter|thickness|hairline faceplate)\b/i.test(t);
+   const technical=t=>/^\d+\s*V\s+(?:Single|Multi)\s*[-–]\s*\d+\s*Master Stations?$/i.test(t.trim())||/^Mitsubishi\s+Standard$/i.test(t.trim())||/^(?:[A-Z0-9][A-Z0-9./×+– -]*|\d+[\d., ×x+-]*(?:mm|kg|m\/s|m²)?)$/.test(t.trim());
+   const local=t=>t.replace(/8th Floor – Tower B – Viettel Tower, 285 Cach Mang Thang 8 Street, Hoa Hung Ward, HCMC/g,'Tầng 8 – Tháp B – Tòa nhà Viettel, 285 Cách Mạng Tháng 8, phường Hòa Hưng, TP. Hồ Chí Minh').replace(/\b(\d+)\s*V\s+(Single|Multi)\s*[–-]\s*(\d+)\s*Master Stations?\b/gi,(_,v,k,n)=>v+'V '+(k.toLowerCase()==='single'?'Single':'Multi')+' - '+n+' Master station').replace(/(\d+)\s*Lines\b/gi,'$1 đường').replace(/\(Main specifications\)/ig,'').trim();
+   const ranges=new Map(all(x,'mergeCell').map(el=>{const [a,b]=el.getAttribute('ref').split(':');return [a,b]}));
+   const widths=new Map();
+   for(const col of all(x,'col'))for(let i=+col.getAttribute('min');i<=Math.min(lastDataColumn,+col.getAttribute('max'));i++)widths.set(i,+col.getAttribute('width'));
+   const richText=node=>all(node,'t').map(t=>t.textContent).join('');
+   const borderTable=child(styles.documentElement,'borders'),xfTable=child(styles.documentElement,'cellXfs');
+   const borders=all(borderTable,'border'),edgeCache=new Map(),styleCache=new Map();
+   // In bilingual rows the upper cell has the top edge and the lower cell has the bottom edge.
+   function carryBottom(upper,lower){
+     const original=+upper.getAttribute('s')||0,base=xfs[original];
+     const source=xfs[+lower.getAttribute('s')||0];
+     const sourceId=+source.getAttribute('borderId')||0,baseId=+base.getAttribute('borderId')||0;
+     const edge=child(borders[sourceId],'bottom');
+     if(!edge?.getAttribute('style')||baseId===sourceId)return;
+     const styleKey=original+':'+sourceId;
+     if(!styleCache.has(styleKey)){
+       const edgeKey=baseId+':'+sourceId;
+       if(!edgeCache.has(edgeKey)){
+         const border=borders[baseId].cloneNode(true),old=child(border,'bottom');
+         if(old)border.replaceChild(edge.cloneNode(true),old);
+         else border.insertBefore(edge.cloneNode(true),Array.from(border.children).find(e=>['diagonal','vertical','horizontal'].includes(e.localName))||null);
+         edgeCache.set(edgeKey,borders.length);borders.push(border);borderTable.appendChild(border);
+       }
+       const xf=base.cloneNode(true);xf.setAttribute('borderId',String(edgeCache.get(edgeKey)));xf.setAttribute('applyBorder','1');
+       styleCache.set(styleKey,xfs.length);xfs.push(xf);xfTable.appendChild(xf);
+     }
+     upper.setAttribute('s',String(styleCache.get(styleKey)));
+   }
+   const removedRows=new Set();
+   let previousCells=new Map();
+   const sheetRows=all(x,'row');
+   const featureCodes=new Map();
+   const englishFeatureRows=new Set();
+   function featureTitle(row){
+     if(!row||row.getAttribute('hidden')==='1')return '';
+     const label=Array.from(row.children).find(c=>c.getAttribute('r')==='A'+row.getAttribute('r'));
+     if(!label)return '';
+     const node=label.getAttribute('t')==='s'?strings[+child(label,'v')?.textContent]:child(label,'is');
+     return node?richText(node).trim().split(/\r?\n/)[0].trim():'';
+   }
+   function identifier(title){
+     const prefix=/^\(([A-Z][A-Za-z0-9 /-]*)\)(?:\s|$)|^([A-Z][A-Z0-9-]*)\s+[-–—]\s+/.exec(title);
+     if(prefix)return prefix[1]||prefix[2];
+     // These two legacy factory labels use the full feature name in the code column.
+     if(/^Multi\s*-\s*Beam Door Sensor$/i.test(title))return 'MBS';
+     if(/^Non-service Temporary Release for Hall Call\s*[-–]\s*Card Reader Type/i.test(title))return 'NSCR-H';
+     return '';
+   }
+   let inFeatureSection=false;
+   for(let i=0;i<sheetRows.length-1;i++){
+     const first=sheetRows[i],second=sheetRows[i+1],a=featureTitle(first);
+     if(/^(?:V|VI)\.\s/.test(a))inFeatureSection=true;
+     if(!inFeatureSection||!a||/^[-–]|^(?:V|VI)\./.test(a))continue;
+     const b=featureTitle(second);
+     if(!b||/^[-–]|^(?:V|VI)\./.test(b)||+second.getAttribute('r')!==+first.getAttribute('r')+1)continue;
+     const firstCode=identifier(a),secondCode=identifier(b);
+     const viFirst=vn(a)&&!vn(b)&&secondCode;
+     const enFirst=!vn(a)&&vn(b)&&firstCode;
+     if(!viFirst&&!enFirst)continue;
+     featureCodes.set(+(viFirst?first:second).getAttribute('r'),'('+(viFirst?secondCode:firstCode)+')');
+     englishFeatureRows.add(+(viFirst?second:first).getAttribute('r'));
+     i++;
+   }
+   let inFeatures=false;
+   for(const row of sheetRows){
+     if(row.getAttribute('hidden')==='1')continue;
+     const number=+row.getAttribute('r');if(number<2)continue;
+     const cells=Array.from(row.children).filter(c=>c.localName==='c'&&/^[A-Z]\d+$/.test(c.getAttribute('r'))&&c.getAttribute('r').charCodeAt(0)-64<=lastDataColumn);
+     let hadText=false,remaining=false,changed=false,height=16;
+     for(const c of cells){
+       const addr=c.getAttribute('r'),col=addr.charCodeAt(0)-64;
+       const node=c.getAttribute('t')==='s'?strings[+child(c,'v')?.textContent]:child(c,'is');
+       if(!node){if(child(c,'v'))remaining=true;continue}
+       const original=richText(node);if(!original.trim())continue;
+       hadText=true;
+       if(col===1&&/^V\.\s/.test(original))inFeatures=true;
+       const font=fonts[+(xfs[+c.getAttribute('s')||0]?.getAttribute('fontId')||0)];
+       const italic=!!child(font,'i')&&child(font,'i').getAttribute('val')!=='0';
+       const runs=Array.from(node.children).filter(r=>r.localName==='r');
+       const protectedValue=number<=10&&col>1;
+       let value=original;
+       if(!protectedValue){
+         if(runs.length)value=runs.map(run=>{
+           const t=richText(run),props=child(run,'rPr');
+           if(!t.trim())return t;
+           if(child(props,'i')&&!vn(t)&&!/\/\d+\s*thang\b/i.test(t)&&!technical(t))return t.replace(/[^\n]/g,'');
+           return t;
+         }).join('');
+         if(italic&&!vn(original)&&!technical(original)&&!/\/\d+\s*thang\b/i.test(original))value='';
+         if(inFeatures&&/^\([^)]*\)\s+[A-Za-z]/.test(original)&&!vn(original))value='';
+         if(col>=3&&vn(original)){
+           // Detailed descriptions can mix both languages within one rich-text run.
+           value=value.replace(/\(([^()\n]+)\)/g,(part,inside)=>detailTranslation(inside)?'':part)
+             .split(/\r?\n/).filter(line=>!detailTranslation(line)).join('\n');
+         }
+         value=local(value).split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!/^Only apply for\b/i.test(line)).join('\n');
+         if(vn(value))value=value.replace(/\s*\(([^()]*[a-z][^()]*)\)/gi,(match,inside)=>!vn(inside)&&/\b(?:Emergency exit|Basic specifications|Main specifications|Provided on|Not supplied|Control system)\b/i.test(inside)?'':match);
+       }
+       if(col===1&&featureCodes.has(number)&&vn(value)){
+         const lines=value.split('\n'),code=featureCodes.get(number);
+         if(!lines[0].includes(code))lines[0]=lines[0].trimEnd()+' '+code;
+         value=lines.join('\n');
+       }
+       if(englishFeatureRows.has(number))value='';
+       if(value!==original){
+         const note=value.match(/\n(Chỉ áp dụng cho thang [^\n]+)$/);
+         updateCell(x,c,value);
+         if(note){
+           const inline=child(c,'is');inline.removeChild(child(inline,'t'));
+           for(const [part,red] of [[value.slice(0,note.index),false],[note[0],true]]){
+             const run=x.createElementNS(n,'r'),props=x.createElementNS(n,'rPr'),t=x.createElementNS(n,'t');
+             const name=x.createElementNS(n,'rFont');name.setAttribute('val','Arial');props.appendChild(name);
+             if(red){props.appendChild(x.createElementNS(n,'b'));const color=x.createElementNS(n,'color');color.setAttribute('rgb','FFCC0000');props.appendChild(color)}
+             run.appendChild(props);t.setAttribute('xml:space','preserve');t.textContent=part;run.appendChild(t);inline.appendChild(run);
+           }
+         }
+         changed=true;
+       }
+       if(!value)continue;
+       remaining=true;
+       const end=(ranges.get(addr)||addr).charCodeAt(0)-64;
+       let width=0;for(let k=col;k<=end;k++)width+=widths.get(k)||20;
+       const size=+(child(font,'sz')?.getAttribute('val')||11);
+       const max=Math.max(6,Math.floor((width-2)*10/size));
+       let lines=0;
+       for(const para of value.split('\n')){
+         let used=0;lines++;
+         for(const word of para.split(/\s+/)){
+           if(used&&used+word.length+1>max){lines++;used=0}
+           used+=word.length+(used?1:0);
+           while(used>max){lines++;used-=max}
+         }
+       }
+       height=Math.max(height,Math.ceil(lines*size*1.42+4));
+     }
+     if(hadText&&!remaining){
+       removedRows.add(number);
+       for(const lower of cells){
+         const upper=previousCells.get(lower.getAttribute('r')[0]);
+         if(upper)carryBottom(upper,lower);
+       }
+       row.setAttribute('hidden','1');row.setAttribute('ht','0');row.setAttribute('customHeight','1');
+     }else{
+       previousCells=new Map(cells.map(c=>[c.getAttribute('r')[0],c]));
+       if(changed){row.setAttribute('ht',String(Math.min(409,height)));row.setAttribute('customHeight','1')}
+     }
+   }
+   const merges=child(x.documentElement,'mergeCells');
+   if(merges){
+     for(const merge of all(merges,'mergeCell')){
+       const [start,end]=merge.getAttribute('ref').split(':');
+       const first=+start.match(/\d+$/)[0],last=+end.match(/\d+$/)[0];
+       if(first===last||removedRows.has(first)||!removedRows.has(last))continue;
+       let visible=last;
+       while(visible>first&&removedRows.has(visible))visible--;
+       const finalCell=end.replace(/\d+$/,String(visible));
+       if(start===finalCell)merges.removeChild(merge);
+       else merge.setAttribute('ref',start+':'+finalCell);
+     }
+     merges.setAttribute('count',String(all(merges,'mergeCell').length));
+   }
+   if(styleCache.size){
+     borderTable.setAttribute('count',String(borders.length));xfTable.setAttribute('count',String(xfs.length));
+     zip.file('xl/styles.xml',serial(styles));
+   }
+ }
+
  async function xlsxFromModel(zip, model, db, doc){
    const workbookXML=await zip.file('xl/workbook.xml').async('string');
    const relsXML=await zip.file('xl/_rels/workbook.xml.rels').async('string');
@@ -4203,6 +4390,7 @@
      if(c&&(all(c,'t').some(t=>t.textContent.trim())||all(c,'v').some(v=>v.textContent.trim())))
        throw Error('Unexpected content in section II merged C'+rn);
    }
+   if(doc.onlyVi)await vietnameseSheet(zip,x,3);
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
@@ -4345,5 +4533,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
+ window.SPEC_EXPORT={vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();

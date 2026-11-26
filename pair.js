@@ -242,7 +242,13 @@ async function buildPairBook(cars){
    else while(sameControlGroup(cars[start+size-1],cars[start+size]))size--;
   }
   const group=cars.slice(start,start+size),n=i+1,id=i?'rIdCar'+n:'rId1',name='Spec '+(start+1)+'-'+(start+size),path='xl/worksheets/sheet'+n+'.xml';
-  zip.file(path,groupSheet(template,group,featureNotes,showItpTypes));
+  let sheetXml=groupSheet(template,group,featureNotes,showItpTypes);
+  if(cars[0].onlyVi){
+   const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
+   await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
+   sheetXml=new XMLSerializer().serializeToString(sheet);
+  }
+  zip.file(path,sheetXml);
   sheets+='<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="'+name+'" sheetId="'+n+'" r:id="'+id+'"/>';
   titles+='<definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+name.replace(/^(.+)$/,"'$1'")+'!$9:$9</definedName>';
   if(i){relationships=relationships.replace('</Relationships>','<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/'+path+'"/></Relationships>');

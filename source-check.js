@@ -68,6 +68,15 @@ window.SPEC_PANEL_DISPLAY_RULES=(()=>{
  return {classify,incompatible,selected};
 })();
 
+window.SPEC_CEILING_EXIT=Object.freeze({
+ sized(model,ceiling){
+  const code=String(ceiling??'').trim().toUpperCase();
+  return model==='MR'?['FEVN10','FE10VN'].includes(code):model==='MRL'&&code==='FL1';
+ },
+ c30Selected(changes){return ['1','TRUE','V','✓'].includes(String(changes.FE_C30??'').trim().toUpperCase())},
+ vi:'Khi có hỏa hoạn và công tắc vận hành FE kích hoạt, tất cả các cuộc gọi thang và gọi tầng đều bị hủy, thang máy sẽ lập tức trở về tầng đã được chỉ định trước. Sau đó, thang máy chỉ đáp ứng các cuộc gọi trong thang phục vụ cho công tác chữa cháy và cứu hộ - Vận hành theo yêu cầu QC06',
+ en:'During a fire, when the fire operation switch is activated, the car calls of a specified car and all hall calls are canceled and the car immediately returns to a predetermined floor. The car then responds only to car calls which facilitate fire-fighting and rescue operations-Following QC06'
+});
 window.SPEC_SOURCE_CHECK=function(model,changes,db){
  const Engine=window.SpecExcelSourceEngine?.SourceEngine;
  if(!Engine||!db)return {errors:['SOURCE: Không tải được Excel calculation engine / Missing source engine'],warnings:[],verified:[],unverified:['Excel engine unavailable'],details:[],pass:false};
@@ -129,6 +138,12 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   return model==='MR'?'D21':'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
+ if(model==='MR'&&window.SPEC_CEILING_EXIT.c30Selected(changes)&&['1','TRUE','V','✓'].includes(String(value('SpecForm','A93').value).toUpperCase())){
+  issue('Feature!FE-exclusive','FE_C30','FE và FE Hongkong C30 chỉ được chọn một phương án.');
+ }
+ if(model==='MR'&&window.SPEC_CEILING_EXIT.sized(model,value('SpecForm','D45').value)&&!window.SPEC_CEILING_EXIT.c30Selected(changes)){
+  issue('Feature!Ceiling-FE-C30','FE_C30','Trần FEVN10 yêu cầu chọn FE Hongkong C30 tại mục V – Tính năng khẩn cấp.');
+ }
  // Alpha-specific additions, with MR legacy logic unchanged except the 2-stop Travel cap.
  if(window.SPEC_ALPHA_5865){
   const get=addr=>{const x=value('SpecForm',addr);return x.ok?x.value:null;};

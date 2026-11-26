@@ -215,7 +215,7 @@ function sourceFeatureRows(){
  if($('model').value==='MR' && fromSource.length && !fromSource.some(f=>f.code==='FE-C30')){
   const def=(xrules().features||[]).find(f=>f.code==='FE-C30');
   if(def){const idx=fromSource.findIndex(f=>f.code==='FE');
-   fromSource.splice(idx>=0?idx+1:0,0,{...def,cell:'FE_C30',virtual:true,apply:0,table:'TblFeature_Emergency'});
+   fromSource.splice(idx>=0?idx+1:0,0,{...def,vi:window.SPEC_CEILING_EXIT.vi,en:window.SPEC_CEILING_EXIT.en,cell:'FE_C30',virtual:true,apply:0,table:'TblFeature_Emergency'});
   }
  }
  if($('model').value==='MRL') fromSource.push(...(window.SPEC_V52_FEATURES?.virtual('MRL',db)||[]));
@@ -720,6 +720,9 @@ function renderFeatures(){
   const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
   // NSCR-C and NSCR-H are independent options; the card-reader variant
   // must never lock or overwrite the card-reader-free NSCR-C selection.
+  if($('model').value==='MR'&&['FE','FE-C30'].includes(fCode)&&window.SPEC_CEILING_EXIT.sized('MR',currentValue('D45'))){
+   disabled=true;line.title='Trần FEVN10 sử dụng FE Hongkong C30.';
+  }
   if(fCode==='NSCR-C'){
     const model=$('model').value;
     const ctl=currentValue(model==='MR'?'D21':'D22');
@@ -1292,6 +1295,10 @@ function row(field,displayName='',compact=false){
  input.value=value;
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
+   if($('model').value==='MR'&&field.cell==='D45'){
+    if(window.SPEC_CEILING_EXIT.sized('MR',input.value)){changes.FE_C30='1';changes.A93='0';featureTouched.add('FE_C30');}
+    renderFeatures();
+   }
    // MR: an unsupplied handrail has no mounting location/quantity (D68).
    // Leaving its previous value in this hatched cell falsely fails Check Spec.
    // If the user later chooses a handrail, restore an allowed location.
@@ -3154,12 +3161,12 @@ function download(bytes,name,type){
  const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),120000);
 }
-async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked)){
+async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked),onlyVi=Boolean($('only-vi')?.checked)){
   const model=$('model').value,db=workbookEngineData();
   // Source validation MUST pass before any export side effect.
   const evaluation=window.SPEC_EXPORT.exportModel(model,changes,db);
   // Optional presentation-only detail rows; defaults OFF for both models.
-  evaluation.includeTechDetails=includeTechDetails;
+  evaluation.includeTechDetails=includeTechDetails; evaluation.onlyVi=onlyVi;
   window.SPEC_EXPORT.attachMRMaterialThickness?.(model,changes,db,evaluation);
   const bytes=sourceFiles[model]?.bytes||bytesFromB64(window.SPEC_WORKBOOKS[model]);
   const zip=await JSZip.loadAsync(bytes);
