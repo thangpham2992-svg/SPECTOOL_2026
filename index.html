@@ -1417,7 +1417,7 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
   .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
 }
 </style>
-</head>
+<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style></head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><div class="header-tools" style="display:flex;align-items:center;gap:8px"><div class="summary-group" style="display:inline-flex;align-items:center;gap:8px;padding:3px 6px;border:1px solid #aabdd2;border-radius:3px"><span class="summary-note" style="font-size:.5625rem;line-height:1.2;white-space:nowrap;color:#8b292d">Đang phát triển,<br>không nghịch nhé! ^^</span><a class="summary-tab btn btn-secondary" style="background:#eaeced;border-color:#c6c9cd;color:#363a40" href="multi.html" target="multi-spec-mr">Spec Summary</a></div><span class="brand-side">SPEC ENGINEERING</span></div><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 <main class="workspace">
@@ -2091,7 +2091,7 @@ patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 </script>
 <script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=244-R45"></script>
+<script src="app.js?v=R59"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}

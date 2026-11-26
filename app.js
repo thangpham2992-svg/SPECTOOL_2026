@@ -452,6 +452,48 @@ function enforceMRSingleEntrance(){
  el.closest('.field')?.classList.add('locked');
  el.title='NEXIEZ-MR: cố định 1D-1G / Fixed door-gate type';
 }
+// Use the source form's selected values and dependencies for this elevator only.
+function summaryChildVisible(input,fieldsByCell,fieldsByName){
+ const name=fieldsByCell.get(input.dataset.cell)?.name;
+ const parentValue=key=>{
+  const parent=fieldsByName.get(key);
+  return parent?String(currentValue(parent.cell)??'').trim():'';
+ };
+ for(const [parent,paint,pattern] of finishDependents){
+  if(name&&name===paint)return paintedMaterial(parentValue(parent));
+  if(name&&name===pattern)return patternedMaterial(parentValue(parent));
+ }
+ if(name==='K22_CeilingColor'){
+  const choices=window.SPEC_CEILING_FINISH.options($('model').value,parentValue('K22_CeilingModel'));
+  return choices.some(option=>option&&!/^No color/i.test(option));
+ }
+ if(name==='K31_COPModel'){
+  const chosen=['K31_COPButton','K31_COPCode'].some(key=>{
+   const field=fieldsByName.get(key);
+   return field&&Object.hasOwn(changes,field.cell);
+  });
+  return chosen&&Boolean(parentValue('K31_COPButton')&&parentValue('K31_COPCode')&&input.value);
+ }
+ if(name==='K32_HandrailQuantity')return !/^(?:No|Not supplied|)$/i.test(parentValue('K32_Handrail'));
+ if(name==='K28_FlooringWeight')return /local granite/i.test(parentValue('K28_FlooringType'));
+ if(input.classList.contains('hall-qty'))return !input.disabled;
+ return input.dataset.cfLocked!=='1'&&!input.closest('.car-finish-inactive,.car-design-no-variant');
+}
+function refreshChildVisibility(){
+ if(!['MR','MRL'].includes($('model').value))return;
+ const fieldList=current?.fields||[];
+ const byCell=new Map(fieldList.map(f=>[f.cell,f])),byName=new Map(fieldList.map(f=>[f.name,f]));
+ const root=$('fields');
+ for(const input of root.querySelectorAll('.field [data-cell],.hall-qty')){
+  const box=input.closest('.hall-qty-wrap')||input.closest('.field');
+  if(!box||!box.contains(input)||input.matches('.mr-original-internal'))continue;
+  box.classList.toggle('dependent-off',!summaryChildVisible(input,byCell,byName));
+ }
+ for(const row of root.querySelectorAll('.spec-row')){
+  const fields=Array.from(row.querySelectorAll('.field'));
+  row.classList.toggle('dependent-row-off',fields.length>0&&fields.every(f=>f.classList.contains('dependent-off')));
+ }
+}
 function refreshLocks(){
  // Release only locks previously applied by the workbook's conditional formatting.
  for(const el of document.querySelectorAll('[data-cf-locked="1"]')){
@@ -1271,7 +1313,10 @@ function row(field,displayName='',compact=false){
  box.dataset.sourceCell=field.cell;
  // Source identifiers remain as data-cell attributes for Check Spec, focus and Export.
  const name=document.createElement('label');name.className='nm';name.textContent=window.SPEC_PROOFREAD?.(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '))??(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '));
- const choices=workbookChoices(field);const input=hasDropdown(field)?document.createElement('select'):document.createElement('input');input.dataset.cell=field.cell;input.id='spec-'+field.cell;
+ const choices=workbookChoices(field);const summaryQty=field.name==='K0_Qty'&&window.parent!==window;
+ const input=!summaryQty&&hasDropdown(field)?document.createElement('select'):document.createElement('input');
+ if(summaryQty){input.type='number';input.min='1';input.step='1';}
+ input.dataset.cell=field.cell;input.id='spec-'+field.cell;
  name.htmlFor=input.id;
  let value=String(field.value??'');
  if(input.tagName==='SELECT'){
@@ -2307,6 +2352,7 @@ function mountHallQuantity(item,input,kind){
   run(0);
  }
 function renderAllSpecRows(){
+ queueMicrotask(refreshChildVisibility);
  const rows=current.layout||layouts[$('model').value]||[];
  const byRow=new Map();for(const f of current.fields){const n=split(f.cell)[1];if(!byRow.has(n))byRow.set(n,[]);byRow.get(n).push(f)}
  const root=$('fields'),project=$('project-fields');root.replaceChildren();project.replaceChildren();
@@ -2646,6 +2692,7 @@ function refreshLeadTime(){
 // delegated controls and model/database reloads. No export pipeline changes.
 document.addEventListener('change',()=>queueMicrotask(refreshLeadTime));
 
+document.addEventListener('change',e=>{if(e.target.closest?.('#fields,#features'))queueMicrotask(refreshChildVisibility)},true);
 function load(){mrlTravelEN8172='No';mrlVerticalBufferCap='No';clearGroupControlPreview();hallManualSelections=new Set();hallAutoSelections=new Set();hallManualQuantities=new Set();featureTouched=new Set();window.__lastCheck=null;if($('check-top')){$('check-top').textContent='Chưa kiểm tra';$('check-top').className='check-top';}if($('check-issues'))$('check-issues').replaceChildren();changes={};let model=$('model').value;current=models[model];restoreHallLanternFromSource();renderAllSpecRows();if(model==='MR')applyValue('D33','2100');setMRDefaultGroupAndFER();setMRLHandrailDefault();if(isMRBedCapacity())applyMRBedDefaults(currentValue('D13'));captureMRRoomAllowance();refreshTwoStopTravelWarning();refreshMRBedShaftNotes();setupSpecialOptions();refreshMRLTravelMinimum();flooringManual=false;updateFlooringWeight(true);syncDropdownOptions();syncLandingFinishFromCar();refreshNY40CopChoices();refreshSideDrop();refreshLocks();refreshDesignHints();updateFinishPreviews();refreshMirrorWeightHint();refreshMRLOverheadMinimum(false);refreshMRLShaftMinimum();renderFeatures();refreshMRLTravelMinimum();refreshGroupControlPreview();refreshHallQuantities();refreshMRLDecorationMaximum();$('numvalid').textContent=current.validations.length;$('numtables').textContent=current.table_count;$('filename').textContent=sourceFiles[model]?.name||modelFiles[model]+' (embedded copy)';status('Đã hiển thị '+(current.layout||layouts[model]).length+' dòng có nội dung trong SpecForm của '+$('model').selectedOptions[0].text+'.\nCheck Spec: tính lại công thức DataTable. Export Excel/A4 theo dữ liệu SpecFormExport, chỉ khi Check Spec PASS.','');refreshLeadTime();}
 
 function issueDetails(raw){

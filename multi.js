@@ -40,7 +40,11 @@ async function refresh(){
  const revision=++version;
  try{
  const snapshot=Object.fromEntries(await Promise.all(Object.keys(sections).map(async id=>[id,await Promise.all(cars.map(c=>request(c,'fields',{section:id,group:el('featureGroup').value})))])));
- if(revision!==version)return;cache=snapshot;draw();
+ if(revision!==version)return;cache=snapshot;
+ for(const bank of new Set(cars.map(c=>c.group).filter(Boolean))){
+   if(internalBanks(bank,bank.mode))for(const member of bank)member.group=null;
+ }
+ draw();
  }catch(e){if(revision===version)status(e.message)}
 }
 const isMRL=new URLSearchParams(location.search).get('model')==='MRL';
@@ -56,9 +60,25 @@ function titleInput(car){
  const input=make('input');input.value=car.name;input.title='Sửa mã thang';input.setAttribute('aria-label','Mã thang '+car.name);
  input.onfocus=()=>input.select();input.onkeydown=e=>{if(e.key==='Escape')input.value=car.name;if(['Escape','Enter'].includes(e.key))input.blur()};
  input.onchange=()=>{const name=input.value.trim();
-  if(!name||cars.some(c=>c!==car&&c.name.toLowerCase()===name.toLowerCase())){status('Mã thang cần có tên riêng.');input.value=car.name;return}
+  if(!name){status('Vui lòng nhập tên thang.');input.value=car.name;return}
   clearErrorMarks();car.name=name;car.frame.title=name;el('car').options[cars.indexOf(car)].text=name;draw();
  };return input;
+}
+function columnCount(car){
+ return Number(cache.I?.[cars.indexOf(car)]?.find(f=>f.key==='D11')?.value);
+}
+function internalBanks(members,mode){
+ const size=parseInt(mode,10);
+ return size>1&&members.every(c=>columnCount(c)>0&&columnCount(c)%size===0);
+}
+function internalLabel(car,size,count){
+ const names=car.name.split(/[,;]/).map(v=>v.trim()).filter(Boolean);
+ if(names.length===count){
+  const groups=[];
+  for(let i=0;i<names.length;i+=size)groups.push(names.slice(i,i+size).join(' + '));
+  return groups.join(' · ');
+ }
+ return car.name+' · '+(count/size)+' nhóm × '+size+' thang';
 }
 function groupLabel(car){return car.group.map(c=>c.name).join(' + ')}
 function groupMode(size){return size<=2?size+'C-2BC':size+'C-SAI-2200C'}
@@ -96,16 +116,45 @@ async function copyGroupFeatures(primary,members){
   for(const f of fields)if(actual.get(f.key)!==f.value)throw Error(car.name+' · '+f.sharedCode+' chưa đồng bộ.');
  }
 }
-async function bankUpdate(primary,members,apply){
+async function readPivs(car){
+ return (await request(car,'fields',{section:'IV'})).filter(f=>f.pivKey===f.key);
+}
+async function syncPivs(primary,members,before,joining){
+ const source=await readPivs(primary),peer=members.find(c=>c!==primary);
+ const other=await readPivs(peer);
+ for(const f of source){
+  const g=other.find(g=>g.key===f.key);
+  if(!g||f.value===g.value)continue;
+  if(joining&&!f.doublePiv&&g.doublePiv){
+   await request(primary,'set',{key:f.key,value:g.value,section:'IV',mirrorPiv:true});
+  }else if(f.doublePiv||g.doublePiv&&before?.some(v=>v.key===f.key&&v.doublePiv)){
+   await request(peer,'set',{key:f.key,value:f.value,section:'IV',mirrorPiv:true});
+  }
+ }
+}
+async function bankUpdate(primary,members,apply,options={}){
  const saved=await Promise.all(members.map(c=>request(c,'snapshot')));
- try{await apply();await copyGroupFeatures(primary,members)}
- catch(err){await Promise.all(members.map((c,i)=>request(c,'restore',saved[i])));throw err}
+ try{
+  const before=options.piv?await readPivs(primary):null;
+  await apply();
+  if(options.features!==false&&!isMRL)await copyGroupFeatures(primary,members);
+  if(options.piv)await syncPivs(primary,members,before,options.joining);
+ }catch(err){await Promise.all(members.map((c,i)=>request(c,'restore',saved[i])));throw err}
 }
 async function editFeature(car,f,payload){
- if(!isMRL&&car.group&&f.sharedCode){
+ if(car.group?.mode==='2C-2BC'&&f.pivKey===payload.key){
+  await bankUpdate(car,car.group,()=>request(car,'set',payload),{piv:true,features:false});
+ }else if(!isMRL&&car.group&&f.sharedCode){
   await bankUpdate(car,car.group,()=>request(car,'set',payload));
  }else await request(car,'set',payload);
 }
+window.addEventListener('message',async e=>{
+ if(e.data?.channel!=='summary-piv')return;
+ const car=cars.find(c=>c.frame.contentWindow===e.source);if(!car)return;
+ const main=document.querySelector('main');main.inert=true;
+ try{await editFeature(car,{pivKey:e.data.payload.key},e.data.payload)}
+ catch(err){status(err.message)}finally{main.inert=false;await refresh()}
+});
 window.addEventListener('message',async e=>{
  if(e.data?.channel!=='summary-feature'||isMRL)return;
  const car=cars.find(c=>c.frame.contentWindow===e.source);if(!car)return;
@@ -114,8 +163,7 @@ window.addEventListener('message',async e=>{
  catch(err){status(err.message)}finally{await refresh();main.inert=false}
 });
 async function selectGroupMode(car,value){
- if(isMRL)await writeGroupMode(car.group,value);
- else await bankUpdate(car,car.group,()=>writeGroupMode(car.group,value));
+ await bankUpdate(car,car.group,()=>writeGroupMode(car.group,value),{piv:value==='2C-2BC',joining:true});
  car.group.mode=value;
 }
 async function changeGroup(car,other){
@@ -130,21 +178,27 @@ async function changeGroup(car,other){
    const currentMode=fields.find(f=>f.key===controlKey)?.value;
    if(parseInt(currentMode,10)>=size)value=currentMode;
   }
-  if(!isMRL&&other)await bankUpdate(car,members,()=>writeGroupMode(members,value));
+  const within=other&&internalBanks(members,value);
+  if(other&&!within)await bankUpdate(car,members,()=>writeGroupMode(members,value),{piv:value==='2C-2BC',joining:true});
   else await writeGroupMode(members,value);
   const selected=current(),ordered=cars.filter(c=>members.includes(c)),first=cars.indexOf(ordered[0]);
-  if(other){
+  if(other&&!within){
    const rest=cars.filter(c=>!members.includes(c));
    rest.splice(first,0,...ordered);cars.splice(0,cars.length,...rest);
   }
   ordered.mode=value;
-  for(const c of members)c.group=other?ordered:null;
+  for(const c of members)c.group=other&&!within?ordered:null;
   el('car').replaceChildren(...cars.map(c=>new Option(c.name)));el('car').selectedIndex=cars.indexOf(selected);
   page=Math.floor(first/4);
-  status(other?'Đã ghép '+groupLabel(car)+' · '+displayMode(value):'Đã tách nhóm · 1C-2BC');return true;
+  status(within?'Đã đặt '+displayMode(value)+' riêng trong từng cột.':other?'Đã ghép '+groupLabel(car)+' · '+displayMode(value):'Đã tách nhóm · 1C-2BC');return true;
  }catch(e){status(e.message);return false}finally{main.inert=false;await refresh()}
 }
 function renderGroup(cell,car,view){
+ if(!car.group){
+  const fields=cache.I?.[cars.indexOf(car)]||[];
+  const size=parseInt(fields.find(f=>f.key===controlKey)?.value,10),count=columnCount(car);
+  if(size>1&&count>0&&count%size===0)cell.append(make('strong',internalLabel(car,size,count)));
+ }
  if(car.group){
   cell.colSpan=view.filter(c=>c.group===car.group).length;
   cell.append(make('strong',displayMode(car.group.mode)+' · '+groupLabel(car)));
@@ -191,6 +245,7 @@ function drawSection(section,cache,matrix,from,to,view){
  const buckets=new Map();
  for(const f of seen.values()){
   const row=cache.map(list=>list.find(x=>x.key===f.key));
+  if(!row.slice(from,to).some(Boolean))continue;
   if(el('diff').checked&&new Set(row.map((x,i)=>f.key===controlKey&&cars[i].group?groupLabel(cars[i]):x?.value)).size<2)continue;
   if(!f.title.toLocaleLowerCase().includes(el('search').value.trim().toLocaleLowerCase()))continue;
   const group=['II','III','IV','V'].includes(section)?f.group:sections[section];
@@ -198,7 +253,7 @@ function drawSection(section,cache,matrix,from,to,view){
  }
  const summaryTable=make('table'),header=summaryTable.insertRow();header.append(make('th',section==='I'?'Tên thang':'Hạng mục'));
  for(const car of view){const th=make('th');th.append(section==='I'?titleInput(car):car.name);header.append(th)}
- if(section==='I'){const groupRow=summaryTable.insertRow();const groupTitle=groupRow.insertCell();groupTitle.textContent='Nhóm điều khiển';const hint=make('small',isMRL?'1C: từng thang độc lập. 2C / 3C / 4C: đúng 2 / 3 / 4 thang trong một nhóm.':'1C: từng thang độc lập. 2C: đúng 2 thang trong một nhóm.');hint.style.display='block';groupTitle.append(hint);
+ if(section==='I'){const groupRow=summaryTable.insertRow();const groupTitle=groupRow.insertCell();groupTitle.textContent='Nhóm điều khiển';const hint=make('small',isMRL?'1C: từng thang độc lập. 2C / 3C / 4C: đúng 2 / 3 / 4 thang trong một nhóm.':'1C: từng thang độc lập. 2C: đúng 2 thang trong một nhóm.');hint.textContent+=' Quantity là tổng số thang trong cột. Ví dụ P1,P3 · 2 thang · 2C là một nhóm riêng.';hint.style.display='block';groupTitle.append(hint);
  view.forEach((c,i)=>{
   if(c.group&&view[i-1]?.group===c.group)return;
   renderGroup(groupRow.insertCell(),c,view);
@@ -219,10 +274,14 @@ function drawSection(section,cache,matrix,from,to,view){
    if(first>=0){const bulk=make('button','Áp dụng cho…');bulk.className='bulk-edit';bulk.onclick=()=>edit(row,first,section);label.append(bulk)}
    row.slice(from,to).forEach((item,j)=>{const car=view[j],partner=f.key===controlKey&&car.group;
 
+    const sharedQty=item?.pivKey&&item.key!==item.pivKey&&item.doublePiv&&car.group?.mode==='2C-2BC'&&car.group.every(c=>row[cars.indexOf(c)]?.doublePiv);
+    if(sharedQty&&view[j-1]?.group===car.group)return;
     const cell=tr.insertCell();cell.dataset.fieldKey=f.key;cell.dataset.carIndex=String(from+j);
 
+    if(sharedQty){cell.colSpan=view.filter(c=>c.group===car.group).length;cell.textContent='1 hộp / 2 thang / tầng · '+groupLabel(car);return}
     if(!item){cell.textContent='—';cell.classList.add('empty-slot');return}
     const input=make(item.options?'select':'input');
+    if(f.key==='D11'){input.type='number';input.min='1';input.step='1'}
     if(item.options){for(const [value,label] of item.options){if(partner&&parseInt(value,10)<partner.length)continue;input.add(new Option(f.key===controlKey?displayMode(value):label,value));}
      if(!item.options.some(o=>o[0]===item.value))input.add(new Option(item.value,item.value));}
     input.dataset.fieldKey=item.key;input.dataset.carIndex=String(from+j);input.value=item.value;input.disabled=item.locked;input.classList.toggle('inactive-value',inactiveValue(item,section));input.setAttribute('aria-label',car.name+' · '+f.title);
@@ -238,6 +297,7 @@ function drawSection(section,cache,matrix,from,to,view){
 function edit(row,index,section){
  editing={row,index,section};const f=row[index];el('caption').textContent=f.title;
  const input=make(f.options?'select':'input');if(f.options)for(const [v,t] of f.options)input.add(new Option(t,v));
+ if(f.key==='D11'){input.type='number';input.min='1';input.step='1'}
  input.value=f.value;el('entry').replaceChildren(input);el('picks').replaceChildren();
  cars.forEach((c,i)=>{const label=make('label'),box=make('input');box.type='checkbox';box.checked=i===index;label.append(box,c.name);el('picks').append(label)});
  function eligible(){[...el('picks').querySelectorAll('input')].forEach((box,i)=>{const x=row[i];box.disabled=(f.key===controlKey&&!!cars[i].group)||!x||x.locked||!!x.options&&!x.options.some(o=>o[0]===input.value);if(box.disabled)box.checked=false})}
@@ -266,7 +326,7 @@ el('prev').onclick=()=>{page--;draw()};el('next').onclick=()=>{page++;draw()};
 el('car').onchange=()=>{page=Math.floor(el('car').selectedIndex/4);show()};
 el('detail').onclick=()=>{detail=!detail;show()};
 el('addCar').onclick=async()=>{add();await syncProject([current()]);page=Math.floor((cars.length-1)/4);show()};
-el('renameCar').onclick=()=>{const c=current(),name=prompt('Mã thang',c.name)?.trim();if(!name)return;if(cars.some(x=>x!==c&&x.name===name)){status('Mã thang đã tồn tại.');return}clearErrorMarks();c.name=name;c.frame.title=name;el('car').selectedOptions[0].text=name;show()};
+el('renameCar').onclick=()=>{const c=current(),name=prompt('Mã thang',c.name)?.trim();if(!name)return;clearErrorMarks();c.name=name;c.frame.title=name;el('car').selectedOptions[0].text=name;show()};
 el('deleteCar').onclick=async()=>{if(cars.length===1||!confirm('Xóa '+current().name+'?'))return;const i=el('car').selectedIndex;if(cars[i].group&&!await changeGroup(cars[i],null))return;clearErrorMarks();cars[i].frame.remove();cars.splice(i,1);el('car').remove(i);page=Math.floor(el('car').selectedIndex/4);show()};
 let lastFailures=[];
 function locate(car,issue){
@@ -354,6 +414,23 @@ function validatePair(a,b,fieldsA,fieldsB,maxStopDifference){
  if(tops.some(v=>!v)||tops[0].toUpperCase()!==tops[1].toUpperCase())mismatch(floorsKey,'Tầng trên cùng',tops,'Tên tầng trên cùng của hai thang phải giống nhau.');
  return issues;
 }
+function checkPopup(title,failures=[],canExport=false){
+ const dialog=el('checkExportDialog'),body=el('checkExportBody');
+ el('checkExportTitle').textContent=title;body.replaceChildren();
+ for(const {car,errors} of failures){
+  body.append(make('strong',car.name));
+  for(const error of errors){
+   const issue=typeof error==='string'?{message:error}:error;
+   const node=make(issue.cell?'button':'p',issue.message);
+   if(issue.cell)node.onclick=()=>{dialog.close();jumpToIssue(car,issue)};
+   body.append(node);
+  }
+ }
+ if(canExport)body.append(make('p',cars.map(c=>c.name).join(' · ')+' · '+(el('only-vi').checked?'Vietnamese Only':'Song ngữ')+(el('export-tech-details').checked?' · Có trích xuất chi tiết':'')+' · A4 ngang'));
+ el('confirmExport').hidden=!canExport;
+ dialog.returnValue='';dialog.showModal();
+ return new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='export'),{once:true}));
+}
 async function run(exporting){
  const main=document.querySelector('main'),book=[],failures=[],groupFields=new Map();main.inert=true;clearErrorMarks();
  try{
@@ -365,9 +442,21 @@ async function run(exporting){
      const field=fields.find(x=>x.key===controlKey);
      const count=Number(fields.find(f=>f.key==='D11')?.value),required=parseInt(field?.value,10);
      if(car.group&&field?.value!==car.group.mode)errors.push({cell:controlKey,message:'Hệ điều khiển chưa đồng bộ với nhóm '+groupLabel(car)+'.'});
-     if(!car.group&&required>1&&count!==required)errors.push({cell:'D11',message:car.name+' có '+count+' thang. Một nhóm '+displayMode(field.value)+' yêu cầu đúng '+required+' thang. Kiểm tra Số lượng hoặc ghép thêm cột.'});}
+     if(!Number.isSafeInteger(count)||count<1)errors.push({cell:'D11',message:'Nhập số lượng thang là số nguyên dương.'});
+     else if(!car.group&&required>1&&count%required!==0)errors.push({cell:'D11',message:car.name+' có '+count+' thang. Một nhóm '+displayMode(field.value)+' yêu cầu đúng '+required+' thang. Có thể cấu hình nhiều nhóm đủ số thang trong cùng cột.'});}
    }catch(e){errors.push(e.message)}
    if(errors.length)failures.push({car,errors});
+  }
+  for(const bank of new Set(cars.map(c=>c.group).filter(g=>g?.mode==='2C-2BC'))){
+   const [a,b]=await Promise.all(bank.map(readPivs));
+   for(const f of a){
+    const g=b.find(field=>field.key===f.key);
+    if(!g||!(f.doublePiv||g.doublePiv)||f.value===g.value)continue;
+    for(const car of bank){
+     const issue={cell:f.key,message:groupLabel(car)+' dùng chung một hộp PIV đôi mỗi tầng. Chọn cùng mã hộp.'};
+     const failed=failures.find(x=>x.car===car);if(failed)failed.errors.push(issue);else failures.push({car,errors:[issue]});
+    }
+   }
   }
   if(!isMRL){
    const banks=new Set(cars.map(c=>c.group).filter(Boolean));
@@ -404,15 +493,18 @@ async function run(exporting){
    }
    }
   }
-  if(failures.length){await reportErrors(failures);return}
-  if(exporting)for(const car of cars){
-   try{book.push({onlyVi:el('only-vi').checked,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+  if(failures.length){await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
+  status('Check Spec đạt · '+cars.map(c=>c.name).join(', '));
+  if(!await checkPopup('Check Spec đạt · '+cars.length+' cột thang',[],true))return;
+  exporting=true;
+  for(const car of cars){
+   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
-  if(failures.length){await reportErrors(failures);return}
+  if(failures.length){await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
   if(exporting){const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}
   status(exporting?'Đã xuất Excel A4 ngang.':'Check Spec PASS · '+cars.map(c=>c.name).join(', '));
- }catch(e){status(e.message)}finally{main.inert=false}
+ }catch(e){status(e.message);main.inert=false;await checkPopup('Không thể xuất Excel',[{car:{name:''},errors:[e.message]}])}finally{main.inert=false}
 }
 el('check').onclick=()=>run(false);el('exportBook').onclick=()=>run(true);
 document.querySelectorAll('main button:not(.active)').forEach(b=>b.classList.add('btn','btn-secondary'));

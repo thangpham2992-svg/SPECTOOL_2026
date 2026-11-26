@@ -12,18 +12,22 @@ window.addEventListener('message',async event=>{
  const reply={channel:'multi-result',token:data.token};
  try{
   if(data.action==='snapshot'){
-   reply.result={values:{...changes},touched:[...featureTouched]};
+   reply.result={values:{...changes},touched:[...featureTouched],hallManual:[...hallManualSelections],hallAuto:[...hallAutoSelections],hallQty:[...hallManualQuantities]};
   }else if(data.action==='restore'){
    changes={...data.payload.values};featureTouched=new Set(data.payload.touched);
-   renderAllSpecRows();renderFeatures();invalidateCheck();reply.result=true;
+   hallManualSelections=new Set(data.payload.hallManual);hallAutoSelections=new Set(data.payload.hallAuto);hallManualQuantities=new Set(data.payload.hallQty);
+   renderAllSpecRows();renderFeatures();refreshLocks();refreshHallQuantities();refreshChildVisibility();invalidateCheck();reply.result=true;
   }else if(data.action==='fields'){
    const result=[];
    const section=data.payload.section;
+   const fieldsByCell=new Map(current.fields.map(f=>[f.cell,f]));
+   const fieldsByName=new Map(current.fields.map(f=>[f.name,f]));
    function readControls(root,featureGroup){
     if(!root)return;
     const keys=new Set();
     for(const input of root.querySelectorAll('select,input[data-cell]')){
      if(input.matches('.mr-original-internal,[aria-hidden="true"]')||input.closest('[hidden]'))continue;
+     if(section!=='V'&&!summaryChildVisible(input,fieldsByCell,fieldsByName))continue;
      const hall=input.closest('.hall-choice-item');
      if(input.classList.contains('hall-qty')&&!input.id){
       const source=hall?.querySelector('.field [data-cell]')?.dataset.cell;
@@ -46,7 +50,9 @@ window.addEventListener('message',async event=>{
      if(hallItem)title=input.classList.contains('hall-qty')?hallItem+' · Số hộp':hallItem;
      if(feature)title=feature.querySelector('.fcode')?.textContent+' · '+feature.querySelector('.fdesc')?.firstChild?.textContent;
      if(input.id==='itp-type')title='ITP · Loại liên lạc nội bộ / Interphone type';
-     result.push({sharedCode:sharedMrCode(input),key,sourceCell:input.dataset.cell||input.closest('.field')?.querySelector('.mr-original-internal[data-cell]')?.dataset.cell||'',title,group,featureTable:featureGroup?activeFeatureTable:null,value:input.type==='checkbox'?(input.checked?'1':'0'):input.value,
+     const piv=hall?.querySelector("select[data-cell]");
+     const isPiv=piv&&/^K36_PIV/.test(fieldsByCell.get(piv.dataset.cell)?.name||'');
+     result.push({pivKey:isPiv?piv.dataset.cell:null,doublePiv:isPiv&&hallIndicatorCount(piv.value,'PIV')===2,sharedCode:sharedMrCode(input),key,sourceCell:input.dataset.cell||input.closest('.field')?.querySelector('.mr-original-internal[data-cell]')?.dataset.cell||'',title,group,featureTable:featureGroup?activeFeatureTable:null,value:input.type==='checkbox'?(input.checked?'1':'0'):input.value,
       locked:input.disabled||input.readOnly,options:input.options?Array.from(input.options).filter(o=>!o.disabled).map(o=>[o.value,o.textContent]):input.type==='checkbox'?[['1','Có'],['0','Không']]:null});
     }
    }
@@ -66,7 +72,11 @@ window.addEventListener('message',async event=>{
    if(!input||input.disabled||input.readOnly||input.closest('[hidden]'))throw Error('Trường này được khóa theo cấu hình.');
    if(input.options&&!Array.from(input.options).some(o=>o.value===value&&!o.disabled))throw Error('Giá trị không áp dụng cho cấu hình này.');
    if(input.type==='checkbox')input.checked=value==='1';else input.value=value;
-   input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));reply.result=true;
+   const previous=hallManualSelections;
+   if(data.payload.mirrorPiv)hallManualSelections=new Set([...previous,...current.fields.filter(f=>/^K36_PIV/.test(f.name)).map(f=>f.cell)]);
+   try{input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}))}
+   finally{if(data.payload.mirrorPiv){hallManualSelections=previous;previous.add(key)}}
+   reply.result=true;
   }else if(data.action==='validate'){window.__lastCheck=null;
    const messages=runCheckSpec(),issues=window.__lastCheck?.errors;
    reply.result=issues?.length?orderedCheckErrors(issues).map(e=>({message:e.message||'Vui lòng kiểm tra thông số.',cell:e.cell||''})):messages.map(message=>({message,cell:''}));
@@ -99,4 +109,13 @@ window.addEventListener('change',event=>{
  event.stopImmediatePropagation();
  renderFeatures();
  window.parent.postMessage({channel:'summary-feature',payload},'*');
+},true);
+
+window.addEventListener('change',event=>{
+ const input=event.target,key=input.dataset.cell;
+ if(window.parent===window||!event.isTrusted||!current.fields.some(f=>f.cell===key&&/^K36_PIV/.test(f.name)))return;
+ const value=input.value;
+ event.stopImmediatePropagation();
+ input.value=String(currentValue(key));
+ window.parent.postMessage({channel:'summary-piv',payload:{section:'IV',key,value}},'*');
 },true);

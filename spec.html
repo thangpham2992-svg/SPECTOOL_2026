@@ -1417,7 +1417,7 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
   .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
 }
 </style>
-</head>
+<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style></head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 <main class="workspace">
@@ -2091,11 +2091,11 @@ patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 </script>
 <script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=244-R45"></script>
+<script src="app.js?v=R59"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>
-<script src="pair.js?v=244-R45"></script><script src="multi-bridge.js?v=244-R45"></script></body></html>
+<script src="pair.js?v=R59"></script><script src="multi-bridge.js?v=R59"></script></body></html>
 
 <!-- 5.8.195: EN81-72 and BufferCap remain hidden until re-enabled. -->
