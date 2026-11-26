@@ -29,7 +29,7 @@ window.addEventListener('message',async event=>{
     if(!root)return;
     const keys=new Set();
     for(const input of root.querySelectorAll('select,input[data-cell]')){
-     if(input.matches('.mr-original-internal,[aria-hidden="true"]')||input.closest('[hidden]'))continue;
+     if(input.matches('.mr-original-internal,[aria-hidden="true"]')||input.hidden||input.closest('[hidden]'))continue;
      if(section!=='V'&&!summaryChildVisible(input,fieldsByCell,fieldsByName))continue;
      const hall=input.closest('.hall-choice-item');
      if(input.classList.contains('hall-qty')&&!input.id){

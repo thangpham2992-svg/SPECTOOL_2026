@@ -495,6 +495,27 @@ function refreshChildVisibility(){
   row.classList.toggle('dependent-row-off',fields.length>0&&fields.every(f=>f.classList.contains('dependent-off')));
  }
 }
+// R69: fire-rated landing doors and DSJ1/Large Window are mutually exclusive.
+const landingFireNames=['K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial'];
+const isLandingWindow=v=>/DSJ1|LARGE[\s-]*WINDOW/i.test(String(v||''));
+const isLandingFire=v=>/\bE30\b|EN81\s*[-–]?\s*58\s*\(II\)/i.test(String(v||''));
+function landingFireState(){
+ const field=name=>current.fields.find(f=>f.name===name);
+ const fire=field('K36_FireproofDoor');
+ const doors=landingFireNames.map(field).filter(Boolean);
+ return {fire,doors,rated:!!fire&&isLandingFire(currentValue(fire.cell)),windowed:doors.some(f=>isLandingWindow(currentValue(f.cell)))};
+}
+function refreshLandingFireOptions(){
+ const {fire,doors,rated,windowed}=landingFireState();
+ for(const [field,blocked,test] of [[fire,windowed,isLandingFire],...doors.map(f=>[f,rated,isLandingWindow])]){
+  if(!field)continue;
+  const el=activeInput(field.cell);if(!el||el.tagName!=='SELECT')continue;
+  for(const op of el.options){
+   if(op.dataset.landingFireLock){op.disabled=false;delete op.dataset.landingFireLock;op.title='';}
+   if(blocked&&test(op.value)&&!op.disabled){op.disabled=true;op.dataset.landingFireLock='1';op.title='DSJ1 / Large Window không tương thích với E30 / EN81-58(II)';}
+  }
+ }
+}
 function refreshLocks(){
  // Release only locks previously applied by the workbook's conditional formatting.
  for(const el of document.querySelectorAll('[data-cf-locked="1"]')){
@@ -570,6 +591,7 @@ function refreshLocks(){
  refreshCarDesignStates();
  refreshCalculatedOutputs();
  refreshPanelImagePreviews();
+ refreshLandingFireOptions();
 }
 
 // Controlled constraints. Workbook is the source of allowed raw variants.
@@ -758,8 +780,17 @@ function renderFeatures(){
  tables.forEach(t=>{let b=document.createElement('button');const selected=features.some(f=>f.table===t&&featureIsSelected(f));b.className='btn feature-tab'+(selected?' feature-tab-selected':'')+(t===activeFeatureTable?' feature-tab-current':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
+  const fan=features.find(z=>z.code==='CFO-A'),light=features.find(z=>z.code==='CLO-A');
+  const combined=!!(fan&&light&&f.code==='CFO-A');
+  if(fan&&light&&f.code==='CLO-A')continue;
   const line=document.createElement('div');line.className='feature-line';let addr=document.createElement('span');addr.textContent=f.cell;addr.className='addr';let code=document.createElement('span');code.textContent=f.code;code.className='fcode';let desc=document.createElement('div');desc.className='fdesc';desc.textContent=window.SPEC_PROOFREAD?.(f.vi||f.code)??(f.vi||f.code);let en=document.createElement('small');en.textContent=window.SPEC_PROOFREAD?.(f.en||'')??(f.en||'');desc.append(en);appendFeatureVisual(desc,window.SPEC_V52_FEATURES?.canonical(f.code)||f.code);
   let chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.cell;chk.checked=String(changes[f.cell]??f.apply)==='1'||String(changes[f.cell]??f.apply).toLowerCase()==='true';const optResult=f.virtual?null:featureEngine?.safe('SpecForm','E'+f.cell.slice(1));const manualOption=window.SPEC_V52_FEATURES?.status($('model').value,f.code,currentValue($('model').value==='MR'?'D21':'D22'),db);const dynamicOption=manualOption|| (optResult?.ok?optResult.value:f.option);let disabled=String(dynamicOption).trim().toUpperCase()==='X';
+  if(combined){
+   code.textContent='CFO-A / CLO-A';desc.replaceChildren(document.createTextNode('Tự động tắt quạt và đèn phòng thang'));en.textContent='Car Fan and Lighting Automatic Shut-off';desc.append(en);
+   chk.checked=featureIsSelected(fan)&&featureIsSelected(light);chk.indeterminate=featureIsSelected(fan)!==featureIsSelected(light);
+   if(chk.indeterminate)line.title='Dữ liệu cũ chỉ chọn một mã; chọn lại để áp dụng đồng thời cả hai.';
+   const lightOption=featureEngine?.safe('SpecForm','E'+light.cell.slice(1));disabled=disabled||String(lightOption?.ok?lightOption.value:light.option).trim().toUpperCase()==='X';
+  }
   const fCode=window.SPEC_V52_FEATURES?.canonical(f.code)||f.code;
   // NSCR-C and NSCR-H are independent options; the card-reader variant
   // must never lock or overwrite the card-reader-free NSCR-C selection.
@@ -805,7 +836,7 @@ function renderFeatures(){
    if($('model').value==='MRL'&&code==='FHL'&&!chk.checked&&window.SPEC_HALL_LANTERN?.any(changes)){
      chk.checked=true;changes[f.cell]='1';status('FHL phải đi kèm Hall Lantern đã chọn / FHL is required while lanterns are selected.');return;
    }
-   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';line.classList.toggle('feature-line-selected',chk.checked);
+   featureTouched.add(f.cell);changes[f.cell]=chk.checked?'1':'0';if(combined){featureTouched.add(light.cell);changes[light.cell]=changes[f.cell];chk.indeterminate=false;}line.classList.toggle('feature-line-selected',chk.checked);
    if(code==='HE-B'&&chk.checked){
      const active=c=>sourceFeatureRows().some(f=> (window.SPEC_V52_FEATURES?.canonical(f.code)||f.code)===c&&featureIsSelected(f));
      const missing=['DKO-TB','EXCL'].filter(c=>!active(c));
@@ -1033,6 +1064,7 @@ function syncDropdownOptions(){
   if($('model').value==='MR'&&f.name==='K5_Capacity'&&document.getElementById('mr-capacity-group'))continue;
   // Side-drop filtering is handled separately and must retain its capacity limits.
   if(f.cell==='D23'&&$('model').value==='MRL')continue;
+  if(f.cell===window.SPEC_EMER_DOOR.cell($('model').value))continue;
   let opts=workbookChoices(f,engine),old=String(currentValue(f.cell)??'');
   if((f.cell==='D14'||f.cell==='D16')&&$('model').value==='MRL'){
    // The dynamic formulas in SpecForm are authoritative; if unavailable,
@@ -1293,6 +1325,8 @@ function syncLandingFinishFromCar(){
  const v=String(currentValue(car.cell)||'').trim();if(!v)return;
  const family=/^Painted\b/i.test(v)?'Painted':/^SUS-HL\b/i.test(v)?'SUS-HL':'';
  if(!family)return;
+ // Do not automatically copy a glass cabin finish to fire-rated landing doors.
+ if(landingFireState().rated&&isLandingWindow(v))return;
  const windowSize=/W300xH1300|300x1300/i.test(v)?'300':/W200xH1300|200x1300/i.test(v)?'200':'';
  const glass=/DSJ1/i.test(v)?'DSJ1':/\bDS1\b/i.test(v)?'DS1':/Large\s*window/i.test(v)?'Large':'';
  for(const key of ['K36_DoorFinishMainFloorMaterial','K36_DoorFinishOtherFloorMaterial']){
@@ -1314,6 +1348,18 @@ function row(field,displayName='',compact=false){
  box.dataset.sourceCell=field.cell;
  // Source identifiers remain as data-cell attributes for Check Spec, focus and Export.
  const name=document.createElement('label');name.className='nm';name.textContent=window.SPEC_PROOFREAD?.(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '))??(displayName||xrules().labels[field.cell]||field.label||field.name.replace(/^K\d+_/,'').replaceAll('_',' '));
+ if(field.cell===window.SPEC_EMER_DOOR.cell($('model').value)){
+  const rule=window.SPEC_EMER_DOOR,state=rule.decode(changes[field.cell]??field.value,changes[rule.floorKey]);
+  const mode=document.createElement('select'),floor=document.createElement('input'),wrap=document.createElement('div');
+  mode.dataset.cell=field.cell;mode.id='spec-'+field.cell;name.htmlFor=mode.id;
+  mode.add(new Option('Không cung cấp',rule.none));mode.add(new Option(rule.supplied,rule.supplied));mode.value=state.mode;
+  floor.dataset.cell=rule.floorKey;floor.id='spec-'+rule.floorKey;floor.type='text';floor.placeholder='Nhập tên tầng / Floor';floor.setAttribute('aria-label','Tầng bố trí cửa thoát hiểm / Emergency door floor');floor.value=state.floor;
+  wrap.style.cssText='display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px;align-items:center';
+  const update=()=>{const on=mode.value===rule.supplied;floor.hidden=!on;floor.disabled=!on;if(!on)floor.value='';wrap.style.gridTemplateColumns=on?'minmax(0,2fr) minmax(0,1fr)':'minmax(0,1fr)';};
+  const save=()=>{update();changes[field.cell]=mode.value;changes[rule.floorKey]=floor.value;invalidateCheck();};
+  mode.addEventListener('change',save);floor.addEventListener('input',save);floor.addEventListener('change',save);
+  update();wrap.append(mode,floor);box.append(name,wrap);return box;
+ }
  const choices=workbookChoices(field);const summaryQty=field.name==='K0_Qty'&&window.parent!==window;
  const input=!summaryQty&&hasDropdown(field)?document.createElement('select'):document.createElement('input');
  if(summaryQty){input.type='number';input.min='1';input.step='1';}
@@ -2955,30 +3001,18 @@ function check(){
   }
   if(result.errors.length)result.status='FAIL';
  }
- // v5.8.146: Landing-door glass-window finishes cannot be used with
- // EN81-58(II). Check both main-floor and other-floor landing door fields;
- // never use car-door finish for this landing-door restriction.
+ // R69: validate existing drafts and all export paths, independently of UI locks.
  if(['MR','MRL'].includes(model)){
-  const byName=name=>current.fields.find(f=>f.name===name);
-  const fireField=byName('K36_FireproofDoor');
-  const fire=fireField?String(currentValue(fireField.cell)||''):'';
-  if(/EN81\s*[-–]?\s*58\s*\(II\)/i.test(fire)){
-   const landingDoorFields=[
-    ['K36_DoorFinishMainFloorMaterial','cửa tầng chính'],
-    ['K36_DoorFinishOtherFloorMaterial','cửa tầng khác']
-   ];
-   for(const [name,location] of landingDoorFields){
-    const f=byName(name);
-    if(!f)continue;
+  const {fire,doors,rated}=landingFireState();
+  if(rated){
+   const rating=String(currentValue(fire.cell));
+   for(const f of doors){
     const finish=String(currentValue(f.cell)||'');
-    if(/DSJ1|LARGE\s*[- ]?\s*WINDOW/i.test(finish)){
-     result.errors.push({
-      id:'LandingDoor!WindowFireproof!'+name,
-      cell:f.cell,
-      message:'Không được kết hợp '+finish+' ở '+location+' với cửa chống cháy EN81-58(II). Hãy bỏ lựa chọn DSJ1/Large Window hoặc đổi điều kiện chống cháy. / DSJ1/Large Window landing door is incompatible with EN81-58(II).'
-     });
-     result.status='FAIL';
-    }
+    if(!isLandingWindow(finish))continue;
+    const location=f.name===landingFireNames[0]?'cửa tầng chính':'cửa tầng khác';
+    result.errors.push({id:'LandingDoor!WindowFireproof!'+f.name,cell:f.cell,
+     message:finish+' ở '+location+' không tương thích với '+rating+'. Hãy đổi loại cửa tầng hoặc bỏ chống cháy. / DSJ1 or Large Window landing doors are incompatible with '+rating+'.'});
+    result.status='FAIL';
    }
   }
  }
@@ -3295,6 +3329,7 @@ async function exportWorking(){
    if(value.trim()!==''&&!isNaN(Number(value))){c.removeAttribute('t');let v=xml.createElementNS(NS,'v');v.textContent=value;c.append(v)}
    else {c.setAttribute('t','inlineStr');let is=xml.createElementNS(NS,'is'),t=xml.createElementNS(NS,'t');t.textContent=value;is.append(t);c.append(is)}
   }
+  await window.SPEC_EXPORT.emphasizeExportCodes(zip,xml);
   zip.file(path,new XMLSerializer().serializeToString(xml));
   // Preserve the additional MRL Hall Lantern selections when exporting an editable source workbook.
   if(model==='MRL'&&window.SPEC_HALL_LANTERN){
@@ -3312,6 +3347,7 @@ async function exportWorking(){
      const is=hxml.createElementNS(NS,'is'),t=hxml.createElementNS(NS,'t');
      t.textContent=window.SPEC_HALL_LANTERN.selection(changes,key);is.append(t);c.append(is);
     }
+    await window.SPEC_EXPORT.emphasizeExportCodes(zip,hxml);
     zip.file(hallPath,new XMLSerializer().serializeToString(hxml));
    }
   }

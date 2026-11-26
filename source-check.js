@@ -1,4 +1,17 @@
 'use strict';
+// R67: one factory-supplied emergency landing door per elevator.
+window.SPEC_EMER_DOOR=(()=>{
+ const none='Không có (No)', supplied='Cung cấp 1 bộ cửa tầng - By Factory', floorKey='EMER_FLOOR';
+ const cell=model=>model==='MR'?'D19':'D21';
+ const decode=(raw,floor)=>{
+  const v=String(raw??'').trim();
+  if(/^(?:|Không có(?:\s*\(No\))?|Không cung cấp|No|Not supplied|None)$/iu.test(v))return {mode:none,floor:''};
+  return {mode:supplied,floor:String(floor??(v===supplied?'':v))};
+ };
+ const problem=f=>!String(f).trim()?'Vui lòng nhập tên tầng bố trí cửa thoát hiểm / Enter emergency door floor.': /[,;\/\n\r&+]|\s(?:và|and|đến|to)\s|[~–—]|\d-\d/iu.test(f)?'Chỉ cho phép 01 tầng bố trí cửa thoát hiểm / Only one emergency door floor is permitted.':'';
+ const description=f=>'Cung cấp 01 bộ cửa tầng tại tầng '+f.trim()+' (do nhà máy cung cấp).\n01 set of landing door at floor '+f.trim()+' (by Factory).';
+ return {none,supplied,floorKey,cell,decode,problem,description};
+})();
 /* Source workbook audit: every Condition row is recalculated, never passed from saved TRUE/FALSE. */
 /* v5.8.102 — technology of selected COP/PIV/PIH is checked against every
    served floor name. Source: model-specific panel catalog and TblK10_SFloor.
@@ -138,6 +151,13 @@ window.SPEC_SOURCE_CHECK=function(model,changes,db){
   return model==='MR'?'D21':'D13';
  };
  const issue=(id,cell,message,detail='')=>{issues.push({id,cell,message:base(message),detail:base(detail)});};
+ if(['MR','MRL'].includes(model)){
+  const rule=window.SPEC_EMER_DOOR, addr=rule.cell(model);
+  const state=rule.decode(value('SpecForm',addr).value,changes[rule.floorKey]);
+  const error=state.mode===rule.supplied?rule.problem(state.floor):'';
+  if(error)issue('EmergencyDoor!SingleFloor',rule.floorKey,error);
+ }
+
  if(model==='MR'&&window.SPEC_CEILING_EXIT.c30Selected(changes)&&['1','TRUE','V','✓'].includes(String(value('SpecForm','A93').value).toUpperCase())){
   issue('Feature!FE-exclusive','FE_C30','FE và FE Hongkong C30 chỉ được chọn một phương án.');
  }

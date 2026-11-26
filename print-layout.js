@@ -50,7 +50,9 @@
      const pr=q(run,'rPr');
      const italic=!!q(pr,'i'),rgb=attr(q(pr,'color'),'rgb','');
      const blue=/^(?:FF)?245A86$/i.test(rgb);
-     const html=esc(str).replace(/\r\n|\r|\n/g,'<br>');
+     const rawHtml=esc(str).replace(/\r\n|\r|\n/g,'<br>');
+     const b=q(pr,'b'),bold=b&&!['0','false'].includes(attr(b,'val','1'));
+     const html=bold?'<strong>'+rawHtml+'</strong>':rawHtml;
      const explicitColor=/^(?:[0-9a-f]{2})?[0-9a-f]{6}$/i.test(rgb)?'#'+rgb.slice(-6):'';
      if(italic||blue)return '<em class="spec-english" style="color:'+(explicitColor||'#245A86')+';font-style:italic">'+html+'</em>';
      // A technical surface description may have its own Vietnamese color;
@@ -252,10 +254,15 @@
        if(a){label=a;sub='';}
        if(b&&rn>=firstSectionRow)sub=b;
        const source=cells.get('C'+rn);
-       const englishParts=qa(source?.element,'r').filter(run=>{
+       // Code emphasis may split one English run into adjacent runs. Rejoin
+       // before passing translation hints into the Multi Spec assembler.
+       const englishParts=[];let englishRun='';
+       for(const run of qa(source?.element,'r')){
          const props=q(run,'rPr');
-         return q(props,'i')||attr(q(props,'color'),'rgb').endsWith('245A86');
-       }).map(run=>qa(run,'t').map(t=>t.textContent).join('').trim()).filter(Boolean);
+         if(q(props,'i')||attr(q(props,'color'),'rgb').endsWith('245A86'))englishRun+=qa(run,'t').map(t=>t.textContent).join('');
+         else if(englishRun){if(englishRun.trim())englishParts.push(englishRun.trim());englishRun='';}
+       }
+       if(englishRun.trim())englishParts.push(englishRun.trim());
        const base=JSON.stringify([section,label,sub]);
        const count=occurrences.get(base)||0;occurrences.set(base,count+1);
        result.push({itpType,quantity:label.split(/\r?\n/)[0].trim()==='Số lượng',englishParts,meta:result.length?null:{company,address:companyAddress,doc:cells.get('C1')?.value,revision:cells.get('C2')?.value},fullWidth:merges.get('A'+rn)?.colspan===3&&!b&&!c,upper:bilingualUpper.has(rn),lower:bilingualLower.has(rn),preamble:rn<firstSectionRow,key:base+count,a,b:rn<firstSectionRow?'':b,value:rn<firstSectionRow?(c||b):c,heading:romanSection.test(a)});

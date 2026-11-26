@@ -140,7 +140,7 @@ function groupSheet(template,cars,featureNotes){
   const texts=lower.values.filter(Boolean);
   return !lower.a&&!lower.b&&texts.length>0&&texts.every(v=>/^\s*\(/.test(v));
  }
- const separateLabels=new Set(['Tải trọng','Loại cửa','Tốc độ','Số điểm dừng','Tầng phục vụ','Tầng không phục vụ','Cửa thoát hiểm','Loại mở cửa','Vị trí phòng máy','Vị trí đối trọng','An toàn đối trọng','Cấu trúc hố thang','Thanh dẫn hướng']);
+ const separateLabels=new Set(['Tải trọng','Loại cửa','Tốc độ','Số điểm dừng','Tầng phục vụ','Tầng không phục vụ','Cửa tầng thoát hiểm','Loại mở cửa','Vị trí phòng máy','Vị trí đối trọng','An toàn đối trọng','Cấu trúc hố thang','Thanh dẫn hướng']);
  let labelEnd=-1,inFeatures=false,basicSection=false,separateLiftCells=false;
  for(const [index,r] of body.entries()){
   if(r.heading)basicSection=/^\s*I\./i.test(r.a);
@@ -236,11 +236,10 @@ async function buildPairBook(cars){
   }
   const group=cars.slice(start,start+size),n=i+1,id=i?'rIdCar'+n:'rId1',name='Spec '+(start+1)+'-'+(start+size),path='xl/worksheets/sheet'+n+'.xml';
   let sheetXml=groupSheet(template,group,featureNotes);
-  if(cars[0].onlyVi){
-   const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
-   await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
-   sheetXml=new XMLSerializer().serializeToString(sheet);
-  }
+  const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
+  if(cars[0].onlyVi)await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
+  await window.SPEC_EXPORT.emphasizeExportCodes(zip,sheet);
+  sheetXml=new XMLSerializer().serializeToString(sheet);
   if(i){
    const drawingPath='xl/drawings/drawing'+n+'.xml';
    zip.file(drawingPath,await read('xl/drawings/drawing1.xml'));

@@ -174,6 +174,21 @@
      if(!visibleCount){const heading=nameAddr(db,'SpecFormExport','K'+(37+index)+'_Title_'+group+'Features');if(heading)hiddenRows.add(cellRow(heading));}
      sections[group]={shown:visibleCount};
    }
+   // R68: consolidate selected CFO-A and CLO-A into one bilingual feature pair.
+   // Preserve individual descriptions for legacy configurations selecting only one code.
+   const fanFeature=includedFeatures.find(f=>f.code==='CFO-A'),lightFeature=includedFeatures.find(f=>f.code==='CLO-A');
+   if(fanFeature&&lightFeature&&fanFeature.exportRows.length===2&&lightFeature.exportRows.length===2){
+     const [r1,r2]=fanFeature.exportRows;
+     const englishFirst=/Car Fan|CFO-A/i.test(text(cells['A'+r1]))&&!/Tự động/i.test(text(cells['A'+r1]));
+     const en=englishFirst?r1:r2,vi=englishFirst?r2:r1;
+     cells['A'+vi]='Tự động tắt quạt và đèn phòng thang (CFO-A) (CLO-A)';
+     cells['A'+en]='(CFO-A) (CLO-A) Car Fan and Lighting Automatic Shut-off';
+     cells['C'+vi]='Khi không có cuộc gọi thang trong một khoảng thời gian định trước, quạt thông gió và đèn chiếu sáng phòng thang sẽ tự động tắt để tiết kiệm năng lượng.';
+     cells['C'+en]='If there are no calls for a specified period, the car ventilation fan and lighting will automatically turn off to conserve energy.';
+     for(const rn of lightFeature.exportRows)hiddenRows.add(rn);
+     includedFeatures.splice(includedFeatures.indexOf(lightFeature),1);
+     sections.Operation.shown--;
+   }
    // Hall indicators/buttons: follow the exact K36 named inputs and export row mappings in Tool.exe.
    const halls=model==='MRL'?['TopFloor','MainFloor','OtherFloor']:['MainFloor','OtherFloor'];
    let hiddenHall=0;
@@ -202,6 +217,13 @@
      if(a)cells[a]='';
    }
    Object.assign(cells,overrides);
+   // R67: freeze the one-set description for Excel and PDF from the free-text floor.
+   const emergencyRule=window.SPEC_EMER_DOOR;
+   if(emergencyRule&&['MR','MRL'].includes(model)){
+     const state=emergencyRule.decode(eng.safe('SpecForm',emergencyRule.cell(model)).value,changes[emergencyRule.floorKey]);
+     if(state.mode===emergencyRule.supplied)cells[model==='MR'?'C22':'C24']=emergencyRule.description(state.floor);
+   }
+
    // Include selected Hall Lanterns in the SAME entrance-design floor groups as
    // PIV/HBV/PIH, with complete Vietnamese and English faceplate descriptions.
    // Both XLSX and A4 PDF use these frozen SpecFormExport cells (no separate PDF text).
@@ -668,6 +690,11 @@
        cells.C25=code+'\n'+vi+'\n'+en;
      }
    }
+   // R66: MR car-door material description must not repeat its row label.
+   if(model==='MR'){
+     cells.C50=text(cells.C50).replace(/^Cửa cabin\s*:?\s*(?=\S)/iu,'').replace(/^./u,c=>c.toUpperCase());
+     cells.C51=text(cells.C51).replace(/^(\s*\(?)\s*Car door\s*:\s*(\S)/iu,(_,prefix,first)=>prefix+first.toUpperCase());
+   }
    const fatal=unresolved.filter(e=>!hiddenRows.has(cellRow(e.addr))&&/^[ABC]/.test(e.addr));
    if(fatal.length)throw Error('Công thức Export chưa tính được / Cannot evaluate '+fatal.slice(0,5).map(x=>x.addr+' '+x.error).join(' | '));
    return {model,cells,hiddenRows,removedFeatures,includedFeatures,sections,hiddenHall,hallLanternExportRows,totalFormulaUnresolved:unresolved.length,fatal,traction:model==='MR'?mrDutyBySpec(eng):null,mrlMotor:model==='MRL'?mrlMotorBySpec(eng):null};
@@ -949,6 +976,59 @@
    if(typeof v==='boolean'){c.setAttribute('t','b');const val=document.createElementNS(n,'v');val.textContent=v?'1':'0';c.appendChild(val);return;}
    const inline=document.createElementNS(n,'is'),t=document.createElementNS(n,'t');
    c.setAttribute('t','inlineStr');if(/^\s|\s$|\n/.test(String(v)))t.setAttribute('xml:space','preserve');t.textContent=String(v);inline.appendChild(t);c.appendChild(inline);
+ }
+ // R70: emphasize material and catalogue identifiers in the final workbook.
+ // Preserve the original run text, font, language colour and italics.
+ const exportCodePattern=()=>{
+   const codes=new Set(['SUS430','SUS430J1L','SUS304','430J1L','SUS-HL','SUS-M','SUS-HE','PPS','S00','S200','S300','N120','N130','N140','N300','N300S','L200','L200S','L210','L210S','L310','L400','L410','FEVN10','CL1','CL2','DL5','DL6','DL7','BN1','FL1','DS1','DSJ1','GHCL','E30','E120','CBH','CBVF','NSCR-H','SDE','SR','ITV','PIDM','PIDO','PIDT']);
+   for(const model of ['MR','MRL'])for(const f of window.SPEC_RULES?.[model]?.features||[])if(/^[A-Z0-9-]+$/.test(f.code))codes.add(f.code);
+   for(const key of Object.keys(window.SPEC_V52_FEATURES?.catalog||{}))if(/^[A-Z0-9-]+$/.test(key))codes.add(key);
+   const literal=[...codes].sort((a,b)=>b.length-a.length).map(v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+   const patterns=[String.raw`NEXIEZ-MRL(?:\s+(?:Version\s*0?2|Ver\.?\s*0?2))?|NEXIEZ-MR`,String.raw`SUS\s*(?:430J1L|430|304)(?:\s*\/\s*(?:SUS\s*)?(?:430J1L|430|304))*`,String.raw`(?:EN\s*81[-–]\s*58|BS[-–]?476)(?:\s*[\[(]II[\])])?|EN81-20/50`,String.raw`[1-8]C\s*[-–]?\s*(?:2BC|SAI[-–]?\d+[A-Z]*|[A-Z][A-Z0-9-]+)`,String.raw`(?:PIV|HBV|PIH|PID|HIP|HPI|HOP|HLV|HLH|COP)\d*[-–]?[A-Z]?\d+[A-Z0-9]*(?:-[A-Z0-9]+)*|CBV[1-6]`,String.raw`Y[HZ]\s*[-–]?\s*\d+[A-Z0-9]*|NY-40[A-E]`,String.raw`(?:C|N|M|P|F)\d{3,4}[A-Z]*`,String.raw`(?:Y\d{3}[A-Z]?|(?:CP|LA|ML)\d+[A-Z0-9]*)`,String.raw`(?:CL[12]|DL[567])-[CW]`,String.raw`[Ll][Aa][Rr][Gg][Ee]\s+[Ww][Ii][Nn][Dd][Oo][Ww]`,String.raw`EXIT SWITCH`,literal];
+   return new RegExp('(?<![A-Za-z0-9])(?:'+patterns.join('|')+')(?![A-Za-z0-9])','g');
+ };
+ async function emphasizeExportCodes(zip,x){
+   const sd=parse(await zip.file('xl/styles.xml').async('string'));
+   const fonts=all(child(sd.documentElement,'fonts'),'font');
+   const xfs=all(child(sd.documentElement,'cellXfs'),'xf');
+   const sf=zip.file('xl/sharedStrings.xml');
+   const shared=sf?all(parse(await sf.async('string')),'si'):[];
+   const create=tag=>x.createElementNS(n,tag);
+   function baseProps(c){
+     const p=create('rPr'),font=fonts[+(xfs[+c.getAttribute('s')||0]?.getAttribute('fontId')||0)];
+     for(const item of Array.from(font?.children||[])){
+       if(item.localName==='name'){const f=create('rFont');f.setAttribute('val',item.getAttribute('val'));p.appendChild(f);}
+       else if(['charset','family','b','i','strike','outline','shadow','condense','extend','color','sz','u','vertAlign','scheme'].includes(item.localName))p.appendChild(x.importNode(item,true));
+     }
+     return p;
+   }
+   for(const c of all(x,'c')){
+     if(child(c,'f'))continue;
+     const source=c.getAttribute('t')==='s'?shared[+child(c,'v')?.textContent]:child(c,'is');
+     if(!source)continue;
+     const existing=Array.from(source.children).filter(el=>el.localName==='r');
+     const parts=existing.length?existing.map(run=>({value:all(run,'t').map(t=>t.textContent).join(''),props:child(run,'rPr')})):[{value:child(source,'t')?.textContent||'',props:null}];
+     const full=parts.map(p=>p.value).join('');
+     const ranges=Array.from(full.matchAll(exportCodePattern()),m=>[m.index,m.index+m[0].length]);
+     for(const m of full.matchAll(/(?:\b(?:[Kk]iểu|[Tt]ype|COP)\s*[:.-]?\s*)(710|720|730|760|770|780)(?![A-Za-z0-9])/g))ranges.push([m.index+m[0].length-m[1].length,m.index+m[0].length]);
+     if(!ranges.length)continue;
+     const inline=create('is');let offset=0;
+     for(const part of parts){
+       const start=offset,end=start+part.value.length;offset=end;
+       const cuts=[...new Set([start,end,...ranges.flat().filter(i=>i>start&&i<end)])].sort((a,b)=>a-b);
+       for(let i=0;i<cuts.length-1;i++){
+         const a=cuts[i],b=cuts[i+1];if(a===b)continue;
+         const run=create('r'),props=part.props?x.importNode(part.props,true):baseProps(c);
+         if(ranges.some(([lo,hi])=>a>=lo&&b<=hi)){
+           let bold=child(props,'b');if(!bold){bold=create('b');props.appendChild(bold);}bold.removeAttribute('val');
+         }
+         const t=create('t');t.setAttribute('xml:space','preserve');t.textContent=full.slice(a,b);
+         run.appendChild(props);run.appendChild(t);inline.appendChild(run);
+       }
+     }
+     for(const old of Array.from(c.children).filter(el=>['v','is'].includes(el.localName)))old.remove();
+     c.setAttribute('t','inlineStr');c.appendChild(inline);
+   }
  }
  // Project the final, styled sheet so Form đơn, PDF and Spec Summary share the same language rules.
  async function vietnameseSheet(zip,x,lastDataColumn){
@@ -3862,7 +3942,7 @@
          if(!separated)return null;
          vi=separated[1].trim();en=separated[2].trim();suffix=separated[3]||'';
        }
-       if(!hasVietnamese(vi)||hasVietnamese(en)||!/[a-z]/i.test(en)||codeOnly.test(en)||!en.trim())return null;
+       if(!hasVietnamese(vi)||hasVietnamese(en)||!/[a-z]/i.test(en)||codeOnly.test(en)||/^(?:[A-Z][A-Z0-9]*)(?:-[A-Z0-9]+)+$/.test(en)||!en.trim())return null;
        // Main heading has a trailing colon in its source; retain it at the
        // English end rather than losing punctuation.
        return {vi,en:en+suffix};
@@ -4413,6 +4493,7 @@
        throw Error('Unexpected content in section II merged C'+rn);
    }
    if(doc.onlyVi)await vietnameseSheet(zip,x,3);
+   await emphasizeExportCodes(zip,x);
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
    for(const old of sheetnodes.filter(s=>s!==sheet)){
@@ -4555,5 +4636,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
+ window.SPEC_EXPORT={emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();
