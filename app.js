@@ -291,7 +291,17 @@ function currentValue(addr){return changes[addr]??current.fields.find(f=>f.cell=
 function activeInput(addr){return document.querySelector('[data-cell="'+addr+'"]')}
 // v5.8.68: Inline 11,000 mm warning for exactly two stops on BOTH models.
 // Read live DOM values for immediate feedback; never change SpecForm inputs or constraints.
+function refreshMRLFloorLimit(){
+ if($('model')?.value!=='MRL')return;
+ const input=activeInput('D20'), box=input?.closest('.field');if(!box)return;
+ let hint=box.querySelector('.mrl-floor-limit-hint');
+ if(!hint){hint=document.createElement('small');hint.className='mrl-floor-limit-hint';hint.style.cssText='font-size:11px;line-height:1.3';box.append(hint);}
+ const f=window.SPEC_ALPHA_5865?.mrlFloorTotals(addr=>activeInput(addr)?.value??currentValue(addr));
+ hint.textContent=f?`Tổng tầng: ${f.total}/${f.max} · Tầng không phục vụ tối đa: ${f.remaining} (không tính cửa tầng thoát hiểm)`:'Không tính cửa tầng thoát hiểm';
+ hint.style.color=f&&f.total>f.max?'#b91c1c':'#64748b';
+}
 function refreshTwoStopTravelWarning(){
+ refreshMRLFloorLimit();
  const model=$('model')?.value;
  const travelCell=model==='MR'?'D39':'D35';
  const input=activeInput(travelCell);
@@ -1385,6 +1395,7 @@ function row(field,displayName='',compact=false){
   input.style.cursor='not-allowed';
  }
  input.value=value;
+ if($('model').value==='MRL'&&['D18','D19','D20'].includes(field.cell))input.addEventListener('input',refreshMRLFloorLimit);
  input.addEventListener('change',()=>{
    changes[field.cell]=input.value;input.classList.add('dirty');
    if($('model').value==='MR'&&field.cell==='D45'){

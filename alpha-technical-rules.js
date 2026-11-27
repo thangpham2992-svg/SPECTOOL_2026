@@ -40,6 +40,26 @@ window.SPEC_ALPHA_5865 = Object.freeze({
     if(prefix)return ({'06':450,'08':630,'11':825,'13':1000,'17':1275,'18':1350,'21':1600,'24':1800})[prefix];
     return null;
   },
+  // R75: count named floors and numeric ranges without changing their export text.
+  floorListCount(raw){
+    const str=String(raw??'').trim();
+    if(!str||/^(?:No|None|Không có(?: \(No\))?|Không cung cấp|[-–—])$/iu.test(str))return 0;
+    let count=0;
+    for(const token of str.split(/[,;\/\n\r]+/).map(x=>x.trim()).filter(Boolean)){
+      const m=token.match(/^([\p{L}]*)(\d+)\s*[-–—~]\s*([\p{L}]*)(\d+)$/iu);
+      if(m&&m[1].toUpperCase()===m[3].toUpperCase())count+=Math.abs(Number(m[2])-Number(m[4]))+1;
+      else count++;
+    }
+    return count;
+  },
+  mrlFloorTotals(get){
+    const limits=this.mrlV02Limits(this.mrlV02CapacityKg(get('D13')),Number(get('D17')));
+    if(!limits?.applicable)return null;
+    const declared=Number(get('D18'));
+    const served=Math.max(Number.isFinite(declared)?declared:0,this.floorListCount(get('D19')));
+    const nonServed=this.floorListCount(get('D20'));
+    return {served,nonServed,total:served+nonServed,max:limits.maxStops,remaining:Math.max(0,limits.maxStops-served)};
+  },
   mrlV02Validate(get){
     const cap=this.mrlV02CapacityKg(get('D13'));
     const speed=Number(get('D17'));
@@ -51,9 +71,9 @@ window.SPEC_ALPHA_5865 = Object.freeze({
         message:`Tốc độ ${speed} m/min không áp dụng cho tải trọng ${cap} kg theo Table 2.1-B/C Version02 / Speed not applicable.`});
       return errors;
     }
-    const stops=Number(get('D18'));
-    if(Number.isFinite(stops)&&stops>limits.maxStops)errors.push({id:'MRL_V02!MaximumStops',cell:'D18',
-      message:`Số điểm dừng ${stops} vượt giới hạn ${limits.maxStops} (bao gồm tầng không phục vụ), theo Table 2.1-C Version02 / Maximum stops exceeded.`});
+    const floors=this.mrlFloorTotals(get);
+    if(floors&&floors.total>floors.max)errors.push({id:'MRL_V02!MaximumStops',cell:floors.nonServed?'D20':'D18',
+      message:`Tầng phục vụ ${floors.served} + tầng không phục vụ ${floors.nonServed} = ${floors.total}, vượt tối đa ${floors.max} theo Table 2.1-C Version02. / Total floors exceed maximum.`});
     const travel=Number(get('D35'));
     if(Number.isFinite(travel)&&travel>limits.maxTravelMm)errors.push({id:'MRL_V02!MaximumTravel',cell:'D35',
       message:`Travel ${travel.toLocaleString('vi-VN')} mm vượt giới hạn ${limits.maxTravelMm.toLocaleString('vi-VN')} mm cho ${cap} kg, ${speed} m/min theo Table 2.1-B Version02.`});
