@@ -89,7 +89,7 @@ window.addEventListener('message',async event=>{
   }else   if(data.action==='pairRows'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');
    const x=await buildFinalExport(Boolean(data.payload?.includeTechDetails),false);reply.result=await window.SPEC_PRINT_LAYOUT.fromXlsx(x.data,x.model,true);
-  }else if(data.action==='summaryPrint'){const book=await buildPairBook(data.payload,false);reply.result=await window.SPEC_PRINT_LAYOUT.summaryFromXlsx(await book.arrayBuffer(),data.payload[0]?.orientation);
+  }else if(data.action==='summaryPrint'){const book=await buildPairBook(data.payload,false,true);reply.result=await window.SPEC_PRINT_LAYOUT.summaryFromXlsx(await book.arrayBuffer(),data.payload[0]?.orientation);
   }else if(data.action==='pairBook'){reply.result=await buildPairBook(data.payload);
   }else if(data.action==='excel'){
    if(runCheckSpec().length)throw Error('Vui lòng xử lý các mục trong Check Spec.');

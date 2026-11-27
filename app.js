@@ -3069,6 +3069,26 @@ function check(){
    result.status='FAIL';
   }
  }
+ // R103: keep source validation; identify the exact field for required/locked errors.
+ for(const [cell,label] of [['C7','Tên dự án / Project name'],['C8','Hạng mục / Item']]){
+  if(!String(currentValue(cell)??'').trim()&&!result.errors.some(e=>e.cell===cell&&/\/ Required$/.test(String(e.id)))){
+   result.errors.push({id:'SpecForm!'+cell+' / Required',cell,message:'',detail:label});
+  }
+ }
+ for(const err of result.errors){
+  const cell=String(err.cell||'');
+  const required=/\/ Required$/.test(String(err.id)),locked=/\/ LightUp$/.test(String(err.id));
+  if(!required&&!locked)continue;
+  const field=current.fields.find(f=>f.cell===cell);
+  const node=activeInput(cell);
+  const label=({'C7':'Tên dự án / Project name','C8':'Hạng mục / Item'})[cell]||
+   node?.getAttribute('aria-label')||node?.closest('.field')?.querySelector('.nm')?.textContent?.trim()||
+   xrules().labels?.[cell]||field?.label||field?.name||cell||'Trường dữ liệu';
+  err.message=required&&cell==='C7'?'Chưa nhập tên dự án / Project name is required.':
+   required&&cell==='C8'?'Chưa nhập hạng mục / Item is required.':
+   label+(required?' — Chưa nhập dữ liệu bắt buộc. / Required input is blank.':' — Trường không áp dụng cho cấu hình này, cần xóa dữ liệu. / Clear inapplicable input.');
+ }
+ if(result.errors.length)result.status='FAIL';
  renderSourceCheck(result);
  window.__lastCheck=result;
  status(result.status==='PASS'?'PASS — Đạt':result.status==='FAIL'?`FAIL — ${result.errors.length} lỗi`:'CHƯA XÁC MINH',result.status==='FAIL'?'error':'');
@@ -3185,7 +3205,7 @@ function renderSourceCheck(result){
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=((String(err.id)==='Tool.exe CheckSpecStep1'&&/PIV |HBV |PIH\/PID|hall fixture/i.test(String(err.message)))||cell==='D65' || isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=(/\/ (?:Required|LightUp)$/.test(String(err.id))||(String(err.id)==='Tool.exe CheckSpecStep1'&&/PIV |HBV |PIH\/PID|hall fixture/i.test(String(err.message)))||cell==='D65' || isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')?10:(isDimension(cell)?dimensionPriority(err):0);
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{id:String(err.id),name,message,priority});

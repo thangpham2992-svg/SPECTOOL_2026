@@ -1131,6 +1131,30 @@
      c.setAttribute('t','inlineStr');c.appendChild(inline);
    }
  }
+ // R102: normalize the document title only, with explicit fonts for Vietnamese and English.
+ async function normalizeReportTitle(zip,x){
+   const sf=zip.file('xl/sharedStrings.xml');
+   const shared=sf?all(parse(await sf.async('string')),'si'):[];
+   for(const c of all(x,'c')){
+     if(!/^A[1-9]$/.test(c.getAttribute('r')||''))continue;
+     const src=c.getAttribute('t')==='s'?shared[+child(c,'v')?.textContent]:child(c,'is');
+     const value=all(src,'t').map(t=>t.textContent).join('').normalize('NFC').trim();
+     if(!/^ĐẶC TÍNH KỸ THUẬT(?:\s*\(?Main specifications\)?)?$/iu.test(value))continue;
+     const bilingual=/Main specifications/i.test(value);
+     const make=tag=>x.createElementNS(n,tag),inline=make('is');
+     for(const [content,en] of [['ĐẶC TÍNH KỸ THUẬT',false],...(bilingual?[['\nMain specifications',true]]:[])]){
+       const run=make('r'),pr=make('rPr');
+       for(const [tag,val] of [['rFont','Arial'],['b',en?'0':'1'],['i',en?'1':'0'],['color',en?'FF245A86':'FF17365D'],['sz',en?'12':'20'],['u','none']]){
+         const el=make(tag);el.setAttribute(tag==='color'?'rgb':'val',val);pr.appendChild(el);
+       }
+       const t=make('t');t.setAttribute('xml:space','preserve');t.textContent=content;
+       run.append(pr,t);inline.appendChild(run);
+     }
+     for(const old of Array.from(c.children))if(['v','is'].includes(old.localName))old.remove();
+     c.setAttribute('t','inlineStr');c.appendChild(inline);
+     const row=c.parentNode;row.setAttribute('ht',String(Math.max(Number(row.getAttribute('ht'))||0,bilingual?44:30)));row.setAttribute('customHeight','1');
+   }
+ }
  // Project the final, styled sheet so Form đơn, PDF and Spec Summary share the same language rules.
  async function vietnameseSheet(zip,x,lastDataColumn){
    const styles=parse(await zip.file('xl/styles.xml').async('string'));
@@ -4699,6 +4723,7 @@
    await insertAutomaticOperationRows(zip,x,workbook,doc);
    await normalizeExportPunctuation(zip,x);
    await emphasizeExportCodes(zip,x);
+   await normalizeReportTitle(zip,x);
    if(doc.compactHidden)doc.compacted=await compactHiddenExport(zip,x,finalpath,all(workbook,'definedName'));
    zip.file(finalpath,serial(x));zip.file('xl/workbook.xml',serial(workbook));zip.file('xl/_rels/workbook.xml.rels',serial(rels));
    // remove unused worksheets and their sheet relationships; keep style and drawing parts.
@@ -4842,5 +4867,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={automaticOperationFeatures,normalizeExportPunctuation,compactHiddenExport,emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
+ window.SPEC_EXPORT={normalizeReportTitle,automaticOperationFeatures,normalizeExportPunctuation,compactHiddenExport,emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();

@@ -40,6 +40,14 @@
    if(!uniformBorders){const b=x.border||{};for(const key of ['left','right','top','bottom'])if(b[key])rules.push('border-'+key+':'+b[key]);}
    return rules.join(';');
  }
+ // R102: render Vietnamese and English report titles separately; avoid underline/diacritic collisions.
+ function reportTitleHtml(value){
+   const normalized=String(value||'').normalize('NFC').trim();
+   const english=/Main specifications/i.test(normalized);
+   const vi=normalized.replace(/\s*\(?Main specifications\)?\s*$/i,'').trim();
+   return '<span class="report-title-vi">'+esc(vi)+'</span>'+(english?'<span class="report-title-en">Main specifications</span>':'');
+ }
+ const reportTitleCss='.report-title-vi,.report-title-en{display:block;font-family:Arial,"Liberation Sans",sans-serif!important;font-synthesis:none;font-variant:normal;letter-spacing:normal;text-decoration:none!important;white-space:normal;overflow-wrap:normal;line-height:1.32}.report-title-vi{font-size:18pt!important;font-weight:700!important;font-style:normal!important;color:#17365d}.report-title-en{font-size:11pt!important;font-weight:400!important;font-style:italic!important;color:#245a86;margin-top:2px}';
  function readInlineRichHtml(c){
    if(!c||attr(c,'t')!=='inlineStr')return '';
    const is=q(c,'is');if(!is)return '';
@@ -276,7 +284,7 @@
      (companyAddress?'<div class="spec-address">'+esc(companyAddress)+'</div>':'')+
      '</div></div>'+
      '<div class="spec-logo-row"><img class="spec-logo" alt="Mitsubishi Electric" src="'+logoSrc+'"></div>'+
-     '<h1 class="spec-report-title">'+esc(reportTitle)+'</h1></header>';
+     '<h1 class="spec-report-title">'+reportTitleHtml(reportTitle)+'</h1></header>';
    // Detect a bilingual pair from the real exported XLSX border styles across
    // ALL sections. Section III may have a vertically merged label on the left,
    // unlike Section V features where both lines carry their own labels.
@@ -412,7 +420,8 @@
    .spec-logo-row{height:57px;display:flex;align-items:center;justify-content:flex-start;margin:3px 0 6px}
    .spec-logo{display:block;width:126px;height:auto;max-height:56px;object-fit:contain}
    table.excel em{color:#245A86;font-style:italic}
-   .spec-report-title{font-size:13.5pt;line-height:1.25;text-align:center;font-weight:700;margin:5px 0 9px;color:#203f65}
+   .spec-report-title{line-height:1.32;text-align:center;font-weight:700;margin:5px 0 9px;color:#203f65}
+   ${reportTitleCss}
    
    table.excel{border-collapse:collapse;border-spacing:0;table-layout:fixed;width:100%;font-size:8.2pt;line-height:1.18}
    table.excel td{padding:3px 4px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;line-height:1.23;min-width:0}
@@ -480,14 +489,15 @@
        for(let col=1;col<=widths.length;col++){
          const key=colAddr(col)+n;if(covered.has(key))continue;
          const cell=cells.get(key),[w,h]=spans.get(key)||[1,1];
-         const content=readInlineRichHtml(cell)||esc(readText(cell,[])).replace(/\n/g,'<br>');
+         const raw=readText(cell,[]);
+         const content=n===5&&col===1?reportTitleHtml(raw):(readInlineRichHtml(cell)||esc(raw).replace(/\n/g,'<br>'));
          tr+='<td colspan="'+w+'" rowspan="'+h+'" style="'+formatStyle(+attr(cell,'s',0),styles)+'">'+content+'</td>';
        }
        tr+='</tr>';if(n<9)pre+=tr;else if(n===9)head+=tr;else body+=tr;
      }
      pages.push('<section><img class="logo" alt="Mitsubishi Electric" src="'+FALLBACK_LOGO+'"><table>'+cols+'<tbody>'+pre+'</tbody></table><table>'+cols+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></section>');
    }
-   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · '+paper+'</title><style>@page{size:A4 '+(portrait?'portrait':'landscape')+';margin:0}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:'+(portrait?'192':'279')+'mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:'+(portrait?'2px 2px':'2px 4px')+';overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}'+numbered.css+'</style><body><nav>Spec Summary · '+paper+' &nbsp; <button disabled onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+numbered.script+'</body></html>';
+   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · '+paper+'</title><style>@page{size:A4 '+(portrait?'portrait':'landscape')+';margin:0}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:'+(portrait?'192':'279')+'mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:'+(portrait?'2px 2px':'2px 4px')+';overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td{text-align:center!important;text-decoration:none!important;padding:5px 2px 8px;line-height:1.32}'+reportTitleCss+'nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}'+numbered.css+'</style><body><nav>Spec Summary · '+paper+' &nbsp; <button disabled onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+numbered.script+'</body></html>';
  }
  window.SPEC_PRINT_LAYOUT={fromXlsx,summaryFromXlsx};
 })();

@@ -52,15 +52,16 @@ function displayRuns(value,english,mixed,hints){
  plain(rest);return runs;
 }
 function sameControlGroup(a,b){return a?.groupId!=null&&a.groupId===b?.groupId}
-function groupSheet(template,cars,featureNotes){
+function groupSheet(template,cars,featureNotes,wideExcel=false){
  const portrait=cars[0].orientation!=='landscape',labelA=portrait?20:25,labelB=portrait?12:15;
- const last=String.fromCharCode(66+cars.length),width=(portrait?76:108)/cars.length,merges=[],lines=[],carry=new Map();
+ const columnLetter=n=>{let s="";for(;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s};
+ const last=columnLetter(2+cars.length),width=(portrait?76:108)/(wideExcel?Math.min(cars.length,4):cars.length),merges=[],lines=[],carry=new Map();
  function line(values,kind='value'){
   const n=lines.length+1;const headingArea=n<=8;
   let height=headingArea?([17,16,2,2,47,3,27,27][n-1]):21,cells=[];
   for(const [col,value,span=1,style=kind,depth=1,edges=15,englishLabel=false,hints=[],bold=false,scopeNote=''] of values){
-   const letter=String.fromCharCode(65+col);
-   if(span>1||depth>1)merges.push('<mergeCell ref="'+letter+n+':'+String.fromCharCode(64+col+span)+(n+depth-1)+'"/>');
+   const letter=columnLetter(col+1);
+   if(span>1||depth>1)merges.push('<mergeCell ref="'+letter+n+':'+columnLetter(col+span)+(n+depth-1)+'"/>');
    const capacity=headingArea?Array.from({length:span},(_,offset)=>[labelA,labelB][col+offset]??width).reduce((a,b)=>a+b,0)-2:col<2?(span>1?labelA+labelB-2:labelA-1):width*span-2;
    const english=englishLabel||style==='en'||style==='feature_en';
    const mixed=['label','title','section','feature_heading','project','value','feature_value'].includes(style)||(style==='header'&&col===0);
@@ -80,7 +81,7 @@ function groupSheet(template,cars,featureNotes){
     const baseStyle=anchor&&edges===15?formStyles[style]:edgeStyles[style][(anchor?15:mask)&edges];
     const faint=mask & ~edges & 12;
     const id=faint?bilingualStyles[[baseStyle,faint]]:baseStyle;
-    const addr=String.fromCharCode(65+col+x)+(n+y);
+    const addr=columnLetter(col+x+1)+(n+y);
     const cell='<c r="'+addr+'" s="'+id+'"'+(anchor?' t="inlineStr"><is>'+content+'</is></c>':'/>');
     if(!y)cells[col+x]=cell;
     else{if(!carry.has(n+y))carry.set(n+y,[]);carry.get(n+y)[col+x]=cell}
@@ -217,7 +218,8 @@ function groupSheet(template,cars,featureNotes){
  }
  return template.replace(/orientation="landscape"/, 'orientation="'+(portrait?'portrait':'landscape')+'"').replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="'+labelA+'" customWidth="1"/><col min="2" max="2" width="'+labelB+'" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
 }
-async function buildPairBook(cars,compactHidden=true){
+async function buildPairBook(cars,compactHidden=true,splitForPrint=false){
+ if(!cars.length||cars.length>16382)throw Error("Số cột thang không hợp lệ / Invalid elevator column count.");
  const zip=await JSZip.loadAsync(pairTemplate,{base64:true}),read=p=>zip.file(p).async('string');
  const template=await read('xl/worksheets/sheet1.xml'),wb='xl/workbook.xml',rels='xl/_rels/workbook.xml.rels',types='[Content_Types].xml';
  let relationships=await read(rels),content=await read(types),sheets='',titles='',start=0;
@@ -226,21 +228,23 @@ async function buildPairBook(cars,compactHidden=true){
   const names=cars.filter((car,index)=>Boolean(row.values[index]?.trim())).map(car=>car.name);
   if(names.length&&names.length<cars.length)featureNotes.set(row.key,names);
  }
- const count=Math.ceil(cars.length/4);
+ // Excel: one worksheet for every elevator column; PDF retains A4 pagination.
+ const count=splitForPrint?Math.ceil(cars.length/4):1;
  for(let i=0;start<cars.length;i++){
-  let size=Math.min(4,Math.ceil((cars.length-start)/Math.max(1,count-i)));
-  if(sameControlGroup(cars[start+size-1],cars[start+size])){
+  let size=splitForPrint?Math.min(4,Math.ceil((cars.length-start)/Math.max(1,count-i))):cars.length;
+  if(splitForPrint&&sameControlGroup(cars[start+size-1],cars[start+size])){
    let end=start+size;
    while(sameControlGroup(cars[end-1],cars[end]))end++;
    if(end-start<=4)size=end-start;
    else while(sameControlGroup(cars[start+size-1],cars[start+size]))size--;
   }
-  const group=cars.slice(start,start+size),n=i+1,id=i?'rIdCar'+n:'rId1',name='Spec '+(start+1)+'-'+(start+size),path='xl/worksheets/sheet'+n+'.xml';
-  let sheetXml=groupSheet(template,group,featureNotes);
+  const group=cars.slice(start,start+size),n=i+1,id=i?'rIdCar'+n:'rId1',name=splitForPrint?'Spec '+(start+1)+'-'+(start+size):'Spec Summary',path='xl/worksheets/sheet'+n+'.xml';
+  let sheetXml=groupSheet(template,group,featureNotes,!splitForPrint);
   const sheet=new DOMParser().parseFromString(sheetXml,'application/xml');
   if(cars[0].onlyVi)await window.SPEC_EXPORT.vietnameseSheet(zip,sheet,group.length+2);
   await window.SPEC_EXPORT.normalizeExportPunctuation(zip,sheet);
   await window.SPEC_EXPORT.emphasizeExportCodes(zip,sheet);
+  await window.SPEC_EXPORT.normalizeReportTitle(zip,sheet);
   if(i){
    const drawingPath='xl/drawings/drawing'+n+'.xml';
    zip.file(drawingPath,await read('xl/drawings/drawing1.xml'));

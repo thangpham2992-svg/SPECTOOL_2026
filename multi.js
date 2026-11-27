@@ -55,7 +55,7 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?v=R101&model='+frameModel;document.querySelector('main').append(frame);
+ frame.src='spec.html?v=R104&model='+frameModel;document.querySelector('main').append(frame);
  return {name,frame,ready};
 }
 function add(){
@@ -334,6 +334,7 @@ function draw(viewState){
   if(id==='P'){
    for(const f of cache.P[0]||[]){
     const label=make('label',f.title),input=make('input');input.value=project.get(f.key)??f.value;
+    input.dataset.projectKey=f.key;
     if(f.key==='C7'){input.placeholder='Điền tên dự án';input.classList.add('project-name-prompt');}
 
     project.set(f.key,input.value);input.onchange=async()=>{project.set(f.key,input.value);
@@ -564,7 +565,31 @@ function locate(car,issue){
   if(field)return {id,field};
  }
 }
+function sharedProjectIssue(issue){return ['C7','C8'].includes(issue?.cell);}
+function splitCheckFailures(failures){
+ const common=new Map(),individual=[];
+ for(const f of failures){
+  const errors=[];
+  for(const issue of f.errors){
+   if(sharedProjectIssue(issue)){const key=issue.cell+'|'+issue.message;if(!common.has(key))common.set(key,issue);}
+   else errors.push(issue);
+  }
+  if(errors.length)individual.push({...f,errors});
+ }
+ return {common:[...common.values()],individual};
+}
+function focusProjectIssue(issue){
+ const input=el('sharedProject').querySelector('[data-project-key="'+CSS.escape(issue.cell)+'"]');
+ if(!input)return;
+ input.classList.add('has-spec-error');input.scrollIntoView({block:'center',inline:'nearest'});input.focus({preventScroll:true});
+}
+function appendProjectIssues(parent,issues,onClick){
+ if(!issues.length)return;
+ parent.append(make('strong','Thông tin công trình (áp dụng chung)'));
+ for(const issue of issues){const button=make('button',issue.message);button.type='button';button.className='project-check-error';button.onclick=()=>onClick(issue);parent.append(button);}
+}
 async function jumpToIssue(car,issue){
+ if(sharedProjectIssue(issue)){focusProjectIssue(issue);return;}
  const index=cars.indexOf(car);if(index<0)return;
  el('car').selectedIndex=index;el('search').value='';el('diff').checked=false;
  if(el('featureGroup').value!=='all'){el('featureGroup').value='all';await refresh()}
@@ -594,6 +619,7 @@ function markFailedFields(){
  for(const {car,errors} of lastFailures){
   const index=cars.indexOf(car);
   for(const issue of errors){
+   if(sharedProjectIssue(issue)){el('sharedProject').querySelector('[data-project-key="'+CSS.escape(issue.cell)+'"]')?.classList.add('has-spec-error');continue;}
    const target=issue.cell&&locate(car,issue);if(!target)continue;
    failedSections.add(target.id);
    const panel=el('part-'+target.id);
@@ -608,21 +634,23 @@ function markFailedFields(){
 }
 function renderErrors(){
  const panel=el('carErrors'),grid=make('div');grid.className='error-grid';
+ const {common,individual}=splitCheckFailures(lastFailures);
+ const shared=make('div');shared.className='project-check-errors';appendProjectIssues(shared,common,focusProjectIssue);
  const visible=cars;grid.style.gridTemplateColumns='240px repeat('+visible.length+',minmax(150px,1fr))';grid.style.minWidth=(240+150*visible.length)+'px';
- grid.append(make('strong','Kết quả kiểm tra · '+lastFailures.length+'/'+cars.length+' thang có lỗi'));
+ grid.append(make('strong','Kết quả kiểm tra · '+individual.length+'/'+cars.length+' thang có lỗi riêng'));
  for(const car of visible){
-  const column=make('div'),errors=lastFailures.find(f=>f.car===car)?.errors||[];
-  column.append(make('strong',car.name+' · '+(errors.length?errors.length+' lỗi':'Đạt')));
+  const column=make('div'),errors=individual.find(f=>f.car===car)?.errors||[];
+  column.append(make('strong',car.name+' · '+(errors.length?errors.length+' lỗi':'Không có lỗi riêng')));
   for(const e of errors){const issue=typeof e==='string'?{message:e,cell:''}:e;
    const button=make(issue.cell?'button':'p',issue.message);if(issue.cell)button.onclick=()=>jumpToIssue(car,issue);column.append(button)}
   grid.append(column);
  }
- panel.replaceChildren(grid);
+ panel.replaceChildren();if(common.length)panel.append(shared);if(individual.length)panel.append(grid);
 }
 async function reportErrors(failures){
  if(el('featureGroup').value!=='all'){el('featureGroup').value='all';await refresh()}
  lastFailures=failures;detail=false;cars.forEach(c=>c.frame.hidden=true);el('overview').hidden=false;
- const panel=el('carErrors');panel.hidden=false;draw();panel.scrollIntoView({block:'start'});status('Cần xử lý lỗi của '+failures.map(f=>f.car.name).join(', '));
+ const panel=el('carErrors');panel.hidden=false;draw();panel.scrollIntoView({block:'start'});const {common,individual}=splitCheckFailures(failures);status('Cần xử lý '+[common.length?'thông tin công trình':null,individual.length?'lỗi của '+individual.map(f=>f.car.name).join(', '):null].filter(Boolean).join(' và '));
 }
 function topServiceFloor(list){
  const last=String(list??'').normalize('NFC').trim().split(/[~,;\n]+/).map(s=>s.trim()).filter(Boolean).pop()||'';
@@ -650,7 +678,9 @@ function validatePair(a,b,fieldsA,fieldsB,maxStopDifference){
 function checkPopup(title,failures=[],canExport=false){
  const dialog=el('checkExportDialog'),body=el('checkExportBody');
  el('checkExportTitle').textContent=title;body.replaceChildren();
- for(const {car,errors} of failures){
+ const {common,individual}=splitCheckFailures(failures);
+ appendProjectIssues(body,common,issue=>{dialog.close();focusProjectIssue(issue)});
+ for(const {car,errors} of individual){
   body.append(make('strong',car.name));
   for(const error of errors){
    const issue=typeof error==='string'?{message:error}:error;
