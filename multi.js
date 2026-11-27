@@ -28,7 +28,7 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?model='+frameModel;document.querySelector('main').append(frame);
+ frame.src='spec.html?v=R76&model='+frameModel;document.querySelector('main').append(frame);
  return {name,frame,ready};
 }
 function add(){

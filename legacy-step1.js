@@ -2,6 +2,14 @@
 /* Port of the non-formula rules in FormSpecGXLM2P / FormSpecGQXL2P CheckSpecStep1_ItemClick.
    Excel formulas and DataTable conditions are evaluated separately in source-check.js.
    UI/conditional-fill-only checks are not treated as certified unless we can observe their state. */
+// Shared PIV family classification: enclosure suffix does not change display count.
+window.SPEC_PIV_RULES=(()=>{
+ const families={A1010:[1,'SEGMENT'],A1020:[2,'SEGMENT'],A1030:[1,'DOT'],A1040:[2,'DOT'],A1080:[1,'DOT'],A1090:[2,'DOT'],C710:[1,'SEGMENT'],C720:[2,'SEGMENT'],C730:[1,'DOT'],C740:[2,'DOT'],C766:[1,'LCD'],C776:[2,'LCD'],C780:[1,'DOT'],C790:[2,'DOT']};
+ const classify=code=>{const m=/^PIV[1-6][- ]([AC]\d{3,4})[A-Z0-9]*$/i.exec(String(code??'').trim());const info=m&&families[m[1].toUpperCase()];return info?{count:info[0],technology:info[1]}:null;};
+ const requiresSingle=(model,group)=>model==='MRL'?['1C-2BC','3C-AI22'].includes(group):group==='1C-2BC';
+ const allowed=(model,group,code)=>!requiresSingle(model,group)||classify(code)?.count===1;
+ return {classify,requiresSingle,allowed};
+})();
 window.SPEC_LEGACY_STEP1=function(model,changes,db){
  const Engine=window.SpecExcelSourceEngine?.SourceEngine;
  if(!Engine||!db)return{errors:[],verified:[],unverified:['Legacy C# engine unavailable']};
@@ -208,11 +216,11 @@ window.SPEC_LEGACY_STEP1=function(model,changes,db){
  // 3. Fixture checks per original Tool.exe.
  const pivKeys=model==='MRL'?['TopFloor','MainFloor','OtherFloor']:['MainFloor','OtherFloor'];
  const notSup=s=>s.includes('Not supplied');
- const requireSingle=model==='MRL'?['1C-2BC','3C-AI22'].includes(group):group==='1C-2BC';
+ 
  for(const key of pivKeys){
   const P='K36_PIV'+key,H='K36_HBV'+key,I='K36_PIH_PID'+key;
   const piv=f(P),hbv=f(H),pih=f(I);
-  if(requireSingle&&!notSup(piv)&&!['71','73','766','1010','1030'].some(c=>piv.includes(c)))mark(P,`PIV ${piv} không áp dụng điều khiển nhóm ${group} / Invalid hall fixture for control group`);
+  if(!notSup(piv)&&!window.SPEC_PIV_RULES.allowed(model,group,piv)){const info=window.SPEC_PIV_RULES.classify(piv);mark(P,info?`PIV ${piv}: ${info.count} màn hình; hệ điều khiển ${group} yêu cầu 1 màn hình / Single indicator required.`:`PIV ${piv}: chưa xác định số màn hình / Unknown PIV family.`);}
   // Exception confirmed by Sales Engineering: PIV may share a landing with
   // HBV1-F716N / HBV2-F716N / HBV3-F716N / HBV4-F716N only.
   // Attribute any other simultaneous PIV/HBV failure to HBV, the conflicting fixture.

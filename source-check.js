@@ -38,16 +38,7 @@ window.SPEC_PANEL_DISPLAY_RULES=(()=>{
    if(wheelchair)return wheelchair[1]==='660'?'SEGMENT':'DOT';
    return 'UNKNOWN';
   }
-  if(kind==='PIV'){
-   // Suffix (N/H/H2/E2/B/BA/...) affects enclosure, not display hardware.
-   const m=/^PIV[1-6]-([AC])(\d{3,4})[A-Z0-9]*$/.exec(v);
-   if(!m)return 'UNKNOWN';
-   const core=m[1]+'-'+m[2];
-   if(['A-1010','A-1020','C-710','C-720'].includes(core))return 'SEGMENT';
-   if(['A-1030','A-1040','A-1080','A-1090','C-730','C-740','C-780','C-790'].includes(core))return 'DOT';
-   if(['C-766','C-776'].includes(core))return 'LCD';
-   return 'UNKNOWN';
-  }
+  if(kind==='PIV')return window.SPEC_PIV_RULES.classify(v)?.technology||'UNKNOWN';
   if(kind==='PIH'){
    if(v==='PIH-C117')return 'LCD';
    if((model==='MRL'&&v==='PIH-D455')||(model==='MR'&&v==='PIH-D415'))return 'DOT';

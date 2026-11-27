@@ -1062,6 +1062,11 @@ function workbookChoices(field,engine=null){
  if($('model').value==='MR'&&/^K36_PIV(?:MainFloor|OtherFloor)$/.test(field.name)){
    list=list.filter(v=>!/^PIV\d+-[A-Z]\d{3,4}H$/i.test(String(v).trim()));
  }
+ // Apply the same group rule as Check Spec, without relaxing workbook eligibility.
+ if(/^K36_PIV(?:TopFloor|MainFloor|OtherFloor)$/.test(field.name)){
+   const model=$('model').value,group=String(currentValue(model==='MR'?'D21':'D22')??'').trim();
+   list=list.filter(v=>!/^PIV/i.test(String(v).trim())||window.SPEC_PIV_RULES.allowed(model,group,v));
+ }
  return [...new Set(list.map(v=>String(v??'').trim()).filter(Boolean))];
 }
 function hasDropdown(field){return Boolean(field.validation||supplementalListSources[field.name]||(field.options||[]).length||field.cell==='D23'&&$('model').value==='MRL'||field.name==='K18_CarJJ'&&$('model').value==='MRL')}
@@ -2128,12 +2133,7 @@ function hallIndicatorCount(code,kind){
  if(kind==='HBV')return 0;
  if(kind==='PIH_PID')return 1;
  if(kind!=='PIV')return null;
- const match=String(code||'').toUpperCase().match(/PIV\d*[- ]?([A-Z])(\d{3,4})/);
- if(!match)return null;
- const family=match[1]+match[2];
- const singles=new Set(['A1010','A1030','A1080','C710','C730','C766','C780']);
- const doubles=new Set(['A1020','A1040','A1090','C720','C740','C776','C790']);
- return singles.has(family)?1:doubles.has(family)?2:null;
+ return window.SPEC_PIV_RULES.classify(code)?.count??null;
 }
 function hallGroupCars(){
  const model=$('model').value;
@@ -3173,7 +3173,7 @@ function renderSourceCheck(result){
   if(!name||name===cell)name='Thông số kỹ thuật';
   // NSCR-C/C760: explain required EVRC choice, instead of merely showing an
   // unlabeled failed NSCR-C row. Clicking the error opens Operation at EVRC-C.
-  const message=(cell==='D65' || isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
+  const message=((String(err.id)==='Tool.exe CheckSpecStep1'&&/PIV |HBV |PIH\/PID|hall fixture/i.test(String(err.message)))||cell==='D65' || isDimension(cell)||String(err.id)==='ALPHA!TwoStopsTravel'||String(err.id).startsWith('MRL_V02_DECOR!')||String(err.id).startsWith('NY40!')||String(err.id)==='FloorName!AAN-G'||String(err.id).startsWith('FloorName!Display!')||String(err.id)==='Feature!HE-B-Dependencies'||(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')||String(err.id)==='Feature!MR_COP_OLHL_EXCLC'||String(err.id).startsWith('LandingDoor!WindowFireproof!')||String(err.id).startsWith('JD!')||($('model').value==='MR'&&String(err.id)==='DataTable!D494'))?String(err.message||'').trim():'';
   const priority=(String(err.id)==='MR!SideDropBHMax'||String(err.id)==='MRL!Standard1G_BHMax'||String(err.id)==='MRL!2G_BH_Exact')?10:(isDimension(cell)?dimensionPriority(err):0);
   const old=fields.get(cell);
   if(!old||priority>old.priority)fields.set(cell,{id:String(err.id),name,message,priority});
