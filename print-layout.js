@@ -510,6 +510,8 @@
      for(const c of qa(doc,'col'))for(let i=+attr(c,'min');i<=+attr(c,'max');i++)widths[i-1]=+attr(c,'width');
      const total=widths.reduce((a,b)=>a+b,0);
      const cols='<colgroup>'+widths.map(w=>'<col style="width:'+w/total*100+'%">').join('')+'</colgroup>';
+     const locationRow=rows.find(r=>+attr(r,'r')===9);
+     const headerEnd=/^Vị trí/i.test(readText(locationRow?.firstElementChild,[]))?10:9;
      let pre='',head='',body='';
      for(const row of rows){
        const n=+attr(row,'r');
@@ -523,7 +525,7 @@
          const content=n===5&&col===1?reportTitleHtml(raw):(readInlineRichHtml(cell)||esc(raw).replace(/\n/g,'<br>'));
          tr+='<td colspan="'+w+'" rowspan="'+h+'" style="'+formatStyle(+attr(cell,'s',0),styles)+'">'+content+'</td>';
        }
-       tr+='</tr>';if(n<9)pre+=tr;else if(n===9)head+=tr;else body+=tr;
+       tr+='</tr>';if(n<9)pre+=tr;else if(n<=headerEnd)head+=tr;else body+=tr;
      }
      pages.push('<section><img class="logo" alt="Mitsubishi Electric" src="'+FALLBACK_LOGO+'"><table>'+cols+'<tbody>'+pre+'</tbody></table><table>'+cols+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></section>');
    }

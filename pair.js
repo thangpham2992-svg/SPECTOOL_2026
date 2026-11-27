@@ -82,7 +82,7 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
     const faint=mask & ~edges & 12;
     const id=faint?bilingualStyles[[baseStyle,faint]]:baseStyle;
     const addr=columnLetter(col+x+1)+(n+y);
-    const cell='<c r="'+addr+'" s="'+id+'"'+(anchor?' t="inlineStr"><is>'+content+'</is></c>':'/>');
+    const cell='<c r="'+addr+'" s="'+id+'"'+(anchor?(typeof value==='number'?' t="n"><v>'+value+'</v></c>':' t="inlineStr"><is>'+content+'</is></c>'):'/>');
     if(!y)cells[col+x]=cell;
     else{if(!carry.has(n+y))carry.set(n+y,[]);carry.get(n+y)[col+x]=cell}
    }
@@ -103,6 +103,11 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
  for(const [label,pattern] of [['Công trình (Project)',/project|công trình/i],['Hạng mục (Item)',/item|hạng mục/i]]){
   const field=preamble.find(r=>pattern.test(r.a));line([[0,label,1,'project'],[1,field?.values[0]||'',total-1,'entry']]);
  }
+ if(cars.some(c=>c.hasLocations||c.location)){
+  const values=[[0,'Vị trí (Location)',2]];
+  for(let i=0;i<cars.length;){const c=cars[i];let span=1;while(c.locationId!=null&&i+span<cars.length&&cars[i+span].locationId===c.locationId)span++;values.push([i+2,c.location||'',span]);i+=span;}
+  line(values,'header');
+ }
  line([[0,'Tên thang (Elev name)',2],...cars.map((c,i)=>[2+i,c.name])],'header');
  const vietnamese=text=>/[đĐ]|\p{Script=Latin}\p{M}/u.test(String(text??'').normalize('NFD'));
  function splitTranslation(value){
@@ -114,6 +119,8 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
  const body=rows.filter(r=>!r.preamble).flatMap(row=>{
   const r={...row,quantity:row.quantity||/^\s*(?:Số lượng(?: thang)?|Quantity)\s*(?:\(|$)/iu.test(row.a.split(/\r?\n/)[0])};
   if(r.quantity&&!r.a&&r.values.some(v=>/\bsets?\b/i.test(v||'')))r.lower=true;
+  // R112: quantity stays on a single row in the Excel summary.
+  if(wideExcel&&r.quantity&&r.a)return [r];
   if(r.heading||r.upper||r.lower)return [r];
   const pairs=r.values.map(splitTranslation);
   if(!pairs.some(Boolean))return [r];
@@ -151,7 +158,7 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
   const featureHeading=/^\s*[-–—_]\s*Tính năng(?:\s|$)/iu.test(r.a)&&!r.b&&r.values.every(v=>!v);
   if(r.heading)inFeatures=/tính năng|features?/iu.test(r.a);
   if(featureHeading)inFeatures=true;
-  const rowNumber=lines.length+1;
+  const rowNumber=lines.length+1-(cars.some(c=>c.hasLocations||c.location)?1:0);
   const keepEachLift=rowNumber===45||rowNumber===46;
   const headingCells=()=>keepEachLift?[[0,r.a.trim(),2],...cars.map((_,i)=>[2+i,''])]:[[0,r.a.trim(),total]];
   if(r.heading){line(headingCells(),'section');continue}
@@ -211,6 +218,11 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
    }
    const emphasizeIdentity=(/Manufacturer/i.test(r.a)&&value.trim()==='MITSUBISHI ELECTRIC')||
       (/Model/i.test(r.a)&&/^NEXIEZ-MRL?\b/i.test(value.trim()));
+   // Write elevator quantities as real XLSX numbers, not numeric-looking text.
+   if(wideExcel&&r.quantity&&r.a){
+    const qty=/^\s*(\d+)\s*(?:thang\s*(?:\(\s*\d+\s*sets?\s*\))?|sets?)?\s*\.?\s*$/i.exec(value);
+    if(qty&&Number.isSafeInteger(Number(qty[1])))value=Number(qty[1]);
+   }
    values.push([2+i,value,j-i,(inFeatures?'feature_':'')+(r.lower||/^\s*\(/.test(r.values[i]||'')?'en':'value'),1,edges,false,r.parts[i],emphasizeIdentity]);i=j;
   }
   line(values);
@@ -256,7 +268,7 @@ async function buildPairBook(cars,compactHidden=true,splitForPrint=false){
   sheetXml=new XMLSerializer().serializeToString(sheet);
   zip.file(path,sheetXml);
   sheets+='<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="'+name+'" sheetId="'+n+'" r:id="'+id+'"/>';
-  titles+='<definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+name.replace(/^(.+)$/,"'$1'")+'!$9:$9</definedName>';
+  titles+='<definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+name.replace(/^(.+)$/,"'$1'")+(group.some(c=>c.hasLocations||c.location)?'!$9:$10':'!$9:$9')+'</definedName>';
   if(i){relationships=relationships.replace('</Relationships>','<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/'+path+'"/></Relationships>');
    content=content.replace('</Types>','<Override PartName="/'+path+'" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')}
   start+=size;
