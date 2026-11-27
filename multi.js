@@ -58,7 +58,7 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?v=R115&model='+frameModel;document.querySelector('main').append(frame);
+ frame.src='spec.html?v=R116&model='+frameModel;document.querySelector('main').append(frame);
  return {name,frame,ready,location:{text:""},commercial:{}};
 }
 function add(){
@@ -105,16 +105,23 @@ function titleInput(car){
 function columnCount(car){
  return Number(cache.I?.[cars.indexOf(car)]?.find(f=>f.key==='D11')?.value);
 }
+function projectExportName(value){
+ let name=String(value??'').normalize('NFC').trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/\s+/g,' ').replace(/[. ]+$/g,'').slice(0,120).replace(/[. ]+$/g,'');
+ if(/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name))name='_'+name;
+ return name||'Specification';
+}
+const liftNames=car=>car.name.split(/[,;\n]+/).map(v=>v.trim()).filter(Boolean);
+const formatBanks=groups=>groups.map(names=>'('+names.join('+')+')').join(';');
 function internalBanks(members,mode){
  const size=parseInt(mode,10);
  return size>1&&members.every(c=>columnCount(c)>0&&columnCount(c)%size===0);
 }
 function internalLabel(car,size,count){
- const names=car.name.split(/[,;]/).map(v=>v.trim()).filter(Boolean);
+ const names=liftNames(car);
  if(names.length===count){
   const groups=[];
-  for(let i=0;i<names.length;i+=size)groups.push(names.slice(i,i+size).join(' + '));
-  return groups.join(' · ');
+  for(let i=0;i<names.length;i+=size)groups.push(names.slice(i,i+size));
+  return formatBanks(groups);
  }
  return car.name+' · '+(count/size)+' nhóm × '+size+' thang';
 }
@@ -128,11 +135,11 @@ function bankLayout(members,mode,quantity=columnCount){
  if(members.length===size&&counts.every(n=>n===counts[0]))return {size,count:counts[0],total};
  return null;
 }
-function groupLabel(car){
- const bank=car.group,layout=bankLayout(bank,bank.mode);
+function groupLabel(car,quantity=columnCount){
+ const bank=car.group,layout=bankLayout(bank,bank.mode,quantity);
  if(layout?.count>1){
-  const names=bank.map(c=>c.name.split(/[,;\n]+/).map(n=>n.trim()).filter(Boolean));
-  if(names.every(n=>n.length===layout.count))return Array.from({length:layout.count},(_,i)=>names.map(n=>n[i]).join(' + ')).join(' · ');
+  const names=bank.map(liftNames);
+  if(names.every(n=>n.length===layout.count))return formatBanks(Array.from({length:layout.count},(_,i)=>names.map(n=>n[i])));
   return bank.map(c=>c.name).join(' + ')+' · '+layout.count+' nhóm × '+layout.size+' thang';
  }
  return bank.map(c=>c.name).join(' + ');
@@ -802,6 +809,7 @@ async function run(format){
      const count=Number(fields.find(f=>f.key==='D11')?.value),required=parseInt(field?.value,10);
      if(car.group&&field?.value!==car.group.mode)errors.push({cell:controlKey,message:'Hệ điều khiển chưa đồng bộ với nhóm '+groupLabel(car)+'.'});
      if(!Number.isSafeInteger(count)||count<1)errors.push({cell:'D11',message:'Nhập số lượng thang là số nguyên dương.'});
+     else if(required>1&&liftNames(car).length>1&&liftNames(car).length!==count)errors.push({cell:'D11',message:car.name+': có '+liftNames(car).length+' tên thang nhưng Số lượng = '+count+'. Vui lòng sửa danh sách Tên thang hoặc Số lượng để ghép nhóm chính xác.'});
      else if(!car.group&&required>1&&count%required!==0)errors.push({cell:'D11',message:car.name+' có '+count+' thang. Một nhóm '+displayMode(field.value)+' yêu cầu đúng '+required+' thang. Có thể cấu hình nhiều nhóm đủ số thang trong cùng cột.'});}
    }catch(e){errors.push(e.message)}
    if(errors.length)failures.push({car,errors});
@@ -861,16 +869,16 @@ async function run(format){
   format=choice;const orientation=el('exportOrientation').value==='landscape'?'landscape':'portrait';const paper=orientation==='portrait'?'A4 dọc':'A4 ngang';
 
   for(const car of cars){
-   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupLabel:car.group?groupLabel(car):'',commercialExpanded,commercial:commercialValues(car),location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupLabel:car.group?groupLabel(car,c=>Number(groupFields.get(c)?.find(f=>f.key==='D11')?.value)):'',commercialExpanded,commercial:commercialValues(car),location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
   if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
   if(format==='pdf'){
    const markup=await request(cars[0],'summaryPrint',book);
    if(!preview||preview.closed)throw Error('Tab bản in đã đóng.');
-   preview.document.open();preview.document.write(markup);preview.document.close();preview.focus();
+   preview.document.open();preview.document.write(markup);preview.document.close();preview.document.title=projectExportName(project.get('C7'));preview.focus();
    status('Đã mở bản in '+paper+'. Chọn In / Save as PDF để lưu.');
-  }else{const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=(isMRL?'Spec_Summary_NEXIEZ_MRL_Version2.xlsx':'Multi_Spec_NEXIEZ_MR.xlsx');a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Đã xuất Excel '+paper+'.')}
+  }else{const blob=await request(cars[0],'pairBook',book),url=URL.createObjectURL(blob),a=make('a');a.download=projectExportName(project.get('C7'))+'.xlsx';a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Đã xuất Excel '+paper+'.')}
 
  }catch(e){if(preview&&!preview.closed)preview.close();status(e.message);main.inert=false;await checkPopup('Không thể hoàn tất kiểm tra hoặc xuất file',[{car:{name:''},errors:[e.message]}])}finally{main.inert=false;if(el('checkExportTitle').textContent==='Đang kiểm tra Spec')status('Đã đóng kiểm tra Spec.')}
 }

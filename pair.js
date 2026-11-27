@@ -169,8 +169,8 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
   if(featureHeading){line(headingCells(),'feature_heading');continue}
   if((r.fullWidth&&!r.b&&r.values.every(v=>!v))){line(headingCells(),'label');continue}
   const groupControl=basicSection&&/group control operation|điều khiển (vận hành )?nhóm/i.test(r.key);
-  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].bankLabel?v+' · '+cars[i].bankLabel:v);
-  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].groupId!=null?v+' · '+(cars[i].groupLabel||cars.filter(c=>sameControlGroup(c,cars[i])).map(c=>c.name).join(' + ')):v);
+  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].bankLabel?v+'\n'+cars[i].bankLabel:v);
+  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].groupId!=null?v+'\n'+(cars[i].groupLabel||cars.filter(c=>sameControlGroup(c,cars[i])).map(c=>c.name).join(' + ')):v);
   const cop=/Car operation panel|Bảng điều khiển/i.test(r.key+' '+r.a);
   const dimension=/Car internal size|Door size|Hoistway size|Machine room size/i.test(r.a);
   const perLift=/Hoistway size|Machine room size/i.test(r.a);
@@ -246,16 +246,16 @@ async function styleSummaryIdentity(zip,sheet,cars,wideExcel){
  const header=Array.from(sheet.getElementsByTagNameNS(ns,'row')).find(r=>Number(r.getAttribute('r'))===nameRow);
  if(!header)return;
  let fillId,fontId;const styleMap=new Map();
- function leftStyle(id,commercial=false){
-  const key=id+':'+commercial;if(styleMap.has(key))return styleMap.get(key);
-  const xf=xfs.children[Number(id)||0].cloneNode(true);let align=get(xf,'alignment');if(!align){align=create('alignment');xf.appendChild(align)}align.setAttribute('horizontal','left');align.setAttribute('vertical','center');align.setAttribute('wrapText','1');xf.setAttribute('applyAlignment','1');
+ function identityStyle(id,commercial=false,center=false){
+  const key=id+':'+commercial+':'+center;if(styleMap.has(key))return styleMap.get(key);
+  const xf=xfs.children[Number(id)||0].cloneNode(true);let align=get(xf,'alignment');if(!align){align=create('alignment');xf.appendChild(align)}align.setAttribute('horizontal',center?'center':'left');align.setAttribute('vertical','center');align.setAttribute('wrapText','1');xf.setAttribute('applyAlignment','1');
   if(commercial){
    if(fillId==null){const fill=create('fill'),pattern=create('patternFill'),fg=create('fgColor'),bg=create('bgColor');pattern.setAttribute('patternType','solid');fg.setAttribute('rgb','FFFFFF00');bg.setAttribute('indexed','64');pattern.append(fg,bg);fill.append(pattern);fillId=append(fills,fill);const font=fonts.children[4].cloneNode(true);let color=get(font,'color');if(!color){color=create('color');font.appendChild(color)}for(const a of Array.from(color.attributes))color.removeAttribute(a.name);color.setAttribute('rgb','FFFF0000');fontId=append(fonts,font);}
    xf.setAttribute('fillId',String(fillId));xf.setAttribute('fontId',String(fontId));xf.setAttribute('applyFill','1');xf.setAttribute('applyFont','1');
   }
   const index=append(xfs,xf);styleMap.set(key,index);return index;
  }
- for(const c of Array.from(header.children))if(c.localName==='c')c.setAttribute('s',String(leftStyle(c.getAttribute('s'))));
+ for(const c of Array.from(header.children))if(c.localName==='c')c.setAttribute('s',String(identityStyle(c.getAttribute('s'),false,!/^[AB]\d+$/.test(c.getAttribute('r')))));
  if(wideExcel&&cars[0].commercialExpanded===true){
   const rows=Array.from(sheet.getElementsByTagNameNS(ns,'row'));
   for(const [offset,[key,label]] of summaryCommercialFields.entries()){
@@ -263,7 +263,7 @@ async function styleSummaryIdentity(zip,sheet,cars,wideExcel){
    row.removeAttribute('hidden');
    const cells=Array.from(row.children).filter(c=>c.localName==='c');
    for(const [i,c] of cells.entries()){
-    c.setAttribute('s',String(leftStyle(c.getAttribute('s'),true)));if(i===1)continue;
+    c.setAttribute('s',String(identityStyle(c.getAttribute('s'),true)));if(i===1)continue;
     const text=i===0?label:String(cars[i-2]?.commercial?.[key]??'');
     c.replaceChildren();c.setAttribute('t','inlineStr');const inline=sheet.createElementNS(ns,'is'),t=sheet.createElementNS(ns,'t');t.setAttribute('xml:space','preserve');t.textContent=text;inline.appendChild(t);c.appendChild(inline);
    }

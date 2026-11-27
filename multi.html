@@ -1689,8 +1689,8 @@ body>.workspace{max-width:none;width:100%;padding:10px 16px 32px;box-sizing:bord
 </aside>
 <div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div><dialog id="editor"><h2 id="caption"></h2><div id="entry"></div><p>Áp dụng cho thang</p><div id="picks"></div><div class="controls"><button id="apply">Áp dụng</button><button id="cancel">Đóng</button></div></dialog><dialog class="r111-dialog" id="columnCopyDialog"><h2>Copy nội dung cột</h2><label>Cột nguồn<select id="copySource"></select></label><div class="r111-dialog-line"><b>Cột đích</b><button type="button" id="copyAllTargets">Chọn tất cả</button></div><div id="copyTargets" class="r111-targets"></div><p class="r111-hint">Copy thông số I–V, giữ tên thang, vị trí và nhóm điều khiển.</p><p id="copyError" role="alert"></p><div class="r111-dialog-line"><button type="button" onclick="this.closest('dialog').close()">Đóng</button><button type="button" class="r111-primary" id="applyColumnCopy">Copy</button></div></dialog><dialog class="r111-dialog" id="locationMergeDialog"><h2>Merg vị trí / Merge location</h2><label>Từ cột<select id="locationFirst"></select></label><label>Đến cột<select id="locationLast"></select></label><label>Vị trí chung<input id="locationName" placeholder="Ví dụ: Tòa A"></label><p class="r111-hint">Gộp các cột liền nhau. Chỉ gộp hàng Vị trí; tên thang và nhóm điều khiển không đổi. Bỏ gộp sẽ giữ tên vị trí ở từng ô.</p><p id="locationError" role="alert"></p><div class="r111-dialog-line"><button type="button" onclick="this.closest('dialog').close()">Đóng</button><button type="button" id="applyLocationUnmerge">Bỏ gộp</button><button type="button" class="r111-primary" id="applyLocationMerge">Gộp</button></div></dialog></main><dialog id="checkExportDialog" aria-labelledby="checkExportTitle"><h2 id="checkExportTitle"></h2><div id="checkExportBody"></div><form method="dialog"><button value="close" autofocus>Đóng</button><select id="exportOrientation" aria-label="Khổ giấy"><option value="portrait">A4 dọc</option><option value="landscape">A4 ngang</option></select><button id="confirmExport" value="xlsx">Xuất Excel</button><button id="confirmPdf" value="pdf">Xuất PDF</button></form></dialog><script>
 function openSpecMode(mode,model){
- const name='spec-R115-'+mode+'-'+model;
- const url=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
+ const name='spec-R116-'+mode+'-'+model;
+ const url=(mode==='summary'?'multi.html':'index.html')+'?v=R116&model='+model;
  const w=window.open('',name);
  if(!w){location.href=url;return;}
  try{if(w.location.href==='about:blank')w.location.href=url;}catch(e){/* Existing local-file tab: keep its current draft. */}
@@ -1699,12 +1699,12 @@ function openSpecMode(mode,model){
 function updateModeLinks(model){
  for(const a of document.querySelectorAll('[data-spec-mode]')){
   const mode=a.dataset.specMode;
-  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
-  a.target='spec-R115-'+mode+'-'+model;
+  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R116&model='+model;
+  a.target='spec-R116-'+mode+'-'+model;
   a.onclick=e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();openSpecMode(mode,model)};
  }
 }
-</script><script src="multi.js?v=R115"></script><script>
+</script><script src="multi.js?v=R116"></script><script>
 (()=>{const head=document.querySelector('.flat-head'),menus=[...head.querySelectorAll('.flat-menu')];
 const shut=()=>menus.forEach(m=>m.open=false);
 head.addEventListener('click',e=>{const toggle=e.target.closest('summary');if(toggle){for(const m of menus)if(m!==toggle.parentElement)m.open=false}else if(e.target.closest('button'))shut()});

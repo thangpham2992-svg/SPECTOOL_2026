@@ -3301,6 +3301,11 @@ function download(bytes,name,type){
  const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),120000);
 }
+function projectExportName(value){
+ let name=String(value??'').normalize('NFC').trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/\s+/g,' ').replace(/[. ]+$/g,'').slice(0,120).replace(/[. ]+$/g,'');
+ if(/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name))name='_'+name;
+ return name||'Specification';
+}
 async function buildFinalExport(includeTechDetails=Boolean($('export-tech-details')?.checked),onlyVi=Boolean($('only-vi')?.checked),compactHidden=false){
   const model=$('model').value,db=workbookEngineData();
   // Source validation MUST pass before any export side effect.
@@ -3313,8 +3318,8 @@ async function buildFinalExport(includeTechDetails=Boolean($('export-tech-detail
   const zip=await JSZip.loadAsync(bytes);
   const packageResult=await window.SPEC_EXPORT.xlsxFromModel(zip,model,db,evaluation);
   const data=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
-  const project=String(evaluation.cells.B8||'Project').replace(/[^A-Za-z0-9_-]+/g,'_').slice(0,35);
-  return {model,evaluation,data,filename:'Specification_'+model+'_'+project};
+  const project=projectExportName(currentValue('C7')||evaluation.cells.B8);
+  return {model,evaluation,data,filename:project};
 }
 function canExportBriefly(){
  try{
@@ -3369,7 +3374,7 @@ async function exportFinalPdf(){
   }
   const html=await window.SPEC_PRINT_LAYOUT.fromXlsx(result.data,result.model,false,design);
   if(!popup)throw Error('Trình duyệt đã chặn tab mới. Hãy cho phép mở cửa sổ / Enable popups.');
-  popup.document.open();popup.document.write(html);popup.document.close();
+  popup.document.open();popup.document.write(html);popup.document.close();popup.document.title=result.filename;
   popup.focus();
   status('Đã mở bản in A4 dọc theo bố cục SpecFormExport. Chọn In / Save as PDF để lưu tài liệu.','ok');
  }catch(error){

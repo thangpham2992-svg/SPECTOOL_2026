@@ -2196,15 +2196,15 @@ patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 </script>
 <script src="mrl-v02-vertical-study.js?v=R80"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script>if(new URLSearchParams(location.search).get('model')==='MRL')document.getElementById('model').value='MRL';</script><script src="app.js?v=R109"></script>
+<script>if(new URLSearchParams(location.search).get('model')==='MRL')document.getElementById('model').value='MRL';</script><script src="app.js?v=R116"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>
 <script>
 function openSpecMode(mode,model){
- const name='spec-R115-'+mode+'-'+model;
- const url=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
+ const name='spec-R116-'+mode+'-'+model;
+ const url=(mode==='summary'?'multi.html':'index.html')+'?v=R116&model='+model;
  const w=window.open('',name);
  if(!w){location.href=url;return;}
  try{if(w.location.href==='about:blank')w.location.href=url;}catch(e){/* Existing local-file tab: keep its current draft. */}
@@ -2213,8 +2213,8 @@ function openSpecMode(mode,model){
 function updateModeLinks(model){
  for(const a of document.querySelectorAll('[data-spec-mode]')){
   const mode=a.dataset.specMode;
-  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
-  a.target='spec-R115-'+mode+'-'+model;
+  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R116&model='+model;
+  a.target='spec-R116-'+mode+'-'+model;
   a.onclick=e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();openSpecMode(mode,model)};
  }
 }
