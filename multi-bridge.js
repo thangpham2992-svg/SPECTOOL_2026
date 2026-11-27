@@ -15,9 +15,9 @@ window.addEventListener('message',async event=>{
   }else if(data.action==='draftName'){reply.result=singleDraftName(data.payload);
   }else if(data.action==='openDraft'){checkSingleDraft(data.payload);restoreSingleDraft(data.payload);reply.result=true;
   }else if(data.action==='snapshot'){
-   reply.result={values:{...changes},touched:[...featureTouched],hallManual:[...hallManualSelections],hallAuto:[...hallAutoSelections],hallQty:[...hallManualQuantities]};
+   reply.result={bufferCap:mrlVerticalBufferCap,values:{...changes},touched:[...featureTouched],hallManual:[...hallManualSelections],hallAuto:[...hallAutoSelections],hallQty:[...hallManualQuantities]};
   }else if(data.action==='restore'){
-   changes={...data.payload.values};featureTouched=new Set(data.payload.touched);
+   mrlVerticalBufferCap=data.payload.bufferCap==='Yes'?'Yes':'No';changes={...data.payload.values};featureTouched=new Set(data.payload.touched);
    hallManualSelections=new Set(data.payload.hallManual);hallAutoSelections=new Set(data.payload.hallAuto);hallManualQuantities=new Set(data.payload.hallQty);
    renderAllSpecRows();renderFeatures();refreshLocks();refreshHallQuantities();refreshChildVisibility();invalidateCheck();reply.result=true;
   }else if(data.action==='fields'){
@@ -52,6 +52,7 @@ window.addEventListener('message',async event=>{
      if(device)title=input.closest('.car-design-variants')?field:device;
      if(hallItem)title=input.classList.contains('hall-qty')?hallItem+' · Số hộp':hallItem;
      if(feature)title=feature.querySelector('.fcode')?.textContent+' · '+feature.querySelector('.fdesc')?.firstChild?.textContent;
+     if(input.id==='mrl-g11-buffercap')title='Short OH with Buffer Cap';
      if(input.id==='itp-type')title='ITP · Loại liên lạc nội bộ / Interphone type';
      const piv=hall?.querySelector("select[data-cell]");
      const isPiv=piv&&/^K36_PIV/.test(fieldsByCell.get(piv.dataset.cell)?.name||'');
@@ -80,6 +81,8 @@ window.addEventListener('message',async event=>{
    try{input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}))}
    finally{if(data.payload.mirrorPiv){hallManualSelections=previous;previous.add(key)}}
    reply.result=true;
+  }else if(data.action==='leadTime'){
+   reply.result=$('model').value==='MRL'?calculateMRLLeadTime():calculateMRLeadTime();
   }else if(data.action==='validate'){window.__lastCheck=null;
    const messages=runCheckSpec(),issues=window.__lastCheck?.errors;
    reply.result=issues?.length?orderedCheckErrors(issues).map(e=>({message:e.message||'Vui lòng kiểm tra thông số.',cell:e.cell||''})):messages.map(message=>({message,cell:''}));
@@ -122,4 +125,15 @@ window.addEventListener('change',event=>{
  event.stopImmediatePropagation();
  input.value=String(currentValue(key));
  window.parent.postMessage({channel:'summary-piv',payload:{section:'IV',key,value}},'*');
+},true);
+
+// In a Summary iframe, send speed edits to the parent before mutating the local
+// form. The parent applies the same speed transactionally to every bank member.
+window.addEventListener('change',event=>{
+ const input=event.target;
+ if(window.parent===window||!event.isTrusted||input.dataset.cell!==($('model').value==='MRL'?'D17':'D15'))return;
+ const value=input.value;
+ event.stopImmediatePropagation();
+ input.value=String(currentValue(input.dataset.cell));
+ window.parent.postMessage({channel:'summary-speed',value},'*');
 },true);

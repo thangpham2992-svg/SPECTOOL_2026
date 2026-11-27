@@ -179,7 +179,7 @@ function groupSheet(template,cars,featureNotes){
    }).join('\n');
   }
   const scope=inFeatures?featureNotes.get(r.key):null;
-  const labelsEnglish=r.lower||/^\([A-Z0-9 -]+\)/.test(r.a)&&!hasVN(r.a);
+  const labelsEnglish=(!cars[0].onlyVi&&/^Short buffercap$/i.test(r.a))||r.lower||/^\([A-Z0-9 -]+\)/.test(r.a)&&!hasVN(r.a);
   const scopeNote=scope?(labelsEnglish?'Only apply for ':'Chỉ áp dụng cho thang ')+scope.join(', '):'';
   const common=scope?[...new Set(r.values.filter(v=>v!=null&&v.trim()))]:[];
   const compare=common.length===1?cars.map(()=>common[0]):hall?r.values.map(v=>v==null?v:hallPattern(v)):r.values;

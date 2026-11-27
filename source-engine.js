@@ -57,8 +57,44 @@ function choice(val,criterion){const original=scalar(criterion);if(typeof origin
  if(typeof target==='string' && /[?*]/.test(target)){const escaped=target.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.');const match=new RegExp('^'+escaped+'$','i').test(xstr(val));return op==='<>'?!match:match;}
  const c=cmp(val,target);return op==='='?c===0:op==='<>'?c!==0:op==='>='?c>=0:op==='<='?c<=0:op==='>'?c>0:c<0;
 }
+// R84: local granite thickness choices; keep the original workbook data intact.
+const flooringPatched=new WeakSet();
+function patchFlooring(data){
+ if(!data||flooringPatched.has(data))return;
+ const t=data.tables?.TblK28_Flooring,form=data.sheets?.SpecForm,output=data.sheets?.SpecFormExport;
+ if(!t||!form||!output||t.sheet==='WebFlooring')return;
+ const b=rect(t.ref),source=data.sheets[t.sheet],sheet='WebFlooring';
+ const cells={};let end=b.r1;
+ for(let r=b.r1;r<=b.r2;r++){
+  const key=source[colText(b.c1)+r];
+  const name=String(key?.v??key??'');
+  if(/^Local granite \(20 mm\)$/i.test(name)){
+   for(const mm of [18,20,25]){
+    const values=[`Local granite (${mm} mm)`,`Sàn đá granite cung cấp trong nước, chiều dày hoàn thiện sau thi công ${mm}mm`,`Local natural granite, finishing thickness ${mm} mm`];
+    for(let c=b.c1;c<=b.c2;c++)cells[colText(c)+end]=values[c-b.c1];
+    end++;
+   }
+  }else{
+   for(let c=b.c1;c<=b.c2;c++)cells[colText(c)+end]=source[colText(c)+r];
+   end++;
+  }
+ }
+ data.sheets[sheet]=cells;
+ data.tables.TblK28_Flooring={...t,sheet,ref:`${colText(b.c1)}${b.r1}:${colText(b.c2)}${end-1}`};
+ const weightCell=['D60','D56'].find(k=>form[k]?.f?.includes('K28_FlooringType'));
+ if(weightCell){
+  const granite='OR(K28_FlooringType="Local granite (18 mm)",K28_FlooringType="Local granite (20 mm)",K28_FlooringType="Local granite (25 mm)")';
+  const thickness='IF(K28_FlooringType="Local granite (18 mm)",0.018,IF(K28_FlooringType="Local granite (25 mm)",0.025,0.02))';
+  form[weightCell]={...form[weightCell],f:`IF(${granite},IF(K18_CarJJ<1000,5,10)+ROUND(K17_CarW*K17_CarD*${thickness}*2.7*0.001,0),0)`};
+ }
+ if(output.C56?.f?.includes('TblK28_Flooring')){
+  const granite='OR(SpecForm!$D$55="Local granite (18 mm)",SpecForm!$D$55="Local granite (20 mm)",SpecForm!$D$55="Local granite (25 mm)")';
+  output.C56={...output.C56,f:output.C56.f.replaceAll('SpecForm!$D$55="Local granite (20 mm)"',granite).replaceAll(',TblK28_Flooring,',',TblK28_Flooring[],')};
+ }
+ flooringPatched.add(data);
+}
 class SourceEngine{
- constructor(data, changes={},extra={}){this.d=data;this.changes=changes;this.extra=extra;this.memo=new Map();this.inflight=new Set();this.parsed=new Map();this.unverified=[];this.cacheQueries=new Map();this.callCount=0;this.maxCalls=250000;this.hits=0;}
+ constructor(data, changes={},extra={}){patchFlooring(data);this.d=data;this.changes=changes;this.extra=extra;this.memo=new Map();this.inflight=new Set();this.parsed=new Map();this.unverified=[];this.cacheQueries=new Map();this.callCount=0;this.maxCalls=250000;this.hits=0;}
  ast(formula){if(!this.parsed.has(formula))this.parsed.set(formula,parse(formula));return this.parsed.get(formula)}
  at(sheet,addr){addr=String(addr).replace(/\$/g,'').toUpperCase();let key=sheet+'!'+addr;
   if(sheet==='SpecForm'&&Object.prototype.hasOwnProperty.call(this.changes,addr)){let v=this.changes[addr];if(v===''||v===null)return '';if(/^[-+]?(?:\d+\.?\d*|\.\d+)$/.test(String(v)))return +v;return v;}

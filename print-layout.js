@@ -62,6 +62,82 @@
    }).join('');
  }
  function readText(c,strings){if(!c)return '';const type=attr(c,'t');if(type==='inlineStr')return qa(q(c,'is'),'t').map(t=>t.textContent).join('');let v=q(c,'v')?.textContent||'';if(type==='s')return strings[Number(v)]||'';if(type==='b')return v==='1'?'TRUE':'FALSE';return v}
+ // R86: explicit A4 pagination, including a real x/y footer on every page.
+ // Keep table rows and merged row groups together; repeat the summary column header.
+ function numberedPrint(orientation,summary){
+   const landscape=orientation==='landscape';
+   const w=landscape?297:210,h=landscape?210:297;
+   const css=`@page{size:A4 ${landscape?'landscape':'portrait'};margin:0}
+   .spec-print-page{position:relative;box-sizing:border-box;width:${w}mm;height:${h-.8}mm;margin:12px auto;background:#fff;padding:${summary?'9mm 9mm 12mm':'13mm 11mm 14mm'};box-shadow:0 2px 12px #14233720;}
+   .spec-page-content{height:100%;display:flow-root;}
+   .spec-print-page main.paper,.spec-print-page section{display:flow-root;width:100%;max-width:none;margin:0;padding:0;box-shadow:none;break-before:auto;page-break-before:auto;zoom:1;}
+   .spec-print-page main.mrl-export tr[data-source-row="69"]{break-before:auto;page-break-before:auto;}
+   .spec-page-number{position:absolute;right:${summary?9:11}mm;bottom:4mm;font:9pt Arial,sans-serif;color:#202020;line-height:1;}
+   @media print{html,body{margin:0!important;padding:0!important;background:white!important;width:${w}mm;} .spec-print-page{margin:0!important;box-shadow:none;break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always;} .spec-print-page:last-child{break-after:auto;page-break-after:auto;} .spec-print-page main.paper,.spec-print-page section{margin:0!important;padding:0!important;max-width:none!important;} }
+   `;
+   function paginate(summary){
+     const toolbar=document.querySelector(summary?'nav':'.print-toolbar');
+     const button=toolbar?.querySelector('button');
+     if(button)button.disabled=true;
+     const sources=Array.from(document.querySelectorAll(summary?'body > section':'body > main.paper'));
+     const pages=[];
+     function createPage(source,table,first){
+       const page=document.createElement('article');page.className='spec-print-page';
+       const content=document.createElement('div');content.className='spec-page-content';page.append(content);
+       const shell=source.cloneNode(false);content.append(shell);
+       if(first)for(const child of source.children){if(child===table)break;shell.append(child.cloneNode(true));}
+       const copy=table.cloneNode(false);
+       for(const child of table.children)if(child.tagName!=='TBODY')copy.append(child.cloneNode(true));
+       const body=copy.createTBody();shell.append(copy);
+       const footer=document.createElement('div');footer.className='spec-page-number';page.append(footer);
+       document.body.append(page);pages.push(page);
+       return {page,content,shell,body,footer};
+     }
+     function groups(rows){
+       const result=[];
+       for(let i=0;i<rows.length;){
+         let end=i;
+         for(let j=i;j<=end&&j<rows.length;j++){
+           for(const c of rows[j].cells)end=Math.max(end,j+Math.max(1,c.rowSpan)-1);
+           const row=rows[j],first=row.cells[0],label=(first?.textContent||'').trim();
+           const heading=row.matches('.excel-heading,.excel-feature-subheading,.excel-bilingual-upper') || (summary&&row.cells.length===1&&/^(?:[IVX]+\.|[-–]|Các tính năng)/i.test(label));
+           if(heading&&j+1<rows.length)end=Math.max(end,j+1);
+           end=Math.min(end,rows.length-1);
+         }
+         result.push(rows.slice(i,end+1));i=end+1;
+       }
+       return result;
+     }
+     try{
+       for(const source of sources){
+         const table=Array.from(source.children).filter(x=>x.tagName==='TABLE').at(-1);
+         if(!table)throw Error('Không tìm thấy bảng Spec.');
+         const rows=Array.from(table.tBodies).flatMap(b=>Array.from(b.rows));
+         let current=createPage(source,table,true);
+         for(const group of groups(rows)){
+           const force=!summary&&source.classList.contains('mrl-export')&&group[0].dataset.sourceRow==='69';
+           if(force&&current.body.rows.length)current=createPage(source,table,false);
+           let copies=group.map(r=>r.cloneNode(true));current.body.append(...copies);
+           const fits=()=>current.shell.getBoundingClientRect().bottom<=current.content.getBoundingClientRect().bottom-.5;
+           if(!fits()&&current.body.rows.length>copies.length){
+             copies.forEach(r=>r.remove());current=createPage(source,table,false);current.body.append(...copies);
+           }
+           if(!fits())throw Error('Một nhóm dòng quá dài cho khổ giấy hiện tại. Hãy chọn A4 ngang hoặc giảm nội dung.');
+         }
+       }
+       pages.forEach((page,i)=>page.querySelector('.spec-page-number').textContent=(i+1)+'/'+pages.length);
+       sources.forEach(s=>s.remove());
+       if(button)button.disabled=false;
+     }catch(error){
+       pages.forEach(p=>p.remove());
+       const warning=document.createElement('span');warning.style.color='#b9232c';warning.textContent=' '+error.message;
+       toolbar?.append(warning);if(button)button.disabled=true;
+       console.error(error);
+     }
+   }
+   // Script is embedded in the self-contained offline print preview.
+   return {css,script:'<script>window.addEventListener(\'load\',function(){Promise.resolve(document.fonts&&document.fonts.ready).then(function(){('+paginate.toString()+')('+JSON.stringify(summary)+');});});<\/script>'};
+ }
  async function fromXlsx(bytes,model,rowsOnly=false){
    const zip=await JSZip.loadAsync(bytes);
    const wb=parse(await zip.file('xl/workbook.xml').async('string'));
@@ -88,6 +164,7 @@
    const isOriginDisclaimer=t => /Toàn bộ thiết bị thang máy được nhập khẩu|All main components are imported|Some auxiliary parts of the lifts/i.test(String(t||''));
    const isExtraRow=(rn,row)=>{
      if(rn<=300)return true;
+     if(rn<=302&&model==='MRL'){const a=Array.from(row.children).find(el=>el.localName==='c'&&attr(el,'r')==='A'+rn);if(readText(a,strings).trim())return true;}
      const c=Array.from(row.children).find(el=>el.localName==='c'&&attr(el,'r')==='A'+rn);
      const t=readText(c,strings).trim();
      if(isOriginDisclaimer(t))return true;
@@ -318,6 +395,7 @@
      html,body,.paper,table.excel,table.excel td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
    }
    `:'';
+   const numbered=numberedPrint('portrait',false);
    const css=`
    /* Zero printer page margins suppress Chromium's unrelated date/url/title header.
       Print-safe margins are provided by repeating .paper padding on every page. */
@@ -368,12 +446,12 @@
    tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
    @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;margin:0;width:100%;max-width:100%;padding:13mm 11mm 14mm;-webkit-box-decoration-break:clone;box-decoration-break:clone;zoom:1}table.excel{width:100%;} }
    `;
-   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+'</style></head><body>'+
-   '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Tắt “Headers and footers” trong hộp thoại in nếu được hỏi</div></div><button onclick="window.print()">In / Save as PDF</button></div>'+
-   '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main></body></html>';
+   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+numbered.css+'</style></head><body>'+
+   '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Chọn A4, tỷ lệ 100%, tắt Headers and footers nếu trình duyệt vẫn hiển thị</div></div><button disabled onclick="window.print()">In / Save as PDF</button></div>'+
+   '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main>'+numbered.script+'</body></html>';
  }
  async function summaryFromXlsx(bytes,orientation){
-   const portrait=orientation!=='landscape',paper=portrait?'A4 dọc':'A4 ngang';
+   const portrait=orientation!=='landscape',paper=portrait?'A4 dọc':'A4 ngang',numbered=numberedPrint(orientation,true);
    const zip=await JSZip.loadAsync(bytes);
    const read=async path=>parse(await zip.file(path).async('string'));
    const styles=styleBook((await read('xl/styles.xml')).documentElement);
@@ -409,7 +487,7 @@
      }
      pages.push('<section><img class="logo" alt="Mitsubishi Electric" src="'+FALLBACK_LOGO+'"><table>'+cols+'<tbody>'+pre+'</tbody></table><table>'+cols+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></section>');
    }
-   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · '+paper+'</title><style>@page{size:A4 '+(portrait?'portrait':'landscape')+';margin:9mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:'+(portrait?'192':'279')+'mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:'+(portrait?'2px 2px':'2px 4px')+';overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}</style><nav>Spec Summary · '+paper+' &nbsp; <button onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+'</html>';
+   return '<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spec Summary · '+paper+'</title><style>@page{size:A4 '+(portrait?'portrait':'landscape')+';margin:0}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#17365d;background:#edf1f6;margin:0}section{background:white;max-width:'+(portrait?'192':'279')+'mm;margin:12px auto;padding:4mm;break-before:page}section:first-of-type{break-before:auto}.logo{display:block;width:20mm;margin:0 0 2mm}table{width:100%;border-collapse:collapse;table-layout:fixed}td{padding:'+(portrait?'2px 2px':'2px 4px')+';overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}.title td,.title td span{font-size:20pt!important;font-weight:bold;text-decoration:underline}.title em{font-weight:400;font-size:13pt}nav{position:sticky;top:0;background:#fff;padding:10px;text-align:center}button{padding:8px 16px}@media print{nav{display:none}body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}section{padding:0;margin:0;max-width:none}}'+numbered.css+'</style><body><nav>Spec Summary · '+paper+' &nbsp; <button disabled onclick="window.print()">In / Save as PDF</button></nav>'+pages.join('')+numbered.script+'</body></html>';
  }
  window.SPEC_PRINT_LAYOUT={fromXlsx,summaryFromXlsx};
 })();

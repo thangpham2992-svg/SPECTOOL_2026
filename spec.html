@@ -996,6 +996,7 @@ body .workspace > .leadtime-check {background-color:#fff;}
 input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f4!important;color:#7d8894!important;border-color:#e0e5ea!important;box-shadow:none!important}
 #leadtime-days.leadtime-standard{color:#24824a!important}
 #leadtime-days.leadtime-extended{color:#b72832!important}
+
 </style>
 
 <style id="mobile-first-three-rows-v5885">
@@ -1265,16 +1266,11 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 </script>
 <style id="mrl-v02-g11l1-vertical-css">
 /* NEXIEZ-MRL Version 2 — Technical Study controls */
-.mrl-ts-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 12px;padding:10px;border:1px solid #dbe5ed;border-radius:8px;background:#f8fbfd}
-.mrl-ts-control{display:flex;flex-direction:column;gap:5px;min-width:0}
-.mrl-ts-control label{font-size:11px;font-weight:700;color:#294664}
-.mrl-ts-control select{width:100%;background:#eaf5ff;border:1px solid #b5d2f0;color:#163454;min-height:36px;border-radius:5px;padding:4px 7px}
-.mrl-ts-details{grid-column:1/-1;font-size:11px;color:#586a7c;line-height:1.4}
-.mrl-ts-output{grid-column:1/-1;font-size:12px;color:#233e58;font-weight:650;line-height:1.4}
-.mrl-ts-output.mrl-ts-unavailable{color:#975629}
+/* R80: place the optional Buffer Cap control beneath Regulation. */
+#fields .mrl-buffer-cap-row[hidden]{display:none!important}
+@media(min-width:1081px){#fields .mrl-buffer-cap-row{grid-column:2}}
 .workspace .dimension-groups[data-model="MRL"] .oh-minimum-hint{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline}
 .mrl-ts-removed-note{font-size:11px;color:#294c74;font-weight:700}
-@media(max-width:520px){.mrl-ts-settings{grid-template-columns:1fr}.mrl-ts-settings>*{grid-column:1}}
 
 /* v5.8.184: MRL Technical Study OH/PD minima must remain visible.
    Legacy note hiding excluded oh-minimum-hint; display beside value on PC. */
@@ -1417,11 +1413,86 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
   .workspace {padding-bottom:calc(85px + env(safe-area-inset-bottom,0px))!important}
 }
 </style>
-<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style></head>
+<style>#fields .dependent-off,#fields .dependent-row-off{display:none!important}</style><style id="single-workspace-r96">
+/* Presentation only; retain all source controls and validation bindings. */
+:root{--single-toolbar:48px;--spec-control-height:30px}
+body{font-family:Arial,sans-serif;background:#f4f6f8;color:#25384a}
+body>.workspace{max-width:1600px;padding:12px 16px 32px;box-sizing:border-box}
+body>.site-header{height:auto;min-height:46px;padding:7px 16px;box-sizing:border-box;border-color:#dce3eb}
+.workspace :is(.flat-head,.spec-section,.features-panel,.action-panel){box-shadow:none;border-radius:4px;border-color:#dce3eb}
+.workspace .flat-head{padding:0;display:contents}
+.workspace .flat-row{background:#fff;border:1px solid #dce3eb;border-bottom:0;min-height:36px;padding:5px 8px;gap:8px}
+.workspace .intro-title,.workspace .flat-row .intro-title{font-family:Arial,sans-serif;font-weight:700;font-size:19px;letter-spacing:0}
+.workspace .flat-actions{position:sticky;top:0;z-index:60;border-bottom:1px solid #dce3eb;box-shadow:0 2px 3px #25384a0b}
+.workspace .flat-actions :is(button,summary){font-size:12px;min-height:28px;padding:5px 8px}
+.workspace .flat-head :is(#leadtime-reasons,#check-issues,#draft-feedback){background:#fff;padding:4px 8px;margin:0}
+.workspace .flat-head :is(#leadtime-reasons,#check-issues,#draft-feedback):empty{display:none}
+.workspace .desktop-check-float{display:none!important}
+.workspace .spec-nav{position:sticky;top:var(--single-toolbar);z-index:40;background:#f4f6f8;padding:5px 0!important;gap:5px;margin:5px 0}
+.workspace .spec-nav a{min-height:28px;padding:5px 10px;font-size:12px;box-shadow:none;border-radius:3px}
+.workspace :is(.spec-section,.features-panel){scroll-margin-top:calc(var(--single-toolbar) + 44px);margin:0 0 12px;padding:0 10px 10px;border-radius:4px}
+.workspace .spec-section[data-section="I"],.workspace .spec-nav a:nth-child(1){--sbg:#eaf3fc;--sfg:#24577c;--saccent:#5799cd}
+.workspace .spec-section[data-section="II"],.workspace .spec-nav a:nth-child(2){--sbg:#e7f3ed;--sfg:#285f47;--saccent:#58a47a}
+.workspace .spec-section[data-section="III"],.workspace .spec-nav a:nth-child(3){--sbg:#f1edf9;--sfg:#62497f;--saccent:#9779bd}
+.workspace .spec-section[data-section="IV"],.workspace .spec-nav a:nth-child(4){--sbg:#faf0df;--sfg:#795723;--saccent:#c49a57}
+.workspace .features-panel,.workspace .spec-nav a:nth-child(5){--sbg:#f8e9ed;--sfg:#85465a;--saccent:#c27b91}
+.workspace .spec-section .section-heading,.workspace .features-panel .section-heading{background:var(--sbg)!important;color:var(--sfg)!important;border-bottom:1px solid var(--saccent)!important;font:700 16px/1.3 Arial,sans-serif;margin:0 -10px 5px!important;padding:7px 10px!important;border-radius:0}
+.workspace .section-heading:before{background:var(--saccent)!important;height:20px!important;width:4px!important}
+.workspace .spec-nav a{background:var(--sbg);color:var(--sfg);border-color:var(--saccent)}
+.workspace .dimension-group-title{background:var(--sbg);color:var(--sfg);border-color:#dce3eb}
+.workspace #fields :is(.spec-row,.car-design-line,.dimension-entry){border-color:#e0e6ed!important;box-shadow:none;padding:3px 8px!important;min-height:34px!important;background:#fff}
+.workspace #fields :is(.spec-row,.car-design-line,.dimension-entry):nth-child(even){background:#f8fafc}
+.workspace #fields :is(.spec-row-title,.car-design-label){font-size:12px!important;font-weight:600;line-height:1.3!important}
+.workspace #fields .field{gap:3px}
+.workspace :is(#fields,#project-fields,.model-control) :is(input:not([type=checkbox]),select):not(:disabled):not(.issue-input-focus):not(.cwt-below-minimum){background:#edf9ef!important;border:1px solid #b7d8bf!important;color:#25384a!important;box-shadow:none!important;border-radius:3px;font:12px/1.3 Arial,sans-serif!important;height:30px!important;min-height:30px!important;padding:3px 7px!important}
+.workspace :is(#fields,#project-fields,.model-control) :is(input,select):not(:disabled):focus{background:#eaf3fc!important;outline:1px solid #83aed3;outline-offset:0}
+.workspace #fields :is(input,select):disabled,.workspace #fields .readonly-value{background:#eef0f2!important;color:#536476!important;border-color:#cbd1d7!important;font-size:12px!important}
+.workspace #fields .dimension-groups[data-model="MR"] :is(input[data-cell="D36"],input[data-cell="D37"],input[data-cell="D38"]):not(.issue-input-focus){background:#eef0f2!important}
+.workspace #fields .spec-row:has(.issue-input-focus),.workspace #fields .dimension-entry:has(.issue-input-focus){background:#ffeded!important}
+.workspace #fields .issue-input-focus{background:#ffeded!important;border-color:#ce6370!important}
+.workspace #fields .field:has(>button[title^="Tính lại từ AA"]){display:flex!important;flex-direction:row!important;align-items:center;gap:6px!important}
+.workspace #fields .field:has(>button[title^="Tính lại từ AA"])>input{flex:1;min-width:0;width:0!important}
+.workspace #fields .field:has(>button[title^="Tính lại từ AA"])>button{flex:0 0 auto;font-size:11px;min-height:28px;padding:3px 8px;white-space:nowrap}
+.workspace #fields .field:has(>button[title^="Tính lại từ AA"])>.nm{display:none!important}
+.workspace .features-panel .feature-tabs{gap:5px;margin:6px 0}
+.workspace .features-panel .feature-tabs .btn.feature-tab{font-size:12px;min-height:28px;padding:5px 9px;background:#fff;border-color:#d5dee6;color:#34465a}
+.workspace .features-panel .feature-tabs .btn.feature-tab-current{background:#f8e9ed!important;border-color:#c27b91!important;color:#85465a!important}
+.workspace .features-panel .feature-line{min-height:34px;padding:5px 7px;border-color:#e0e6ed!important;box-shadow:none!important;background:#fff!important;gap:7px}
+.workspace .features-panel .feature-line.feature-line-selected{background:#e7f3ed!important}
+.workspace .features-panel .feature-line .fdesc,.workspace .features-panel .feature-line .fcode{font-size:12px;line-height:1.3}
+.workspace .features-panel .feature-line .fdesc small{font-size:11px}
+.workspace .features-panel .feature-line input[type="checkbox"]{accent-color:#38795a!important;width:17px;height:17px}
+@media(min-width:851px){
+ #fields .spec-section[data-section="III"] .car-design-line{grid-template-columns:minmax(0,36%) minmax(0,32%) minmax(0,1fr)!important;gap:8px!important;padding:3px 8px!important;min-height:34px!important}
+ #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row{grid-template-columns:minmax(0,36%) minmax(0,1fr)!important;gap:8px!important;padding:3px 8px!important;min-height:34px!important}
+ #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row:not(.multi)>.spec-row-inputs{width:calc(50% + 4px)!important}
+ #fields .spec-section[data-section="III"] .car-design-section-fields>.spec-row.multi>.spec-row-inputs{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+ .workspace .spec-section .dimension-entry{min-height:36px!important;padding:3px 8px!important}
+}
+@media(max-width:850px){.workspace .flat-actions{position:static}.workspace .spec-nav{top:0}.workspace :is(.spec-section,.features-panel){scroll-margin-top:44px}.workspace #fields :is(input:not([type=checkbox]),select){min-height:34px!important;height:34px!important}}
+.workspace #fields .spec-section[data-section="IV"] .spec-row:has(select option[value^="EN81-58"]){background:#fff4e5!important}
+.workspace #fields .spec-section[data-section="IV"] .spec-row select:has(option[value^="EN81-58"]):not(.issue-input-focus):not(:disabled){background:#ffead2!important;border-color:#e8b77b!important;color:#754312!important}
+</style>
+
+
+<style id="r99-model-and-editable">
+.workspace .model-control{display:flex;align-items:center;gap:10px;width:auto!important;min-width:0!important;max-width:60%;flex:0 1 560px}
+.workspace .model-control .model-prompt{display:flex;align-items:center;gap:8px;white-space:nowrap;font:600 12px/1.25 Arial,sans-serif;color:#24577c;cursor:pointer}
+.workspace .model-prompt span{font-size:19px;line-height:1;color:#3979a8}
+.workspace .model-control select{flex:1;min-width:0;width:100%;margin:0}
+@media(max-width:850px){.workspace .model-control{max-width:100%;flex:1 1 280px;gap:5px}.workspace .model-control .model-prompt{white-space:normal;font-size:11px}}
+
+.workspace :is(#fields,#project-fields,.model-control) input[readonly]:not(:disabled):not(.issue-input-focus):not(.cwt-below-minimum),
+.workspace #fields .dimension-groups[data-model="MR"] :is(input[data-cell="D36"],input[data-cell="D37"],input[data-cell="D38"]):not(:disabled):not(.issue-input-focus):not(.cwt-below-minimum){background:#eef0f2!important;border-color:#cbd1d7!important;color:#536476!important}
+.workspace #fields .spec-section[data-section="IV"] .spec-row select:has(option[value^="EN81-58"]):not(.issue-input-focus):not(:disabled){background:#ffead2!important;border-color:#e8b77b!important;color:#754312!important}
+.workspace :is(#fields,#project-fields,.model-control) :is(input:not([readonly]):not([type=checkbox]),select):not(:disabled):not(.issue-input-focus):not(.cwt-below-minimum):focus{outline:1px solid #6fb180;outline-offset:0}
+
+</style>
+</head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
 <main class="workspace">
-<div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="label-top" for="model">Chọn model / Select model</label><select id="model" disabled><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select><script>if(new URLSearchParams(location.search).get('model')==='MRL')document.getElementById('model').value='MRL';</script></div></div>
+<div class="intro"><div><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1><p class="intro-caption">NEXIEZ ALPHA</p></div><div class="model-control"><label class="model-prompt" for="model">Chọn Model / Select model <span aria-hidden="true">→</span></label><select id="model" disabled><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select><script>if(new URLSearchParams(location.search).get('model')==='MRL')document.getElementById('model').value='MRL';</script></div></div>
 <details class="database-options" hidden aria-hidden="true"><summary>Cập nhật dữ liệu Excel / Update database</summary><div class="database-content"><div class="database-meta" id="filename"></div><input id="file" type="file" accept=".xlsx,.xlsm" aria-label="Nạp workbook Excel"><div class="database-buttons"><button class="btn btn-small" id="reload-db" type="button">Nạp lại Database</button><button class="btn btn-small" id="reset" type="button">Khôi phục Database gốc</button><button class="btn btn-small" id="working" type="button">Lưu bản đang nhập (.xlsx)</button></div><div id="status" class="status-message" aria-live="polite"></div></div></details>
 <section class="project-box"><h2 class="project-heading">Thông tin công trình / Project information</h2><div id="project-fields" class="project-grid"></div></section>
 <section class="leadtime-check" id="product-leadtime" aria-live="polite"><div class="leadtime-label">Product Lead Time (ETD)</div><div class="leadtime-main"><strong id="leadtime-days">—</strong><div id="leadtime-reasons" class="leadtime-reasons">Đang đọc thông số / Evaluating specification</div></div></section>
@@ -1524,7 +1595,7 @@ window.SPEC_PROOFREAD = function(input){
 };
 </script>
 <script src="vendor/jszip.min.js?v=5.8.79"></script>
-<script src="spec-core.bundle.js?v=R76"></script>
+<script src="spec-core.bundle.js?v=R80"></script>
 
 
 
@@ -1538,8 +1609,8 @@ window.SPEC_PROOFREAD = function(input){
 
 
 <script src="spec-conditional.js?v=5.8.79"></script>
-<script src="source-engine.js?v=5.8.79"></script>
-<script src="legacy-step1.js?v=R76"></script>
+<script src="source-engine.js?v=R87"></script>
+<script src="legacy-step1.js?v=R80"></script>
 <script>
 
 'use strict';
@@ -1832,8 +1903,8 @@ window.SPEC_EVRC_C_RULE = Object.freeze({
  patchDatabase(window.SPEC_ENGINE_DATABASE?.MR);
 })();
 </script>
-<script src="alpha-technical-rules.js?v=R76"></script>
-<script src="source-check.js?v=R76"></script>
+<script src="alpha-technical-rules.js?v=R80"></script>
+<script src="source-check.js?v=R80"></script>
 <script src="g11l1-ts-alpha-tables.js?v=5.8.79"></script>
 <script src="g11l1-ts-il-data.js?v=5.8.79"></script>
 <script src="g11l1-ts-il-runtime.js?v=5.8.79"></script>
@@ -1998,8 +2069,8 @@ window.SPEC_MIRROR_RULES={weights,source,models,allOptions,adjustment,fixDatabas
   window.SPEC_JAMB_DEPTH=Object.freeze({floors:mrlFloors,floorsForModel,jambType,limits,validate,description});
 })();
 </script>
-<script src="export-engine.js?v=R76"></script>
-<script src="print-layout.js?v=R76"></script>
+<script src="export-engine.js?v=R87"></script>
+<script src="print-layout.js?v=R87"></script>
 <script src="design-guide.js?v=R53"></script>
 <script src="panel-images.js?v=5.8.79"></script>
 <script>/* v5.8.25 — material finish rules. User-approved per-model codes only. */
@@ -2089,13 +2160,13 @@ patchFields('MRL',window.SPEC_EMBEDDED?.MRL?.fields);
 patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 })();
 </script>
-<script src="mrl-v02-vertical-study.js?v=5.8.181"></script>
+<script src="mrl-v02-vertical-study.js?v=R80"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=R76"></script>
+<script src="app.js?v=R87"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
 </script>
-<script src="pair.js?v=R76"></script><script src="multi-bridge.js?v=R76"></script></body></html>
+<script src="pair.js?v=R87"></script><script src="multi-bridge.js?v=R93"></script></body></html>
 
 <!-- 5.8.195: EN81-72 and BufferCap remain hidden until re-enabled. -->

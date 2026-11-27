@@ -1266,6 +1266,7 @@ input:disabled,select:disabled,input[readonly],.readonly-value{background:#f0f2f
 <style id="mrl-v02-g11l1-vertical-css">
 /* NEXIEZ-MRL Version 2 — Technical Study controls */
 .mrl-ts-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 12px;padding:10px;border:1px solid #dbe5ed;border-radius:8px;background:#f8fbfd}
+.mrl-ts-control[hidden]{display:none!important}
 .mrl-ts-control{display:flex;flex-direction:column;gap:5px;min-width:0}
 .mrl-ts-control label{font-size:11px;font-weight:700;color:#294664}
 .mrl-ts-control select{width:100%;background:#eaf5ff;border:1px solid #b5d2f0;color:#163454;min-height:36px;border-radius:5px;padding:4px 7px}
@@ -1476,9 +1477,168 @@ body{background:#f5f2ed}.workspace{max-width:1324px;padding:26px 24px 90px}.work
 .flat-head #leadtime-reasons{font-size:12px}.flat-head #draft-feedback{display:block;font-size:12px}
 @media(min-width:851px){body.flat-top-visible .desktop-check-float{display:none!important}}
 @media(max-width:850px){.flat-head{padding:0 9px}.flat-row{min-height:40px;gap:6px;flex-wrap:wrap}.flat-row .intro-title{font-size:16px}.flat-head .model-control{width:48%}.flat-head .project-grid{gap:7px}.flat-head .project-grid :is(.field,label:has(>input)){flex-direction:column;align-items:stretch;gap:2px}.flat-head .flat-status{flex-basis:100%}.flat-menu:first-of-type .flat-pop{left:0;right:auto}.flat-actions{justify-content:flex-end}}
-</style></head><body><header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span id="modelBadge" class="brand-side">NEXIEZ-MR</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
+.mode-switch{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.mode-switch a,.mode-current{padding:6px 10px;border:1px solid #aac3db;border-radius:5px;color:#234461;background:#edf5ff;text-decoration:none;font-weight:650;font-size:13px}.mode-current{background:#234461;color:#fff}.matrix td button.quick-copy,.matrix th button.copy-column{background:#e5effb;border:1px solid #a9c7e5;color:#234461;border-radius:4px;padding:3px 8px;min-height:0;font-weight:700;line-height:1.2;cursor:pointer}.matrix td button.quick-copy{float:right;margin:0 0 0 5px;font-size:17px}.matrix th button.copy-column{display:block;margin:4px auto 0;font-size:11px}.matrix td button.quick-copy:hover,.matrix th button.copy-column:hover{background:#cfe2f5}
+</style><style id="summary-compact-r88">
+/* Compact Summary only; no changes to the single-car form or print/export. */
+#overview .matrix {font-size:12px;line-height:1.25}
+#overview .matrix>section {margin-bottom:10px;padding-bottom:8px}
+#overview .matrix>section>h2 {font-size:16px;gap:8px;padding:8px 14px;margin-bottom:5px;line-height:1.25}
+#overview .matrix>section>h2::before {height:19px}
+#overview .matrix section h3 {font-size:12px;padding:5px 8px;margin:3px 0 0;line-height:1.25}
+#overview .matrix th,#overview .matrix td {padding:3px 7px;line-height:1.25}
+#overview .matrix td:first-child,#overview .matrix label {font-size:12px;line-height:1.25}
+#overview .matrix td small {font-size:10px;line-height:1.25;font-weight:500}
+#overview .matrix :is(input:not([type=checkbox]),select) {height:28px!important;min-height:28px!important;max-height:none;font-size:12px!important;padding:3px 7px!important;margin:0;line-height:1.2}
+#overview .matrix td button.quick-copy {width:26px;min-width:26px;max-width:26px;height:23px;min-height:23px;padding:0;margin:0 0 0 4px;line-height:1;font-size:16px;text-align:center}
+#overview .matrix th:has(>.copy-column) {white-space:nowrap}
+#overview .matrix th:has(>.copy-column)>input {width:calc(100% - 78px);vertical-align:middle}
+#overview .matrix th button.copy-column {display:inline-block;width:74px;max-width:74px;height:26px;margin:0 0 0 4px;padding:2px 4px;font-size:10px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#overview .matrix .name-header {margin-bottom:0}
+#overview .controls,#overview .pager,#overview .sections {margin:5px 0;gap:5px}
+#overview .sections button {padding:6px 10px}
+#overview .pager button {min-height:28px;height:28px;padding:3px 9px}
+#overview .controls label {font-size:12px}
+@media(max-width:850px) {
+ #overview .matrix :is(input:not([type=checkbox]),select) {height:33px!important;min-height:33px!important;font-size:13px!important}
+ #overview .matrix th:has(>.copy-column)>input {width:100%}
+ #overview .matrix th button.copy-column {display:block;margin:3px auto 0}
+ #overview .matrix td button.quick-copy {height:28px;min-height:28px;width:28px;max-width:28px}
+}
+</style>
+<style id="summary-theme-r89">
+/* R89: scoped Summary section palette; error and inactive states remain unchanged. */
+#overview .matrix>section#part-I,#overview nav.sections button[data-section="I"]{--sec-bg:#eaf3fc;--sec-light:#f3f8fd;--sec-border:#accce9;--sec-ink:#24577c;--sec-accent:#5799cd}
+#overview .matrix>section#part-II,#overview nav.sections button[data-section="II"]{--sec-bg:#e7f3ed;--sec-light:#f2f8f4;--sec-border:#b8d9c6;--sec-ink:#285f47;--sec-accent:#58a47a}
+#overview .matrix>section#part-III,#overview nav.sections button[data-section="III"]{--sec-bg:#f1edf9;--sec-light:#f8f5fc;--sec-border:#d3c4e9;--sec-ink:#62497f;--sec-accent:#9779bd}
+#overview .matrix>section#part-IV,#overview nav.sections button[data-section="IV"]{--sec-bg:#faf0df;--sec-light:#fdf7ed;--sec-border:#e9d2ad;--sec-ink:#795723;--sec-accent:#c49a57}
+#overview .matrix>section#part-V,#overview nav.sections button[data-section="V"]{--sec-bg:#f8e9ed;--sec-light:#fdf3f5;--sec-border:#e5bdc8;--sec-ink:#85465a;--sec-accent:#c27b91}
+#overview .matrix>section[id^="part-"]{border-color:var(--sec-border)}
+#overview .matrix>section[id^="part-"]>h2{background:var(--sec-bg);color:var(--sec-ink);border-bottom-color:var(--sec-border)}
+#overview .matrix>section[id^="part-"]>h2::before{background:var(--sec-accent)}
+#overview .matrix>section[id^="part-"] h3:not(.inactive-group),#overview .matrix>section[id^="part-"] .name-header th{background:var(--sec-light);color:var(--sec-ink);border-color:var(--sec-border)}
+#overview nav.sections button[data-section]:not([data-section="P"]):not(.has-spec-error){background:var(--sec-light)!important;color:var(--sec-ink)!important;border-color:var(--sec-border)!important}
+#overview nav.sections button[data-section]:not([data-section="P"]):not(.has-spec-error):is(:hover,.active){background:var(--sec-bg)!important;border-color:var(--sec-accent)!important}
+#overview nav.sections button[data-section]:not([data-section="P"]):not(.has-spec-error).active{box-shadow:inset 0 -3px var(--sec-accent)}
+</style>
+<style id="summary-mr-room-r90">
+/* Machine-room dimensions remain editable and fully validated. */
+#overview #part-II tr.mr-room-dimension td:not(.has-spec-error):not(.error-pulse){background:#f4f5f6;border-color:#dce0e4}
+#overview #part-II tr.mr-room-dimension :is(input,select):not(:disabled):not(.has-spec-error):not(.error-pulse){background:#eef0f2!important;border-color:#cbd1d7!important;color:#34465c!important}
+#overview #part-II tr.mr-room-dimension button.quick-copy{background:#e9ecef;border-color:#cbd1d7;color:#46576a}
+#overview #part-II tr.mr-room-dimension button.quick-copy:hover{background:#dde2e7}
+</style>
+<style id="summary-visual-r91">
+/* Stronger header hierarchy, without increasing compact row height. */
+#overview .matrix>section[id^="part-"]>h2{background:var(--sec-bg);border-bottom:2px solid var(--sec-accent);font-size:17px;font-weight:800}
+#overview .matrix>section[id^="part-"]>h2::before{width:5px;height:20px}
+#overview .matrix>section[id^="part-"] h3:not(.inactive-group){background:var(--sec-bg);border-left:4px solid var(--sec-accent);border-bottom:1px solid var(--sec-border);font-weight:800;color:var(--sec-ink)}
+#overview .matrix>section[id^="part-"] .name-header th{background:var(--sec-bg);border-bottom:2px solid var(--sec-accent);font-weight:800;color:var(--sec-ink)}
+#overview .matrix .name-header th input:not(:disabled):not(.has-spec-error){background:#fff!important;border-color:var(--sec-border)!important;color:var(--sec-ink)!important;font-weight:800!important}
+#overview #part-IV tr.fireproof-door-row td:not(.has-spec-error):not(.error-pulse):not(.empty-slot){background:#fff4e5;border-color:#efd4b1}
+#overview #part-IV tr.fireproof-door-row td:first-child{color:#854b16;font-weight:700}
+#overview #part-IV tr.fireproof-door-row :is(input,select):not(:disabled):not(.has-spec-error):not(.error-pulse){background:#ffead2!important;border-color:#e8b77b!important;color:#754312!important}
+#overview #part-IV tr.fireproof-door-row button.quick-copy{background:#ffe7ca;border-color:#e8b77b;color:#854b16}
+</style>
+<style id="summary-font-etd-r93">
+/* Consistent Vietnamese UI fonts and weights; not part of printed specification. */
+:root,body{font-family:Arial,"Segoe UI",sans-serif;font-synthesis:weight style}
+button,input,select,textarea,dialog,.workspace button,.workspace input,.workspace select{font-family:inherit}
+#overview .matrix td,#overview .matrix th,#overview .matrix label{font-size:12px;line-height:1.35}
+#overview .matrix>section[id^="part-"]>h2{font-weight:700;font-size:17px;line-height:1.35}
+#overview .matrix>section[id^="part-"] h3:not(.inactive-group),#overview .matrix>section[id^="part-"] .name-header th{font-weight:700}
+#overview .matrix>section[id^="part-"] .name-header th input:not(:disabled):not(.has-spec-error){font-weight:700!important}
+#overview .summary-etd-row td{background:#f4f8fc;text-align:center}
+#overview .summary-etd-row td:first-child{text-align:left}
+.summary-etd-value{font-weight:700;color:#24577c;white-space:nowrap}
+.summary-etd-value.extended{color:#b42318}
+#checkExportDialog .summary-etd-popup{width:100%;border-collapse:collapse;font-size:12px;line-height:1.4}
+#checkExportDialog .summary-etd-popup td{padding:5px 7px;border-bottom:1px solid #dce5ed;vertical-align:top}
+#checkExportDialog .summary-etd-popup td:first-child{font-weight:700}
+#checkExportDialog h3{font-size:14px;font-weight:700}
+</style>
+<style id="summary-workspace-r95">
+/* Flat desktop workspace; all rules remain scoped to the Summary document. */
+:root{--summary-toolbar:42px;--summary-nav:36px}
+body{background:#f4f6f8;color:#25384a}
+body>.site-header{height:48px;padding:0 18px;border-color:#dce3eb}
+body>.workspace{max-width:none;width:100%;padding:10px 16px 32px;box-sizing:border-box}
+.flat-head{display:contents}
+.flat-head>.flat-row{background:#fff;min-height:36px;padding:5px 10px;gap:8px;border:1px solid #dce3eb;border-bottom:0}
+.flat-head>.flat-row:first-child{border-radius:4px 4px 0 0}
+.flat-head .intro-title{font-size:19px;font-weight:700;margin:0}
+.flat-head .flat-actions{position:sticky;top:0;z-index:30;min-height:38px;border-bottom:1px solid #dce3eb;box-shadow:0 2px 3px #25384a0b}
+.flat-head .flat-actions :is(button,select,summary){font-size:12px;min-height:28px;height:auto;padding:5px 8px}
+.flat-head .flat-actions #check{padding:6px 10px}
+.flat-head .flat-actions #statusText{font-size:12px;overflow-wrap:anywhere}
+.flat-head .model-control select,.flat-head #sharedProject input{font-size:12px!important;min-height:28px;height:28px;padding:4px 8px;background:#fff!important;border-color:#cbd5df!important}
+.flat-head #car{background:#fff!important;border-color:#cbd5df!important}
+.quick-exports{display:inline-flex;gap:4px;align-items:center}
+.quick-exports button.branded-export{display:inline-flex!important;width:auto!important;min-width:0!important;min-height:28px!important;height:28px!important;border-radius:3px;align-items:center;gap:0;padding:0!important}
+.quick-exports .export-icon-pane{display:none!important}.quick-exports .export-button-label{padding:4px 9px!important;font-size:12px!important}
+.workspace>.desktop-check-float,.workspace>.mobile-actions{display:none!important}
+#overview nav.sections{position:sticky;top:var(--summary-toolbar);z-index:20;background:#f4f6f8;margin:0;padding:5px 0;gap:4px}
+#overview nav.sections button{border-radius:3px;padding:5px 12px;min-height:27px;font-weight:600}
+#overview .controls{margin:2px 0 5px;min-height:0;gap:10px}
+#overview .matrix>section[id^="part-"]{padding:0 0 5px;border-radius:3px;box-shadow:none;margin-bottom:12px;scroll-margin-top:calc(var(--summary-toolbar) + var(--summary-nav) + 5px)}
+#overview .matrix>section[id^="part-"]>h2{margin:0;padding:6px 10px;border-radius:0;background:var(--sec-bg);border-bottom:1px solid var(--sec-border);font-size:16px}
+#overview .matrix>section[id^="part-"] .name-header th{background:#214968;color:#fff;border:1px solid #365b76;font-weight:700;height:32px;padding:2px 6px}
+#overview .matrix .name-header th input:not(:disabled):not(.has-spec-error){background:transparent!important;border-color:transparent!important;color:#fff!important;box-shadow:none!important}
+#overview .matrix .name-header th input:focus{background:#fff!important;color:#17365d!important}
+#overview .matrix td{padding:2px 6px;border-color:#e0e6ed;height:32px;background:#fff}
+#overview .matrix tr:nth-child(even) td{background:#f8fafc}
+#overview .matrix td:first-child{font-weight:600}
+#overview .matrix :is(input:not([type=checkbox]),select):not(:disabled):not(.has-spec-error):not(.error-pulse){background:#fff!important;border:1px solid #d5dee6!important;color:#25384a!important;box-shadow:none!important;border-radius:3px;height:26px!important;min-height:26px!important}
+#overview .matrix :is(input,select):not(:disabled):not(.has-spec-error):focus{background:#eaf3fc!important;border-color:#83aed3!important;outline:1px solid #83aed3;outline-offset:0}
+#overview .matrix .name-header th:has(>.copy-column)>input{width:calc(100% - 28px)}
+#overview .matrix th button.copy-column{display:inline-block;width:24px;max-width:24px;height:24px;margin:0 0 0 3px;padding:0;border:0;background:transparent;color:white;font-size:18px;line-height:1}
+#overview .matrix td button.quick-copy{background:transparent;border:0;color:#6b8295;width:22px;min-width:22px;max-width:22px;height:23px;font-size:16px}
+#overview .matrix :is(button.quick-copy,button.copy-column):hover{background:#dceaf7;color:#214968}
+#overview .matrix>section[id^="part-"] h3:not(.inactive-group){margin:3px 0 0;padding:4px 8px;background:var(--sec-light);border-left:3px solid var(--sec-accent);font-weight:700}
+#overview .matrix .feature-fold h3{padding:0!important;margin-top:3px}
+#overview .matrix .feature-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:5px 8px;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;font-size:12px;line-height:1.3}
+#overview .matrix .feature-toggle small{margin-left:auto;font-size:10px;font-weight:400;color:#596d80}
+#overview .matrix .feature-toggle:hover{background:#e7edf3}
+#overview .matrix select.feature-provided:not(:disabled):not(.has-spec-error):not(.error-pulse){background:#e7f3ed!important;border-color:#b8d9c6!important;color:#285f47!important}
+#overview .matrix select.inactive-value:disabled:not(.has-spec-error){background:#edf0f2!important}
+#overview .matrix #part-II tr.mr-room-dimension :is(input,select):not(:disabled):not(.has-spec-error):not(.error-pulse){background:#eef0f2!important;border-color:#cbd1d7!important}
+#overview .matrix #part-IV tr.fireproof-door-row :is(input,select):not(:disabled):not(.has-spec-error):not(.error-pulse){background:#ffead2!important;border-color:#e8b77b!important;color:#754312!important}
+#overview .matrix .summary-etd-row td{background:#f3f6f8}
+#overview .matrix .summary-etd-row td:has(.extended){background:#fff3e9}
+#overview .matrix :is(input,select,td){scroll-margin-top:calc(var(--summary-toolbar) + var(--summary-nav) + 42px)}
+#overview .matrix>section[id^="part-"] .name-header th input:not(:disabled):not(.has-spec-error):not(.error-pulse){background:transparent!important;border-color:transparent!important;color:#fff!important}
+#overview .matrix>section[id^="part-"] .name-header th input:not(:disabled):not(.has-spec-error):focus{background:#fff!important;color:#17365d!important}
+@media(min-width:851px){#overview .matrix,#overview .matrix>section{overflow:visible}#overview .matrix .name-header{position:sticky;top:calc(var(--summary-toolbar) + var(--summary-nav));z-index:10;box-shadow:0 2px 4px #193b5a22}}
+@media(max-width:850px){body>.workspace{padding:6px 8px 20px!important}.flat-head>.flat-row{flex-wrap:wrap}.flat-head .flat-actions{position:static}.flat-head .flat-status{flex-basis:100%}#overview nav.sections{top:0}#overview .matrix>section[id^="part-"]{scroll-margin-top:var(--summary-nav)}#overview .matrix :is(input:not([type=checkbox]),select){height:30px!important;min-height:30px!important}.flat-head .flat-actions .flat-pop{z-index:81}}
+</style>
+<style id="summary-autofit-r96">
+/* One width model for every table, including merged group rows. */
+#overview .matrix{--summary-label-width:280px;--car-min-total:600px;min-width:0;max-width:100%;}
+#overview .matrix table{width:100%;min-width:0;table-layout:fixed;}
+#overview .matrix .summary-label-col{width:var(--summary-label-width)}
+#overview .matrix :is(th,td):first-child{width:var(--summary-label-width)!important;}
+#overview .matrix :is(input:not([type=checkbox]),select){min-width:0!important;max-width:100%;box-sizing:border-box}
+#overview .matrix td{overflow-wrap:anywhere}
+#overview .matrix.wide-matrix{overflow:auto!important;max-height:calc(100vh - var(--summary-toolbar) - var(--summary-nav) - 16px);scrollbar-gutter:stable}
+#overview .matrix.wide-matrix>section[id^="part-"]{min-width:calc(var(--summary-label-width) + var(--car-min-total));overflow:visible!important;scroll-margin-top:0}
+#overview .matrix.wide-matrix .name-header{position:sticky;top:0;z-index:12}
+#overview .matrix.wide-matrix table :is(td,th):first-child{position:sticky;left:0;z-index:2;box-shadow:1px 0 0 #cbd7e2;background-clip:padding-box}
+#overview .matrix.wide-matrix .name-header th:first-child{z-index:13}
+#overview .matrix.wide-matrix :is(input,select,td){scroll-margin-top:38px;scroll-margin-left:calc(var(--summary-label-width) + 4px)}
+@media(max-width:850px){#overview .matrix.wide-matrix{max-height:70vh}#overview .matrix .summary-label-col{width:var(--summary-label-width)}}
+</style>
 
-<main class="workspace"><section class="flat-head"><div class="flat-row"><div class="flat-title"><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1></div><div class="model-control"><strong id="summaryModel">NEXIEZ-MR ALPHA</strong></div></div><div class="flat-row"><div id="sharedProject" class="project-grid"></div></div><div class="flat-row flat-actions"><div class="flat-status"><p role="status" id="statusText" class="check-top">Chưa kiểm tra</p></div><select id="car" aria-label="Chọn thang"></select><details class="flat-menu"><summary>Thang</summary><div class="flat-pop "><button id="addCar">+ Thêm thang</button><button id="renameCar">Đổi mã</button><button id="deleteCar">Xóa thang</button><button id="detail">Form đơn</button></div></details><details class="flat-menu"><summary>Lưu tệp</summary><div class="flat-pop "><button type="button" class="btn btn-secondary" id="save-summary-draft">Lưu bản nhập (.json)</button><button type="button" class="btn btn-secondary" id="open-summary-draft">Mở bản nhập (.json)</button></div></details><button id="check">Kiểm tra Spec</button><details class="flat-menu"><summary>Xuất file</summary><div class="flat-pop export-pop"><label class="tech-export-choice" for="only-vi"><input id="only-vi" type="checkbox"><span><strong>Vietnamese Only</strong></span></label><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="export-buttons"><button class="btn btn-secondary branded-export branded-excel" id="exportBook" type="button" title="Xuất Excel · A4 ngang"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2.8h7.6L20 8.2V21H7V2.8Z"></path><path d="M14.5 2.8v5.5H20M10 12h7M10 15.5h7M10 19h7M13.5 11v8"></path><path d="M4 8.6h8v11H4z"></path><path d="m6 12 4 5m0-5-4 5"></path></svg></span><span class="export-button-label">Xuất Excel · A4 ngang</span></button><button class="branded-export branded-pdf" id="exportPdf" type="button" aria-label="Xuất A4 PDF"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 2.5h9l5 5V21.5H5zM14 2.5v5h5"></path><path d="M8 17.5c2.2-2.8 3.7-5.8 4.6-8.1.4 3 1.4 5.4 3.1 7.3-2.8-1-5.5-1-7.7.8Z"></path></svg></span><span class="export-button-label">PDF</span></button></div></div></details></div><input type="file" hidden accept=".json,application/json" id="summary-draft-file"><span role="status" id="draft-feedback"></span></section><div id="overview" class="box"><nav class="sections"></nav><div class="controls"><input id="search" placeholder="Tìm hạng mục" aria-label="Tìm hạng mục"><label><input id="diff" type="checkbox"> Chỉ xem khác biệt</label><select id="featureGroup" hidden aria-label="Nhóm tính năng"></select></div><div class="pager"><button id="prev">‹</button><span id="range"></span><button id="next">›</button></div><section id="carErrors" hidden aria-live="polite"></section><div class="matrix"></div></div>
+<style id="r99-model-and-editable">
+.workspace .model-control{display:flex;align-items:center;gap:10px;width:auto!important;min-width:0!important;max-width:60%;flex:0 1 560px}
+.workspace .model-control .model-prompt{display:flex;align-items:center;gap:8px;white-space:nowrap;font:600 12px/1.25 Arial,sans-serif;color:#24577c;cursor:pointer}
+.workspace .model-prompt span{font-size:19px;line-height:1;color:#3979a8}
+.workspace .model-control select{flex:1;min-width:0;width:100%;margin:0}
+@media(max-width:850px){.workspace .model-control{max-width:100%;flex:1 1 280px;gap:5px}.workspace .model-control .model-prompt{white-space:normal;font-size:11px}}
+
+.workspace .flat-head .model-control #summaryModel:not(:disabled){background:#edf9ef!important;border-color:#b7d8bf!important}
+</style>
+</head><body><header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><div class="mode-switch"><a data-spec-mode="single" href="index.html">Spec đơn</a><span class="mode-current">Spec Summary</span></div><span id="modelBadge" class="brand-side">NEXIEZ-MR</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
+
+<main class="workspace"><section class="flat-head"><div class="flat-row"><div class="flat-title"><h1 class="intro-title">Đặc tính kỹ thuật <span style="font-weight:500;color:#78899c;font-size:.72em">/ Specifications</span></h1></div><div class="model-control"><label class="model-prompt" for="summaryModel">Chọn Model / Select model <span aria-hidden="true">→</span></label><select id="summaryModel" aria-label="Chọn model"><option value="MR">NEXIEZ-MR ALPHA</option><option value="MRL">NEXIEZ-MRL Version2 ALPHA</option></select></div></div><div class="flat-row"><div id="sharedProject" class="project-grid"></div></div><div class="flat-row flat-actions"><div class="flat-status"><p role="status" id="statusText" class="check-top">Chưa kiểm tra</p></div><select id="car" aria-label="Chọn cột"></select><button type="button" id="detailQuick">Form đơn cột đang chọn</button><details class="flat-menu"><summary>Cột</summary><div class="flat-pop "><button id="addCar">+ Thêm cột</button><button id="renameCar">Đổi mã thang</button><button id="deleteCar">Xóa cột</button></div></details><details class="flat-menu"><summary>Lưu tệp</summary><div class="flat-pop "><button type="button" class="btn btn-secondary" id="save-summary-draft">Lưu bản nhập (.json)</button><button type="button" class="btn btn-secondary" id="open-summary-draft">Mở bản nhập (.json)</button></div></details><button id="check">Kiểm tra Spec</button><span id="quickExports" class="quick-exports"></span><details class="flat-menu"><summary>Xuất file</summary><div class="flat-pop export-pop"><label class="tech-export-choice" for="only-vi"><input id="only-vi" type="checkbox"><span><strong>Vietnamese Only</strong></span></label><label class="tech-export-choice" for="export-tech-details"><input id="export-tech-details" type="checkbox"><span><strong>Trích xuất chi tiết – Động cơ, độ ồn, chiều dày…</strong></span></label><div class="export-buttons"><button class="btn btn-secondary branded-export branded-excel" id="exportBook" type="button" title="Xuất Excel · A4 ngang"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2.8h7.6L20 8.2V21H7V2.8Z"></path><path d="M14.5 2.8v5.5H20M10 12h7M10 15.5h7M10 19h7M13.5 11v8"></path><path d="M4 8.6h8v11H4z"></path><path d="m6 12 4 5m0-5-4 5"></path></svg></span><span class="export-button-label">Xuất Excel · A4 ngang</span></button><button class="branded-export branded-pdf" id="exportPdf" type="button" aria-label="Xuất A4 PDF"><span class="export-icon-pane"><svg class="export-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 2.5h9l5 5V21.5H5zM14 2.5v5h5"></path><path d="M8 17.5c2.2-2.8 3.7-5.8 4.6-8.1.4 3 1.4 5.4 3.1 7.3-2.8-1-5.5-1-7.7.8Z"></path></svg></span><span class="export-button-label">PDF</span></button></div></div></details></div><input type="file" hidden accept=".json,application/json" id="summary-draft-file"><span role="status" id="draft-feedback"></span></section><div id="overview" class="box"><nav class="sections"></nav><div class="controls"><input id="search" hidden placeholder="Tìm hạng mục" aria-label="Tìm hạng mục"><label><input id="diff" type="checkbox"> Chỉ xem khác biệt</label><select id="featureGroup" hidden aria-label="Nhóm tính năng"></select></div><section id="carErrors" hidden aria-live="polite"></section><div class="matrix"></div></div>
 <aside class="desktop-check-float" aria-label="Kiểm tra thông số nhanh / Floating Check Spec">
  <button id="desktop-check-floating" type="button" aria-label="Chạy Check Spec">✓ Check Spec</button>
  <span id="desktop-check-floating-status" class="desktop-check-float-status" aria-live="polite">Chưa kiểm tra</span>
@@ -1487,12 +1647,33 @@ body{background:#f5f2ed}.workspace{max-width:1324px;padding:26px 24px 90px}.work
   <button class="branded-export branded-pdf" id="desktop-export-pdf" type="button" aria-label="Xuất A4 PDF"><span class="export-icon-pane"><svg class="export-svg" viewbox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 2.5h9l5 5V21.5H5zM14 2.5v5h5"></path><path d="M8 17.5c2.2-2.8 3.7-5.8 4.6-8.1.4 3 1.4 5.4 3.1 7.3-2.8-1-5.5-1-7.7.8Z"></path></svg></span><span class="export-button-label">PDF</span></button>
  </div>
 </aside>
-<div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div><dialog id="editor"><h2 id="caption"></h2><div id="entry"></div><p>Áp dụng cho thang</p><div id="picks"></div><div class="controls"><button id="apply">Áp dụng</button><button id="cancel">Đóng</button></div></dialog></main><dialog id="checkExportDialog" aria-labelledby="checkExportTitle"><h2 id="checkExportTitle"></h2><div id="checkExportBody"></div><form method="dialog"><button value="close" autofocus>Đóng</button><select id="exportOrientation" aria-label="Khổ giấy"><option value="portrait">A4 dọc</option><option value="landscape">A4 ngang</option></select><button id="confirmExport" value="xlsx">Xuất Excel</button><button id="confirmPdf" value="pdf">Xuất PDF</button></form></dialog><script src="multi.js?v=R76"></script><script>
+<div class="mobile-actions" aria-label="Thao tác nhanh"><button id="m-check" type="button">✓ Check Spec</button><button id="m-xlsx" type="button">Excel .xlsx</button><button id="m-pdf" type="button">A4 PDF</button></div><dialog id="editor"><h2 id="caption"></h2><div id="entry"></div><p>Áp dụng cho thang</p><div id="picks"></div><div class="controls"><button id="apply">Áp dụng</button><button id="cancel">Đóng</button></div></dialog></main><dialog id="checkExportDialog" aria-labelledby="checkExportTitle"><h2 id="checkExportTitle"></h2><div id="checkExportBody"></div><form method="dialog"><button value="close" autofocus>Đóng</button><select id="exportOrientation" aria-label="Khổ giấy"><option value="portrait">A4 dọc</option><option value="landscape">A4 ngang</option></select><button id="confirmExport" value="xlsx">Xuất Excel</button><button id="confirmPdf" value="pdf">Xuất PDF</button></form></dialog><script>
+function openSpecMode(mode,model){
+ const name='spec-'+mode+'-'+model;
+ const url=(mode==='summary'?'multi.html':'index.html')+'?model='+model;
+ const w=window.open('',name);
+ if(!w){location.href=url;return;}
+ try{if(w.location.href==='about:blank')w.location.href=url;}catch(e){/* Existing local-file tab: keep its current draft. */}
+ w.focus();
+}
+function updateModeLinks(model){
+ for(const a of document.querySelectorAll('[data-spec-mode]')){
+  const mode=a.dataset.specMode;
+  a.href=(mode==='summary'?'multi.html':'index.html')+'?model='+model;
+  a.target='spec-'+mode+'-'+model;
+  a.onclick=e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();openSpecMode(mode,model)};
+ }
+}
+</script><script src="multi.js?v=R96"></script><script>
 (()=>{const head=document.querySelector('.flat-head'),menus=[...head.querySelectorAll('.flat-menu')];
 const shut=()=>menus.forEach(m=>m.open=false);
 head.addEventListener('click',e=>{const toggle=e.target.closest('summary');if(toggle){for(const m of menus)if(m!==toggle.parentElement)m.open=false}else if(e.target.closest('button'))shut()});
 document.addEventListener('click',e=>{if(!e.target.closest('.flat-menu'))shut()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const m=menus.find(x=>x.open);if(m){m.open=false;m.querySelector('summary').focus()}}});
-if('IntersectionObserver' in window)new IntersectionObserver(([r])=>document.body.classList.toggle('flat-top-visible',r.isIntersecting)).observe(head.querySelector('.flat-actions'));
+const actions=head.querySelector('.flat-actions'),nav=document.querySelector('#overview nav.sections');
+const quick=document.getElementById('quickExports');
+for(const id of ['desktop-export-xlsx','desktop-export-pdf'])quick.append(document.getElementById(id));
+const measure=()=>{document.documentElement.style.setProperty('--summary-toolbar',actions.getBoundingClientRect().height+'px');document.documentElement.style.setProperty('--summary-nav',nav.getBoundingClientRect().height+'px');};
+measure();if('ResizeObserver' in window){const observer=new ResizeObserver(measure);observer.observe(actions);observer.observe(nav)}window.addEventListener('resize',measure);
 })();
 </script></body></html>

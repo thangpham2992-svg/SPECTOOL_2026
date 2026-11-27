@@ -67,6 +67,49 @@
    if(result.status!=='PASS')throw Error('Chỉ xuất khi Check Spec = PASS / Export blocked: '+result.status+'. '+result.errors.slice(0,3).map(e=>e.message).join(' | ')+' '+result.unverified.slice(0,2).join(' | '));
    return result;
  }
+ // R83: automatic Operation features derived from regulation and Buffer Cap, never editable.
+ function automaticOperationFeatures(model,regulation,bufferCap){
+   if(model!=='MRL'||!/EN\s*81\s*[-–]?\s*20/i.test(String(regulation)))return [];
+   const result=[{key:'AUTO_RESET_PIT',vi:'Công tắc tái khởi động theo EN81-20/50',en:'Reset Pit Switch'}];
+   if(bufferCap==='Yes')result.push({key:'AUTO_SHORT_BUFFERCAP',vi:'',en:'Short buffercap'});
+   return result;
+ }
+ async function insertAutomaticOperationRows(zip,x,workbook,doc){
+   const features=doc.automaticOperation||[];if(!features.length)return;
+   const sf=zip.file('xl/sharedStrings.xml');
+   const shared=sf?all(parse(await sf.async('string')),'si'):[];
+   const cellAt=(row,col)=>Array.from(row?.children||[]).find(c=>c.localName==='c'&&c.getAttribute('r')===col+row.getAttribute('r'));
+   const txt=c=>all(c?.getAttribute('t')==='s'?shared[+child(c,'v')?.textContent]:child(c,'is'),'t').map(t=>t.textContent).join('');
+   const rows=all(x,'row');
+   const heading=rows.find(row=>/^\s*[-–—_]\s*Tính năng vận hành(?!\s+(?:cửa|khẩn cấp))(?:\s*\(|\s*\/|\s*$|\s*:|\s*\n)/iu.test(txt(cellAt(row,'A'))));
+   if(!heading)throw Error('R83: missing Operation feature heading');
+   heading.removeAttribute('hidden');if(!Number(heading.getAttribute('ht')))heading.setAttribute('ht','25');
+   const pivot=+heading.getAttribute('r'),count=features.length;
+   const template=rows.find(row=>+row.getAttribute('r')>pivot&&/^\s*[^(-]/.test(txt(cellAt(row,'A')))&&/[À-ỹ]/.test(txt(cellAt(row,'A')))&&cellAt(row,'C')&&txt(cellAt(row,'C')));
+   if(!template)throw Error('R83: missing Operation row style');
+   const styles=Object.fromEntries(['A','B','C'].map(col=>[col,cellAt(template,col)?.getAttribute('s')||'0']));
+   const shift=ref=>String(ref).replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g,(m,col,num)=>col+(+num>pivot?+num+count:+num));
+   for(const row of rows)if(+row.getAttribute('r')>pivot){row.setAttribute('r',String(+row.getAttribute('r')+count));for(const c of Array.from(row.children))if(c.hasAttribute('r'))c.setAttribute('r',shift(c.getAttribute('r')));}
+   for(const [tag,attr] of [['mergeCell','ref'],['dimension','ref'],['autoFilter','ref'],['conditionalFormatting','sqref'],['dataValidation','sqref'],['hyperlink','ref'],['protectedRange','sqref'],['ignoredError','sqref']])for(const el of all(x,tag))if(el.hasAttribute(attr))el.setAttribute(attr,shift(el.getAttribute(attr)));
+   for(const br of all(child(x.documentElement,'rowBreaks'),'brk'))if(+br.getAttribute('id')>=pivot)br.setAttribute('id',String(+br.getAttribute('id')+count));
+   for(const dn of all(workbook,'definedName'))if(dn.getAttribute('name')==='_xlnm.Print_Area')dn.textContent=shift(dn.textContent);
+   const merges=all(x,'mergeCells')[0];if(!merges)throw Error('R83: missing merge table');
+   const parent=heading.parentNode;let prev=heading;
+   features.forEach((f,i)=>{
+     const rn=pivot+i+1,row=x.createElementNS(n,'row');row.setAttribute('r',String(rn));row.setAttribute('ht',f.vi&&!doc.onlyVi?'34':'21');row.setAttribute('customHeight','1');
+     for(const col of ['A','B','C']){
+       const c=x.createElementNS(n,'c');c.setAttribute('r',col+rn);c.setAttribute('s',styles[col]);row.appendChild(c);
+       if(col==='A'){
+         const label=f.vi?(doc.onlyVi?f.vi:f.vi+'\n'+f.en):f.en;
+         updateCell(x,c,label);
+         if(f.vi&&!doc.onlyVi){const inline=child(c,'is');child(inline,'t')?.remove();for(const [part,english] of [[f.vi+'\n',false],[f.en,true]]){const run=x.createElementNS(n,'r'),pr=x.createElementNS(n,'rPr'),font=x.createElementNS(n,'rFont');font.setAttribute('val','Arial');pr.appendChild(font);if(english){pr.appendChild(x.createElementNS(n,'i'));const color=x.createElementNS(n,'color');color.setAttribute('rgb','FF245A86');pr.appendChild(color);}const t=x.createElementNS(n,'t');t.setAttribute('xml:space','preserve');t.textContent=part;run.append(pr,t);inline.appendChild(run);}}
+       }else if(col==='C')updateCell(x,c,'✓');
+     }
+     parent.insertBefore(row,prev.nextSibling);prev=row;
+     const m=x.createElementNS(n,'mergeCell');m.setAttribute('ref',`A${rn}:B${rn}`);merges.appendChild(m);
+   });
+   merges.setAttribute('count',String(all(merges,'mergeCell').length));
+ }
  function exportModel(model,changes,db){
    if(!db?.sheets?.SpecFormExport||!db?.tables)throw Error('Thiếu SpecFormExport hoặc DataTable / Workbook source missing');
    currentResult(model,changes,db);
@@ -254,7 +297,14 @@
    }
    const ceilingFinish=text(eng.safe('SpecForm',finishCell).value).trim().toUpperCase();
    const ceilingOutputRow=model==='MR'?46:45;
-   if(ceilingName && /^(SUS-HL|SUS-M)$/.test(ceilingFinish)){
+   // R81: customer-facing descriptions of firefighter ceilings, for every export.
+   // Use the selected catalogue colour, not a fixed colour or an applicability note.
+   const firefighterCeiling=(model==='MRL'&&ceilingName==='FL1')||(model==='MR'&&ceilingName==='FEVN10');
+   if(firefighterCeiling && !/^(SUS-HL|SUS-M)$/.test(ceilingFinish)){
+     const color=text(eng.safe('SpecForm',finishCell).value).trim();
+     cells['C'+ceilingOutputRow]=`Trần ${ceilingName} chuyên dùng cho lực lượng PCCC${color?', mã màu theo catalog '+color:''}.`;
+     cells['C'+(ceilingOutputRow+1)]=`(${ceilingName} ceiling specially designed for firefighters${color?', color as catalog '+color:''}).`;
+   }else if(ceilingName && /^(SUS-HL|SUS-M)$/.test(ceilingFinish)){
      const mirror=ceilingFinish==='SUS-M';
      cells['C'+ceilingOutputRow]=`Trần phòng thang kiểu ${ceilingName}, ${mirror?'inox gương':'inox sọc nhuyễn'} (${ceilingFinish}).`;
      cells['C'+(ceilingOutputRow+1)]=`(Car ceiling model ${ceilingName}, ${mirror?'mirror-finish':'hairline-finish'} stainless steel ceiling (${ceilingFinish})).`;
@@ -273,22 +323,6 @@
        for(const row of rows){
          const key='C'+row;
          cells[key]=text(cells[key]).replace(/SUS430J1L|SUS430/gi,'SUS304');
-       }
-     }
-   }
-   // MRL Version02: export the live (and manually overridable) granite weight,
-   // not a cached SpecFormExport result from the source XLSX.
-   if(model==='MRL'){
-     const floorType=text(eng.safe('SpecForm','D55').value).trim();
-     if(floorType==='Local granite (20 mm)'){
-       const weightResult=eng.safe('SpecForm','D56');
-       // SourceEngine reads user overrides first. Retain a manually entered weight.
-       const AA=Number(eng.safe('SpecForm','D28').value),BB=Number(eng.safe('SpecForm','D29').value),JJ=Number(eng.safe('SpecForm','D31').value);
-       const computed=Number.isFinite(AA)&&Number.isFinite(BB)&&Number.isFinite(JJ)?Math.floor(AA*BB*0.02*2.7*0.001+0.5)+(JJ<1000?5:10):NaN;
-       const userWeight=Object.hasOwn(changes,'D56')?Number(changes.D56):(Number.isFinite(Number(weightResult.value))?Number(weightResult.value):computed);
-       if(Number.isFinite(userWeight)&&userWeight>=0){
-         const w=Number.isInteger(userWeight)?String(userWeight):String(userWeight);
-         cells.C56=`Sàn đá granite cung cấp trong nước, chiều dày hoàn thiện sau thi công 20mm, khối lượng ${w} Kg (Local natural granite, finishing thickness 20 mm, weight ${w} Kg).`;
        }
      }
    }
@@ -984,7 +1018,7 @@
    for(const model of ['MR','MRL'])for(const f of window.SPEC_RULES?.[model]?.features||[])if(/^[A-Z0-9-]+$/.test(f.code))codes.add(f.code);
    for(const key of Object.keys(window.SPEC_V52_FEATURES?.catalog||{}))if(/^[A-Z0-9-]+$/.test(key))codes.add(key);
    const literal=[...codes].sort((a,b)=>b.length-a.length).map(v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
-   const patterns=[String.raw`NEXIEZ-MRL(?:\s+(?:Version\s*0?2|Ver\.?\s*0?2))?|NEXIEZ-MR`,String.raw`SUS\s*(?:430J1L|430|304)(?:\s*\/\s*(?:SUS\s*)?(?:430J1L|430|304))*`,String.raw`(?:EN\s*81[-–]\s*58|BS[-–]?476)(?:\s*[\[(]II[\])])?|EN81-20/50`,String.raw`[1-8]C\s*[-–]?\s*(?:2BC|SAI[-–]?\d+[A-Z]*|[A-Z][A-Z0-9-]+)`,String.raw`(?:PIV|HBV|PIH|PID|HIP|HPI|HOP|HLV|HLH|COP)\d*[-–]?[A-Z]?\d+[A-Z0-9]*(?:-[A-Z0-9]+)*|CBV[1-6]`,String.raw`Y[HZ]\s*[-–]?\s*\d+[A-Z0-9]*|NY-40[A-E]`,String.raw`(?:C|N|M|P|F)\d{3,4}[A-Z]*`,String.raw`(?:Y\d{3}[A-Z]?|(?:CP|LA|ML)\d+[A-Z0-9]*)`,String.raw`(?:CL[12]|DL[567])-[CW]`,String.raw`[Ll][Aa][Rr][Gg][Ee]\s+[Ww][Ii][Nn][Dd][Oo][Ww]`,String.raw`EXIT SWITCH`,literal];
+   const patterns=[String.raw`NEXIEZ-MRL(?:\s+(?:Version\s*0?2|Ver\.?\s*0?2))?|NEXIEZ-MR`,String.raw`SUS\s*(?:430J1L|430|304)(?:\s*\/\s*(?:SUS\s*)?(?:430J1L|430|304))*`,String.raw`(?:EN\s*81[-–]\s*58|BS[-–]?476)(?:\s*[\[(]II[\])])?|EN81-20/50`,String.raw`[1-8]C\s*[-–]?\s*(?:2BC|SAI[-–]?\d+[A-Z]*|[A-Z][A-Z0-9-]+)`,String.raw`(?:PIV|HBV|PIH|PID|HIP|HPI|HOP|HLV|HLH|COP)\d*[-–]?[A-Z]?\d+[A-Z0-9]*(?:-[A-Z0-9]+)*|CBV[1-6]`,String.raw`Y[HZ]\s*[-–]?\s*\d+[A-Z0-9]*|NY-40[A-E]`,String.raw`(?:C|N|M|P|F)\d{3,4}[A-Z]*`,String.raw`(?:Y\d{3}[A-Z]?|(?:CP|LA|ML)\d+[A-Z0-9]*)`,String.raw`(?:CL[12]|DL[567])-[CW]`,String.raw`[Ll][Aa][Rr][Gg][Ee]\s+[Ww][Ii][Nn][Dd][Oo][Ww]`,String.raw`E[-–](?:102|202|302)`,String.raw`EXIT SWITCH`,literal];
    return new RegExp('(?<![A-Za-z0-9])(?:'+patterns.join('|')+')(?![A-Za-z0-9])','g');
  };
  // R73: normalize customer-facing description punctuation, without touching labels,
@@ -4662,6 +4696,7 @@
        throw Error('Unexpected content in section II merged C'+rn);
    }
    if(doc.onlyVi)await vietnameseSheet(zip,x,3);
+   await insertAutomaticOperationRows(zip,x,workbook,doc);
    await normalizeExportPunctuation(zip,x);
    await emphasizeExportCodes(zip,x);
    if(doc.compactHidden)doc.compacted=await compactHiddenExport(zip,x,finalpath,all(workbook,'definedName'));
@@ -4807,5 +4842,5 @@
    @page{size:A4 portrait;margin:12mm 10mm 13mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:9pt;color:#1b1b1b;margin:0;padding:0}header{margin:0 0 12px;border-bottom:2px solid #b5161c;padding:7px 0 10px}header strong{font-size:13pt;color:#10345c}header small{display:block;margin-top:3px}table{border-collapse:collapse;width:100%;table-layout:fixed}td{border:1px solid #777;padding:4px 5px;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;line-height:1.33}td:nth-child(1){width:31%;font-weight:600}td:nth-child(2){width:21%}td:nth-child(3){width:48%}tr.section td{font-weight:700;background:#e9edf2;color:#132e4c;break-after:avoid}tr.subsection td{font-weight:700;background:#f3f4f5;break-after:avoid}tr.feature td:first-child{font-weight:500}tr{break-inside:avoid}.spec-english,em{color:#245A86;font-style:italic}.toolbar{position:sticky;top:0;padding:12px;background:#f7f8fa;border-bottom:1px solid #aaa;margin-bottom:12px;font-family:Arial,sans-serif}.toolbar button{padding:9px 16px;background:#ad1119;color:white;border:0;border-radius:5px;cursor:pointer}.toolbar small{margin-left:12px;color:#555}footer{color:#666;font-size:8pt;padding-top:8px} @media print{.toolbar{display:none}header{margin:0 0 10px}footer{display:none}} 
    </style></head><body><div class="toolbar"><button onclick="window.print()">In / Save as A4 PDF</button><small>Chọn máy in “Save as PDF” trong hộp thoại / Select Save as PDF.</small></div><header><strong>MITSUBISHI ELECTRIC VIETNAM — SPECIFICATION</strong><small>${escape(title)} | ${escape(v('B8'))} — ${escape(v('B9'))}</small></header><table><tbody>${rows.join('')}</tbody></table><footer>Source: SpecFormExport | A4 portrait | Excel Database</footer></body></html>`;
  }
- window.SPEC_EXPORT={normalizeExportPunctuation,compactHiddenExport,emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
+ window.SPEC_EXPORT={automaticOperationFeatures,normalizeExportPunctuation,compactHiddenExport,emphasizeExportCodes,exportCodePattern,vietnameseSheet,exportModel,xlsxFromModel,printHtml,attachMRMaterialThickness};
 })();

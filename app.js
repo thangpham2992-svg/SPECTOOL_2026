@@ -319,8 +319,7 @@ function refreshTwoStopTravelWarning(){
 }
 function selectedCapacity(){return current.capacity.find(c=>String(c.EleCapacityName)===String(currentValue('D13')))||{}}
 // FlooringWeight: evaluate the original SpecForm Excel expression in the browser.
-// AA, BB and JJ are in mm. Thickness 0.02 m; density 2700 kg/m3.
-// Hence AA * BB * 0.02 * 2.7 * 0.001 is weight in kg.
+// AA, BB, JJ in mm; granite thickness selected in mm; density 2700 kg/m3.
 let flooringManual=false;
 function flooringAddresses(model=$('model').value){
  return model==='MR'
@@ -329,11 +328,12 @@ function flooringAddresses(model=$('model').value){
 }
 function computedFlooringWeight(){
  const a=flooringAddresses();
- if(String(currentValue(a.type)).trim()!=='Local granite (20 mm)')return 0;
+ const thickness=Number(String(currentValue(a.type)).trim().match(/^Local granite \((18|20|25) mm\)$/i)?.[1]);
+ if(!thickness)return 0;
  const aa=Number(currentValue(a.aa)),bb=Number(currentValue(a.bb)),jj=Number(currentValue(a.jj));
  if(![aa,bb,jj].every(Number.isFinite)||aa<=0||bb<=0||jj<=0)return null;
  // Match Excel ROUND(x,0): for nonnegative x, round halves away from zero.
- return (jj<1000?5:10)+Math.floor(aa*bb*0.02*2.7*0.001+0.5);
+ return (jj<1000?5:10)+Math.floor(aa*bb*(thickness/1000)*2.7*0.001+0.5);
 }
 function updateFlooringWeight(force=false){
  if(flooringManual&&!force)return;
@@ -727,7 +727,7 @@ function setupSpecialOptions(){
   const sel=document.createElement('select');sel.dataset.cell='D23';
   side.replaceWith(sel);if(f)f.options=eligibleSideDrops();
   refreshSideDrop();
-  sel.addEventListener('change',()=>{changes.D23=sel.value;sel.classList.add('dirty');refreshMRLShaftMinimum();invalidateCheck();status('Đã cập nhật loại đối trọng; AH/BH tối thiểu được tra lại theo CWT.')});
+  sel.addEventListener('change',()=>{changes.D23=sel.value;sel.classList.add('dirty');refreshMRLShaftMinimum();refreshMRLOverheadMinimum(false);invalidateCheck();status('Đã cập nhật loại đối trọng; AH/BH tối thiểu được tra lại theo CWT.')});
  }
  const obsField=current.fields.find(f=>/Observation/i.test(f.name));const obs=obsField?activeInput(obsField.cell):null;if(obs && obs.tagName!=='SELECT' && $('model').value==='MR'){
   const f=obsField;const values=['No','NY-40A','NY-40B','NY-40C','NY-40D','NY-40E'];let s=document.createElement('select');s.dataset.cell=obsField.cell;for(let v of values){let o=document.createElement('option');o.value=v;o.textContent=v;s.append(o)}s.value=String(obs.value||'No');s.addEventListener('change',()=>{changes[obsField.cell]=s.value;invalidateCheck()});obs.replaceWith(s);if(f)f.options=values;
@@ -789,6 +789,18 @@ function renderFeatures(){
  if(!tables.includes(activeFeatureTable))activeFeatureTable=tables[0];
  tables.forEach(t=>{let b=document.createElement('button');const selected=features.some(f=>f.table===t&&featureIsSelected(f));b.className='btn feature-tab'+(selected?' feature-tab-selected':'')+(t===activeFeatureTable?' feature-tab-current':'');b.textContent=({TblFeature_Emergency:'Khẩn cấp / Emergency',TblFeature_Operation:'Vận hành / Operation',TblFeature_Door:'Cửa / Door',TblFeature_Signal:'Tín hiệu / Signal',TblFeature_Traffic:'Giao thông / Traffic'})[t]||t;b.onclick=()=>{activeFeatureTable=t;renderFeatures()};tabs.append(b)});
  const db=workbookEngineData(),featureEngine=db&&window.SpecExcelSourceEngine?new window.SpecExcelSourceEngine.SourceEngine(db,changes):null;
+ if(activeFeatureTable==='TblFeature_Operation'){
+  for(const f of window.SPEC_EXPORT.automaticOperationFeatures($('model').value,currentValue('D26'),mrlVerticalBufferCap)){
+   const line=document.createElement('div');line.className='feature-line feature-line-selected';
+   const addr=document.createElement('span');addr.className='addr';
+   const code=document.createElement('span');code.className='fcode';code.textContent='Auto';
+   const desc=document.createElement('div');desc.className='fdesc';desc.textContent=f.vi||f.en;
+   if(f.vi){const en=document.createElement('small');en.textContent=f.en;desc.append(en);}
+   const chk=document.createElement('input');chk.type='checkbox';chk.dataset.cell=f.key;chk.checked=true;chk.disabled=true;
+   const op=document.createElement('span');op.className='option';op.textContent='S';const suggest=document.createElement('span');suggest.className='suggest';
+   line.append(addr,code,desc,chk,op,suggest);main.append(line);
+  }
+ }
  for(const f of features.filter(f=>f.table===activeFeatureTable)){
   const fan=features.find(z=>z.code==='CFO-A'),light=features.find(z=>z.code==='CLO-A');
   const combined=!!(fan&&light&&f.code==='CFO-A');
@@ -1490,7 +1502,7 @@ function row(field,displayName='',compact=false){
     refreshMRLOverheadMinimum(['K5_Capacity','K8_Speed','K21_CarTR','K16_Regulation'].includes(field.name));
     if(['D13','D17','D31','D16','D84','D23'].includes(field.cell))refreshMRLShaftMinimum();
    }
-   if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name))renderFeatures();
+   if(['K13_Operation','K5_Capacity','K8_Speed'].includes(field.name)||($('model').value==='MRL'&&field.cell==='D26'))renderFeatures();
    if(field.name==='K13_Operation'){refreshGroupControlPreview();refreshHallQuantities();}
    if($('model').value==='MRL'&&field.cell==='D14'){syncObservationButton(input);if(/^NY-40/i.test(String(input.value||'')))openNy40Popup(input.value);}
    if($('model').value==='MRL'&&['D36','D37'].includes(field.cell))refreshMRLOverheadMinimum(false);
@@ -1600,7 +1612,7 @@ function mrlVerticalInput(){
  const cwt=String(currentValue('D23')||'');
  const ventilation=String(currentValue('D68')||'');
  const entrance=String(currentValue('D16')||'1D-1G');
- return {code:source,capacity,speed:currentValue('D17'),travel:currentValue('D35'),hl:currentValue('D30'),ceiling:currentValue('D41'),regulation:mrlG11Regulation(),cwtType:cwt,setsL,shortOH:mrlVerticalBufferCap==='Yes',plasmaWithTwoEntrances:/2G/.test(entrance)&&/plasma quad/i.test(ventilation)};
+ return {code:source,capacity,speed:currentValue('D17'),travel:currentValue('D35'),hl:currentValue('D30'),ceiling:currentValue('D41'),regulation:mrlG11Regulation(),cwtType:cwt,setsL,shortOH:mrlG11Regulation()==='EN81-20'&&mrlVerticalBufferCap==='Yes',aa:currentValue('D28'),bb:currentValue('D29'),entrance,plasmaWithTwoEntrances:/2G/.test(entrance)&&/plasma quad/i.test(ventilation)};
 }
 function getMRLVerticalResult(){if($('model').value!=='MRL')return null;return window.SPEC_G11L1_VERTICAL_V02?.calculate(mrlVerticalInput())||{state:'unavailable',reason:'Chưa tải bộ tính G11L1'};}
 // Advisory calculation only: use actual G11L1 values with SETS-L selected.
@@ -1647,28 +1659,21 @@ function mrlSETSLCorrectiveAdvice(){
 
 function mountMRLVerticalOptions(root){
  if($('model').value!=='MRL')return;
- const section=[...root.querySelectorAll('.spec-section')].find(el=>el.dataset.section==='II');
- const card=section?.querySelector('.dimension-hoistway');if(!card)return;
- const panel=document.createElement('div');panel.className='mrl-ts-settings';
- const select=(id,text,items,value)=>{
-  const holder=document.createElement('div');holder.className='mrl-ts-control';
-  const label=document.createElement('label');label.htmlFor=id;label.textContent=text;
-  const el=document.createElement('select');el.id=id;for(const [val,name] of items){const opt=document.createElement('option');opt.value=val;opt.textContent=name;el.append(opt)}el.value=value;holder.append(label,el);panel.append(holder);return el;
- };
- // Regulation comes from the existing SpecForm D26 selection; display it, don't duplicate it.
- // Buffer Cap selection is placed directly below EN81-72 in the hoistway options.
- const details=document.createElement('small');details.className='mrl-ts-details';panel.append(details);
- const output=document.createElement('div');output.className='mrl-ts-output';output.id='mrl-g11-result';panel.append(output);
-
- const first=card.querySelector('.dimension-entry');if(first)card.insertBefore(panel,first);else card.append(panel);
+ const regulation=root.querySelector('[data-cell="D26"]');
+ const regulationRow=regulation?.closest('.spec-row');
+ if(!regulationRow||root.querySelector('#mrl-g11-buffercap'))return;
+ const panel=document.createElement('div');panel.className='spec-row mrl-buffer-cap-row';
+ const label=document.createElement('label');label.className='spec-row-title';label.htmlFor='mrl-g11-buffercap';label.textContent='Short OH with Buffer Cap';
+ const area=document.createElement('div');area.className='spec-row-inputs';
+ const field=document.createElement('div');field.className='field';
+ const cap=document.createElement('select');cap.id='mrl-g11-buffercap';
+ for(const v of ['No','Yes']){const opt=document.createElement('option');opt.value=v;opt.textContent=v;cap.append(opt);}
+ field.append(cap);area.append(field);panel.append(label,area);regulationRow.after(panel);
+ cap.addEventListener('change',()=>{mrlVerticalBufferCap=cap.value;refreshMRLOverheadMinimum(false);renderFeatures();invalidateCheck();});
  window.__mrlG11PanelRefresh=()=>{
-  const currentReg=mrlG11Regulation();
-  const cap=document.getElementById('mrl-g11-buffercap');
-  if(currentReg!=='EN81-20'&&mrlVerticalBufferCap==='Yes')mrlVerticalBufferCap='No';
-  if(cap){cap.value=mrlVerticalBufferCap;const yes=cap.querySelector('option[value="Yes"]');if(yes)yes.disabled=currentReg!=='EN81-20';}
-  details.textContent='Technical Study G11L1 v2.6.0.0 · Hoisting Beam Remain · '+(currentReg==='EN81-20'?'EN81-20 · HARH 1100 mm':currentReg==='MELCO std.'?'Mitsubishi Standard · HARH 700 mm':'Chưa xác định Regulation từ D26');
-  const r=getMRLVerticalResult();output.classList.toggle('mrl-ts-unavailable',r?.state!=='ready');
-  output.textContent=r?.state==='ready'?`OH ≥ ${r.remain} mm · Sau khi tháo dầm = ${r.removed} mm · PD ≥ ${r.pd} mm`:'Chưa xác minh OH/PD: '+(r?.reason||'Không xác định');
+  const applicable=mrlG11Regulation()==='EN81-20';
+  if(!applicable)mrlVerticalBufferCap='No';
+  panel.hidden=!applicable;cap.disabled=!applicable;cap.value=mrlVerticalBufferCap;
  };
  window.__mrlG11PanelRefresh();
 }
@@ -2454,6 +2459,7 @@ function renderAllSpecRows(){
     const cwtRow=sectionI?.querySelector('.spec-row[data-row="'+(model==='MR'?'22':'23')+'"]');
     if(doorRow&&cwtRow)doorRow.after(cwtRow);
   }
+  mountMRLVerticalOptions(root);
   mountMRCapacitySelector(root);
   buildCarDesignLines();
   mountLandingMaterialStandardNotes();
@@ -2560,7 +2566,7 @@ function renderAllSpecRows(){
    }
    dimensionGrid.classList.add('dimension-section-fields');
    dimensionGrid.prepend(grouped);
-   if(model==='MRL')mountMRLVerticalOptions(dimensionSection);
+
   }
  }
  // Consolidate hall call / indicator fields by floor, rather than by Excel source row.
@@ -2966,7 +2972,7 @@ function check(){
    // Check whether explicitly selecting SETS-L would solve undersized OH/PD.
    // No error is suppressed until the user actually selects the feature.
    result.setsLCorrectiveAdvice=mrlSETSLCorrectiveAdvice();
-   result.verified.push('G11L1 v2.6.0.0: OH Remain '+vertical.remain+' mm, Removed '+vertical.removed+' mm, PD '+vertical.pd+' mm');
+   result.verified.push('G11L1 v2.6.0.0 (tính theo bảng nguồn): OH Remain '+vertical.remain+' mm, Removed '+vertical.removed+' mm, PD '+vertical.pd+' mm');
    // The higher PD branch is a valid conservative pass/fail threshold.
    // Do not downgrade every supported speed to INCOMPLETE just because
    // the lower, non-conservative balance-weight branch is undetermined.
@@ -3258,6 +3264,7 @@ async function buildFinalExport(includeTechDetails=Boolean($('export-tech-detail
   // Source validation MUST pass before any export side effect.
   const evaluation=window.SPEC_EXPORT.exportModel(model,changes,db);
   // Optional presentation-only detail rows; defaults OFF for both models.
+  evaluation.automaticOperation=window.SPEC_EXPORT.automaticOperationFeatures(model,currentValue('D26'),mrlVerticalBufferCap);
   evaluation.includeTechDetails=includeTechDetails; evaluation.onlyVi=onlyVi; evaluation.compactHidden=compactHidden;
   window.SPEC_EXPORT.attachMRMaterialThickness?.(model,changes,db,evaluation);
   const bytes=sourceFiles[model]?.bytes||bytesFromB64(window.SPEC_WORKBOOKS[model]);

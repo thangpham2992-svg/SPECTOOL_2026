@@ -1,7 +1,8 @@
 /* NEXIEZ-MRL Version 2 — Vertical Dimension from user's TechnicalStudy_G11L1 v2.6.0.0.
    Sources: embedded Vertical1.tsv, OHalpha.tsv, RefugePosture.tsv and IL CalculateVerticalDimension.
    No Alpha Package / catalogue OH-PD tables. No CWT safety gear. Guide rail standard.
-   Balance weight not deduced from WebTool; PD uses the higher (safe) value of both source branches.
+   PD selects the BalanceWeight1 branch where resolved; otherwise uses the higher branch.
+   Short OH is selected from OHalpha independently of SETS-L; factory option eligibility is not established by this table alone.
 */
 (function(){
 'use strict';
@@ -22,7 +23,6 @@ function calculate(p){
  if(!['EN81-20','MELCO std.'].includes(reg))return fail('Regulation chưa ánh xạ với dữ liệu G11L1.');
  if(!cwt)return fail('Chỉ áp dụng đối trọng BWH-620D/620E/720F/720G; vui lòng kiểm tra CWT Type.');
  if(p.shortOH&&reg!=='EN81-20')return fail('Buffer Cap = Yes chỉ cho phép với EN81-20.');
- if(p.shortOH&&!p.setsL)return fail('Technical Study yêu cầu SETS-L = Yes khi sử dụng Short OH with Buffer Cap (chưa xác minh chế độ này nếu SETS-L = No).');
  if(p.setsL&&speed===60)return fail('SETS-L không áp dụng với tốc độ 60 m/min.');
  const range=capacityRange(cap);if(!range)return fail('Capacity nằm ngoài dải bảng Technical Study.');
  const add={'CL1':50,'CL2':50,'DL5':200,'DL6':190,'DL7':150,'FL1':200,'BN1':200}[cc];
@@ -36,9 +36,13 @@ function calculate(p){
  if(!v)return fail('Bảng Vertical1 không có tổ hợp Capacity/Speed/Travel/SETS-L hiện tại.');
  const posture=one(DATA.refuge,r=>match(r.CapacityRange,range)&&match(r.Speed,speed)&&match(r.Regulation,reg)&&match(r.CodeNumber,code));
  if(!posture)return fail('Chưa ánh xạ được RefugePosture theo mã cấu hình '+code+'.');
- const buf=(sets==='No'&&speed===105)||(sets==='Yes'&&speed===150)?'LSB18':'Other';
+ // Buffer type follows the same speed/SETS-L mapping as G11L1_DUTY_SOURCE.buffer.
+ const bufferData={Speed:speed,SetsL:sets,CapacityRange:range};
+ try{window.G11L1_DUTY_SOURCE.buffer(bufferData);}catch(e){return fail('Không xác định được loại buffer theo bảng G11L1: '+e.message);}
+ const buf=bufferData.CarBuffer==='LSB18'?'LSB18':'Other';
  const harh=reg==='EN81-20'?'Fixed type 1100mm':'Fixed type 700mm';
- const a=one(DATA.alpha,r=>match(r.CapacityRange,range)&&match(r.Speed,speed)&&match(r.Regulation,reg)&&match(r.BalustradeHeight,harh)&&match(r.ShortOHMode,short)&&match(r.RefugeRoofPosture,posture.RefugeRoof)&&match(r['Buffer type'],buf));
+ const alphaFor=mode=>one(DATA.alpha,r=>match(r.CapacityRange,range)&&match(r.Speed,speed)&&match(r.Regulation,reg)&&match(r.BalustradeHeight,harh)&&match(r.ShortOHMode,mode)&&match(r.RefugeRoofPosture,posture.RefugeRoof)&&match(r['Buffer type'],buf));
+ const a=alphaFor(short);
  if(!a)return fail('Bảng OHalpha không có tổ hợp Regulation/HARH/ShortOH/Speed/Buffer hiện tại.');
  // G11L1 IL Method 529 @0x014B–0x01A9:
  // Base HE = Vertical1.HE + Q. The 4100 mm floor is applicable ONLY when
@@ -50,9 +54,20 @@ function calculate(p){
  const refugeMm={'Laying':0,'Crouching':500,'Upright':1500}[posture.RefugePit];if(refugeMm==null)return fail('Không xác định được RefugePitPosture.');
  const pdNoBW=Math.max(v['PD1 (w/o BW) [mm]']+refugeMm,v['PD2 (w/o cwt.sf) [mm]']-q);
  const pdWithBW=Math.max(v['PD1 (w/ BW) [mm]']+refugeMm,v['PD2 (w/o cwt.sf) [mm]']-q);
- // No proven automatic balance-weight count mapping: always use the conservative branch.
- const pd=Math.max(pdNoBW,pdWithBW);
- return {state:'ready',code,capacity:cap,speed,travel,regulation:reg,cwtType:cwt,setsL:sets,shortOH:short,harh:reg==='EN81-20'?1100:700,ceiling:cc,hl,hc,hb,q,he,remain,removed,pd,pdNoBW,pdWithBW,pdConservative:pdNoBW!==pdWithBW,refugeRoof:posture.RefugeRoof,refugePit:posture.RefugePit,buffer:buf};
+ // SpecForm does not distinguish LB/RB. Use the table branch only if both agree.
+ let balanceWeightNum=null;
+ if(reg==='EN81-20' && number(p.aa)>0 && number(p.bb)>0 && ['1D-1G','2D-2G','1D-2G'].includes(p.entrance)){
+  try{
+   const counts=['LB','RB'].map(side=>{
+    const d={CapacityRange:range,Entrance:p.entrance,Speed:speed,CodeNumber:code,AAxx:number(p.aa),BBxx:number(p.bb),TRxm:travel,CwtLocation:side};
+    window.G11L1_DUTY_SOURCE.balance(d);
+    return d.BalanceWeightNum;
+   });
+   if(counts.every(n=>Number.isInteger(n)&&n>=0)&&counts.every(n=>n===counts[0]))balanceWeightNum=counts[0];
+  }catch(e){ /* Missing source combination: retain conservative PD. */ }
+ }
+ const pd=balanceWeightNum===null?Math.max(pdNoBW,pdWithBW):balanceWeightNum>0?pdWithBW:pdNoBW;
+ return {state:'ready',code,capacity:cap,speed,travel,regulation:reg,cwtType:cwt,setsL:sets,shortOH:short,harh:reg==='EN81-20'?1100:700,ceiling:cc,hl,hc,hb,q,he,remain,removed,pd,pdNoBW,pdWithBW,balanceWeightNum,pdConservative:balanceWeightNum===null&&pdNoBW!==pdWithBW,refugeRoof:posture.RefugeRoof,refugePit:posture.RefugePit,buffer:buf,bufferType:bufferData.CarBuffer,shortOHReduction:p.shortOH?(alphaFor('No')?.alphaA??a.alphaA)-a.alphaA:0};
 }
 window.SPEC_G11L1_VERTICAL_V02={calculate,source:'TechnicalStudy_G11L1 v2.6.0.0 (Vertical1/OHalpha/RefugePosture, IL Method 529)'};
 })();
