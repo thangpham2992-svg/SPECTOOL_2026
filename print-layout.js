@@ -133,6 +133,36 @@
            if(!fits())throw Error('Một nhóm dòng quá dài cho khổ giấy hiện tại. Hãy chọn A4 ngang hoặc giảm nội dung.');
          }
        }
+       if(!summary){
+         const template=document.getElementById('r107-design-template');
+         if(template&&sources[0]){
+           const page=document.createElement('article');page.className='spec-print-page r107-design-page';
+           const content=document.createElement('div');content.className='spec-page-content';page.append(content);
+           const header=sources[0].querySelector('.spec-masthead')?.cloneNode(true);
+           if(header){const heading=header.querySelector('.spec-report-title');if(heading)heading.innerHTML='<span class="report-title-vi">PHỐI CẢNH THIẾT KẾ</span><span class="report-title-en">Design illustration</span>';content.append(header);}
+           const block=template.content.cloneNode(true);content.append(block);
+           const footer=document.createElement('div');footer.className='spec-page-number';page.append(footer);
+           document.body.append(page);
+           const graphic=content.querySelector('.r107-design');
+           // R109: fit design to the remaining A4 content box, not a fixed image height.
+           // Page padding already reserves space for the original footer.
+           if(graphic){
+             const available=content.getBoundingClientRect().bottom-graphic.getBoundingClientRect().top-2;
+             if(available>0){
+               graphic.style.height=available+'px';
+               // In unusually long specifications, keep the descriptions inside their blocks.
+               const over=()=>Array.from(graphic.querySelectorAll('dl')).some(el=>el.getBoundingClientRect().bottom>el.parentElement.getBoundingClientRect().bottom+1);
+               if(over())graphic.classList.add('compact-details');
+               // Keep the text close to the actual visible image, not the unused grid space.
+               for(const body of graphic.querySelectorAll('.r107-halls.one .r107-hallbody')){
+                 const img=body.querySelector('img');
+                 if(img){const rect=img.getBoundingClientRect();const imageWidth=Math.min(rect.width,rect.height*405/570);if(imageWidth>0)body.style.gridTemplateColumns=imageWidth+'px minmax(0,1fr)';}
+               }
+             }
+           }
+           pages.push(page);template.remove();
+         }
+       }
        pages.forEach((page,i)=>page.querySelector('.spec-page-number').textContent=(i+1)+'/'+pages.length);
        sources.forEach(s=>s.remove());
        if(button)button.disabled=false;
@@ -146,7 +176,7 @@
    // Script is embedded in the self-contained offline print preview.
    return {css,script:'<script>window.addEventListener(\'load\',function(){Promise.resolve(document.fonts&&document.fonts.ready).then(function(){('+paginate.toString()+')('+JSON.stringify(summary)+');});});<\/script>'};
  }
- async function fromXlsx(bytes,model,rowsOnly=false){
+ async function fromXlsx(bytes,model,rowsOnly=false,design=null){
    const zip=await JSZip.loadAsync(bytes);
    const wb=parse(await zip.file('xl/workbook.xml').async('string'));
    const rels=parse(await zip.file('xl/_rels/workbook.xml.rels').async('string'));
@@ -455,9 +485,9 @@
    tr.excel-space td{padding:0 2px} tr.excel-heading{break-after:avoid;page-break-after:avoid} tr.excel-features-title{break-before:auto;page-break-before:auto}
    @media print{html,body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact} .print-toolbar{display:none!important}.paper{box-shadow:none;margin:0;width:100%;max-width:100%;padding:13mm 11mm 14mm;-webkit-box-decoration-break:clone;box-decoration-break:clone;zoom:1}table.excel{width:100%;} }
    `;
-   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+numbered.css+'</style></head><body>'+
-   '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Chọn A4, tỷ lệ 100%, tắt Headers and footers nếu trình duyệt vẫn hiển thị</div></div><button disabled onclick="window.print()">In / Save as PDF</button></div>'+
-   '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main>'+numbered.script+'</body></html>';
+   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(modelName)+' | A4 Portrait Specification</title><style>'+css+iosPrintCSS+numbered.css+(design?.css||'')+'</style></head><body>'+
+   '<div class="print-toolbar"><div><div class="title">Bản in Spec / Print-ready Specification</div><div class="sub">'+esc(modelName)+' · '+project+' · A4 dọc · Chọn A4, tỷ lệ 100%, tắt Headers and footers nếu trình duyệt vẫn hiển thị</div>'+(design?.warning?'<div class="sub" style="color:#8c5315">'+esc(design.warning)+'</div>':'')+'</div><button disabled onclick="window.print()">In / Save as PDF</button></div>'+
+   '<main class="paper '+(model==='MRL'?'mrl-export':'')+'">'+masthead+'<table class="excel"><colgroup>'+colgroup+'</colgroup><tbody>'+printRows.join('')+'</tbody></table></main>'+(design?.markup?'<template id="r107-design-template">'+design.markup+'</template>':'')+numbered.script+'</body></html>';
  }
  async function summaryFromXlsx(bytes,orientation){
    const portrait=orientation!=='landscape',paper=portrait?'A4 dọc':'A4 ngang',numbered=numberedPrint(orientation,true);

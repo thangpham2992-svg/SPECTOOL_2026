@@ -2653,6 +2653,22 @@ function renderAllSpecRows(){
   });
   const features=document.querySelector('.features-panel');if(features){features.id='spec-section-features';const link=document.createElement('a');link.href='#spec-section-features';link.innerHTML='<b>V</b> <span>Tính năng / Features</span>';nav.append(link)}
  }
+ // R106: the toolbar button is present at the top, independent of the section layout.
+ const renderButton=$('render-cabin-top');
+ if(renderButton){
+  const enabled=$('model').value==='MRL'&&window.parent===window;
+  renderButton.hidden=!enabled;
+  renderButton.style.display=enabled?'':'none';
+  renderButton.onclick=null;
+  if(enabled){
+   const button=renderButton;
+   button.onclick=async()=>{
+    const values=designSnapshot();button.disabled=true;
+    try{const preview=await loadDesignPreview();if($('model').value==='MRL')await preview.open(values);}
+    catch(e){alert(e.message);}finally{button.disabled=false;}
+   };
+  }
+ }
  $('numfields').textContent=String(rendered);
  const missing=rows.filter(x=>x.row>=10 && /^([IVX]+)\.\s*/.test(String(x.B||''))===false && (byRow.get(x.row)||[]).length && !document.querySelector('[data-row="'+x.row+'"]') && !document.querySelector('.hall-choice-item[data-source-row="'+x.row+'"]'));
  if(missing.length)status('Thiếu trường trong giao diện: '+missing.map(x=>x.row).join(', '),'error');
@@ -3329,15 +3345,29 @@ async function exportFinalExcel(){
  }catch(error){console.error('Excel Export:',error);alert('Không thể xuất Excel. Chi tiết: '+(error?.message||String(error)))}
  finally{button.disabled=false;}
 }
+// R107: optional read-only graphics. Only loaded on explicit preview or single MRL PDF export.
+let designPreviewLoading;
+function loadDesignPreview(){
+ if(window.R105_CABIN_PREVIEW?.collectDesign)return Promise.resolve(window.R105_CABIN_PREVIEW);
+ if(!designPreviewLoading)designPreviewLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='design-preview.js?v=R109';script.onload=()=>window.R105_CABIN_PREVIEW?.collectDesign?resolve(window.R105_CABIN_PREVIEW):reject(Error('Invalid design engine'));script.onerror=()=>{script.remove();reject(Error('Không tải được engine đồ họa.'))};document.head.append(script);}).catch(e=>{designPreviewLoading=null;throw e});
+ return designPreviewLoading;
+}
+function designSnapshot(){const values={};for(const cell of ['C7','C8','D14','D15','D16','D18','D41','D42','D43','D44','D45','D46','D47','D48','D49','D50','D51','D52','D53','D54','D55','D59','D60','D61','D62','D64','D65','D66','D71','E71','F71','D72','E72','F72','E73','F73','E74','F74','E75','E76','E77','E78','E79','E80','E81','E82','E83','HL_MAIN','HL_OTHER','HL_TOP'])values[cell]=activeInput(cell)?.value??currentValue(cell);return values;}
 async function exportFinalPdf(){
  if(!canExportBriefly())return;
  const button=$('final-pdf');button.disabled=true;
+ const designValues=$('model').value==='MRL'&&window.parent===window?designSnapshot():null;
  // Create window in direct click handler to avoid browser popup blockers during async processing.
  const popup=window.open('','_blank');
  if(popup){popup.document.write('<!doctype html><html><meta charset="utf-8"><title>Creating A4 Preview</title><body>Đang tạo A4 PDF / Preparing A4 layout...</body></html>');popup.document.close();}
  try{
   const result=await buildFinalExport();
-  const html=await window.SPEC_PRINT_LAYOUT.fromXlsx(result.data,result.model);
+  let design=null;
+  if(designValues&&result.model==='MRL'){
+   try{const preview=await loadDesignPreview();const items=await preview.collectDesign(designValues);const hasImage=items.some(x=>x.src);design={markup:hasImage?preview.designMarkup(items,designValues):'',css:preview.designCSS,warning:hasImage?'':'Thư viện chưa đủ dữ liệu để tái tạo đồ họa. Không thêm trang phối cảnh: '+items.flatMap(x=>x.missing.map(m=>m.name+': '+m.value)).join(' | ')};}
+   catch(e){design={warning:'Không thể tải đồ họa: '+e.message};}
+  }
+  const html=await window.SPEC_PRINT_LAYOUT.fromXlsx(result.data,result.model,false,design);
   if(!popup)throw Error('Trình duyệt đã chặn tab mới. Hãy cho phép mở cửa sổ / Enable popups.');
   popup.document.open();popup.document.write(html);popup.document.close();
   popup.focus();
