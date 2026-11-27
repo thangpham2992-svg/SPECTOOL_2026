@@ -170,7 +170,7 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
   if((r.fullWidth&&!r.b&&r.values.every(v=>!v))){line(headingCells(),'label');continue}
   const groupControl=basicSection&&/group control operation|điều khiển (vận hành )?nhóm/i.test(r.key);
   if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].bankLabel?v+' · '+cars[i].bankLabel:v);
-  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].groupId!=null?v+' · '+cars.filter(c=>sameControlGroup(c,cars[i])).map(c=>c.name).join(' + '):v);
+  if(groupControl)r.values=r.values.map((v,i)=>v!=null&&cars[i].groupId!=null?v+' · '+(cars[i].groupLabel||cars.filter(c=>sameControlGroup(c,cars[i])).map(c=>c.name).join(' + ')):v);
   const cop=/Car operation panel|Bảng điều khiển/i.test(r.key+' '+r.a);
   const dimension=/Car internal size|Door size|Hoistway size|Machine room size/i.test(r.a);
   const perLift=/Hoistway size|Machine room size/i.test(r.a);

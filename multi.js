@@ -58,7 +58,7 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?v=R114&model='+frameModel;document.querySelector('main').append(frame);
+ frame.src='spec.html?v=R115&model='+frameModel;document.querySelector('main').append(frame);
  return {name,frame,ready,location:{text:""},commercial:{}};
 }
 function add(){
@@ -82,9 +82,6 @@ async function refresh(viewState){
  const target=[...cars];
  const [entries,etds]=await Promise.all([Promise.all(Object.keys(sections).map(async id=>[id,await Promise.all(target.map(c=>request(c,'fields',{section:id,group:el('featureGroup').value})))])),Promise.all(target.map(readLeadTime))]);
  if(revision!==version)return;cache=Object.fromEntries(entries);leadTimes=new Map(target.map((c,i)=>[c,etds[i]]));
- for(const bank of new Set(cars.map(c=>c.group).filter(Boolean))){
-   if(internalBanks(bank,bank.mode))for(const member of bank)member.group=null;
- }
  draw(viewState);
  }catch(e){if(revision===version)status(e.message)}
 }
@@ -121,7 +118,25 @@ function internalLabel(car,size,count){
  }
  return car.name+' · '+(count/size)+' nhóm × '+size+' thang';
 }
-function groupLabel(car){return car.group.map(c=>c.name).join(' + ')}
+// Explicit cross-column banks must not be inferred as independent internal banks.
+// Equal quantities represent parallel banks, pairing names in their entered order.
+function bankLayout(members,mode,quantity=columnCount){
+ const size=parseInt(mode,10),counts=members.map(quantity);
+ if(!Number.isSafeInteger(size)||size<2||counts.some(n=>!Number.isSafeInteger(n)||n<1))return null;
+ const total=counts.reduce((a,b)=>a+b,0);
+ if(total===size)return {size,count:1,total};
+ if(members.length===size&&counts.every(n=>n===counts[0]))return {size,count:counts[0],total};
+ return null;
+}
+function groupLabel(car){
+ const bank=car.group,layout=bankLayout(bank,bank.mode);
+ if(layout?.count>1){
+  const names=bank.map(c=>c.name.split(/[,;\n]+/).map(n=>n.trim()).filter(Boolean));
+  if(names.every(n=>n.length===layout.count))return Array.from({length:layout.count},(_,i)=>names.map(n=>n[i]).join(' + ')).join(' · ');
+  return bank.map(c=>c.name).join(' + ')+' · '+layout.count+' nhóm × '+layout.size+' thang';
+ }
+ return bank.map(c=>c.name).join(' + ');
+}
 function groupMode(size){return size<=2?size+'C-2BC':size+'C-SAI-2200C'}
 function displayMode(value){return String(value).replace(/^(\dC)-SAI-2200C$/,'$1-AI2200C')}
 // A control bank has one rated speed. Use the intersection of the live options,
@@ -238,6 +253,8 @@ window.addEventListener('message',async e=>{
  catch(err){status(err.message)}finally{await refresh();main.inert=false}
 });
 async function selectGroupMode(car,value){
+ const lists=await Promise.all(car.group.map(c=>request(c,'fields',{section:'I'})));
+ if(!bankLayout(car.group,value,c=>Number(lists[car.group.indexOf(c)].find(f=>f.key==='D11')?.value)))throw Error('Hệ điều khiển '+displayMode(value)+' không phù hợp số lượng thang đã ghép. Hãy tách nhóm hoặc thêm cột phù hợp.');
  const speed=(await readBankSpeeds([car]))[0]?.value;
  await bankUpdate(car,car.group,async()=>{await writeBankSpeed(car.group,speed);await writeGroupMode(car.group,value);await assertBankSpeed(car.group,speed)},{piv:value==='2C-2BC',joining:true});
  car.group.mode=value;
@@ -250,25 +267,30 @@ async function changeGroup(car,other){
  try{
   let value=groupMode(size);
   if(other){
-   const fields=await request(car,'fields',{section:'I'});
-   const currentMode=fields.find(f=>f.key===controlKey)?.value;
-   if(parseInt(currentMode,10)>=size)value=currentMode;
+   const lists=await Promise.all(members.map(c=>request(c,'fields',{section:'I'})));
+   const counts=lists.map(list=>Number(list.find(f=>f.key==='D11')?.value));
+   const max=isMRL?4:2;
+   const total=counts.reduce((a,b)=>a+b,0);
+   if(!counts.every(n=>Number.isSafeInteger(n)&&n>0))throw Error('Nhập số lượng thang là số nguyên dương trước khi ghép nhóm.');
+   if(!counts.every(n=>n===counts[0])){
+    if(total>max)throw Error('Không thể ghép nhóm: các cột cần có cùng số lượng để ghép nhiều nhóm song song, hoặc tổng số thang không vượt '+max+'.');
+    value=groupMode(total);
+   }
   }
-  const within=other&&internalBanks(members,value);
-  if(other&&!within){
+  if(other){
    const speed=(await readBankSpeeds([car]))[0]?.value;
    await bankUpdate(car,members,async()=>{await writeBankSpeed(members,speed);await writeGroupMode(members,value);await assertBankSpeed(members,speed)},{piv:value==='2C-2BC',joining:true});
   }
   else await writeGroupMode(members,value);
   const selected=current(),ordered=cars.filter(c=>members.includes(c)),first=cars.indexOf(ordered[0]);
-  if(other&&!within){
+  if(other){
    const rest=cars.filter(c=>!members.includes(c));
    rest.splice(first,0,...ordered);cars.splice(0,cars.length,...rest);
   }
   ordered.mode=value;
-  for(const c of members)c.group=other&&!within?ordered:null;
+  for(const c of members)c.group=other?ordered:null;
   refreshColumnSelector(cars.indexOf(selected));
-  status(within?'Đã đặt '+displayMode(value)+' riêng trong từng cột.':other?'Đã ghép '+groupLabel(car)+' · '+displayMode(value):'Đã tách nhóm · 1C-2BC');return true;
+  status(other?'Đã ghép '+groupLabel(car)+' · '+displayMode(value):'Đã tách nhóm · 1C-2BC');return true;
  }catch(e){status(e.message);return false}finally{main.inert=false;await refresh()}
 }
 function renderGroup(cell,car,view){
@@ -286,7 +308,7 @@ function renderGroup(cell,car,view){
  const select=make('select');select.setAttribute('aria-label','Group với thang khác cho '+car.name);
  select.add(new Option('Group với…',''));
  cars.forEach((other,i)=>{if(other!==car&&!other.group)select.add(new Option(other.name,String(i)))});
- select.onchange=()=>{if(select.value!=='')changeGroup(car,cars[Number(select.value)])};cell.append(select);
+ select.onchange=async()=>{if(select.value==='')return;const other=cars[Number(select.value)];if(!other)return;await changeGroup(car,other)};cell.append(select);
 }
 // All input columns share the same geometry; export pagination is independent.
 function updateSummaryFit(){
@@ -470,7 +492,7 @@ function drawSection(section,cache,matrix,from,to,view){
       catch(e){status(e.message)}finally{await refresh(state);main.inert=false}
      };cell.append(input);return;
     }
-    if(sharedQty){cell.colSpan=view.filter(c=>c.group===car.group).length;cell.textContent='1 hộp / 2 thang / tầng · '+groupLabel(car);return}
+    if(sharedQty){cell.colSpan=view.filter(c=>c.group===car.group).length;const layout=bankLayout(car.group,car.group.mode);cell.textContent=(layout?layout.count+' hộp / '+layout.total+' thang / tầng':'1 hộp / 2 thang / tầng')+' · '+groupLabel(car);return}
     if(!item){cell.textContent='—';cell.classList.add('empty-slot');return}
     const input=make(item.options?'select':'input');
     if(f.key==='D11'){input.type='number';input.min='1';input.step='1'}
@@ -814,8 +836,8 @@ async function run(format){
   for(const [car,fields] of groupFields){
    if(car.group&&car.group.every(c=>groupFields.has(c))){
     const total=car.group.reduce((n,c)=>n+Number(groupFields.get(c).find(f=>f.key==='D11')?.value||1),0);
-    if(total!==parseInt(car.group.mode,10)){
-     const issue={cell:'D11',message:groupLabel(car)+' có '+total+' thang. '+displayMode(car.group.mode)+' yêu cầu đúng '+parseInt(car.group.mode,10)+' thang.'};
+    if(!bankLayout(car.group,car.group.mode,c=>Number(groupFields.get(c).find(f=>f.key==='D11')?.value))){
+     const issue={cell:'D11',message:groupLabel(car)+' có '+total+' thang. '+displayMode(car.group.mode)+' yêu cầu đúng '+parseInt(car.group.mode,10)+' thang mỗi nhóm; khi ghép nhiều nhóm song song, số lượng mỗi cột phải bằng nhau.'};
      const failed=failures.find(f=>f.car===car);
      if(failed)failed.errors.push(issue);else failures.push({car,errors:[issue]});
     }
@@ -839,7 +861,7 @@ async function run(format){
   format=choice;const orientation=el('exportOrientation').value==='landscape'?'landscape':'portrait';const paper=orientation==='portrait'?'A4 dọc':'A4 ngang';
 
   for(const car of cars){
-   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,commercialExpanded,commercial:commercialValues(car),location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,groupLabel:car.group?groupLabel(car):'',commercialExpanded,commercial:commercialValues(car),location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
   if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}

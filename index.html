@@ -2203,8 +2203,8 @@ for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf",
 </script>
 <script>
 function openSpecMode(mode,model){
- const name='spec-R114-'+mode+'-'+model;
- const url=(mode==='summary'?'multi.html':'index.html')+'?v=R114&model='+model;
+ const name='spec-R115-'+mode+'-'+model;
+ const url=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
  const w=window.open('',name);
  if(!w){location.href=url;return;}
  try{if(w.location.href==='about:blank')w.location.href=url;}catch(e){/* Existing local-file tab: keep its current draft. */}
@@ -2213,8 +2213,8 @@ function openSpecMode(mode,model){
 function updateModeLinks(model){
  for(const a of document.querySelectorAll('[data-spec-mode]')){
   const mode=a.dataset.specMode;
-  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R114&model='+model;
-  a.target='spec-R114-'+mode+'-'+model;
+  a.href=(mode==='summary'?'multi.html':'index.html')+'?v=R115&model='+model;
+  a.target='spec-R115-'+mode+'-'+model;
   a.onclick=e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();openSpecMode(mode,model)};
  }
 }
