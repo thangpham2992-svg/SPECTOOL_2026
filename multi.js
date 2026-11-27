@@ -73,7 +73,7 @@ function show(){
  cars.forEach(c=>c.frame.hidden=!detail||c!==current());el('overview').hidden=detail;el('detailQuick').textContent=detail?'← Spec Summary':'Form đơn cột đang chọn';
  if(!detail)refresh();
 }
-async function refresh(){
+async function refresh(viewState){
  const revision=++version;
  try{
  const target=[...cars];
@@ -82,7 +82,7 @@ async function refresh(){
  for(const bank of new Set(cars.map(c=>c.group).filter(Boolean))){
    if(internalBanks(bank,bank.mode))for(const member of bank)member.group=null;
  }
- draw();
+ draw(viewState);
  }catch(e){if(revision===version)status(e.message)}
 }
 let model,isMRL,controlKey,speedKey,stopsKey,floorsKey;
@@ -300,10 +300,31 @@ function summaryTableColumns(table,count){
  table.append(cols);return table;
 }
 window.addEventListener('resize',updateSummaryFit);
-function draw(){
+// Rebuilding the entire matrix temporarily collapses the page. Preserve the
+// document AND matrix scroll, using the edited field as a stable anchor.
+function rememberSummaryView(input){
+ const matrix=document.querySelector('.matrix');
+ const panel=input?.closest('section[id^="part-"]');
+ const anchor=panel&&input.dataset.fieldKey?{id:panel.id,key:input.dataset.fieldKey,car:input.dataset.carIndex,y:input.getBoundingClientRect().top}:null;
+ if(panel){section=panel.id.slice(5);el('featureGroup').hidden=section!=='V';document.querySelectorAll('nav.sections button').forEach(b=>b.classList.toggle('active',b.dataset.section===section));}
+ return {x:window.scrollX,y:window.scrollY,left:matrix.scrollLeft,top:matrix.scrollTop,anchor};
+}
+function restoreSummaryView(state,matrix){
+ window.scrollTo({left:state.x,top:state.y,behavior:'instant'});
+ matrix.scrollLeft=state.left;matrix.scrollTop=state.top;
+ const a=state.anchor;if(!a)return;
+ const panel=el(a.id),selector='[data-field-key="'+CSS.escape(a.key)+'"][data-car-index="'+CSS.escape(a.car)+'"]';
+ let node=panel?.querySelector('select'+selector+',input'+selector)||panel?.querySelector(selector);
+ if(!node||!node.getClientRects().length)return;
+ const delta=node.getBoundingClientRect().top-a.y;
+ if(matrix.classList.contains('wide-matrix'))matrix.scrollTop+=delta;
+ else window.scrollBy({top:delta,left:0,behavior:'instant'});
+}
+function draw(viewState){
+ const state=viewState||rememberSummaryView();
  if(!el('carErrors').hidden)renderErrors();
  const from=0,to=cars.length,view=cars,matrix=document.querySelector('.matrix');
- const left=matrix.scrollLeft,top=matrix.scrollTop;matrix.replaceChildren();
+ matrix.replaceChildren();
  matrix.style.setProperty('--car-min-total',150*view.length+'px');
  updateSummaryFit();
  for(const id of Object.keys(sections)){
@@ -320,7 +341,7 @@ function draw(){
   }else drawSection(id,cache[id],panel,from,to,view);
  }
  if(!el('carErrors').hidden)markFailedFields();
- matrix.scrollLeft=left;matrix.scrollTop=top;
+ restoreSummaryView(state,matrix);
 }
 const project=new Map([['C8','Thang máy']]);
 async function syncProject(targets=cars){
@@ -419,9 +440,9 @@ function drawSection(section,cache,matrix,from,to,view){
      for(const [value,label] of options)input.add(new Option(label,value));
      input.value=consistent?speed:'';input.disabled=!options.length;
      if(!consistent)input.style.borderColor='#b42318';
-     input.onchange=async()=>{const main=document.querySelector('main');main.inert=true;
+     input.onchange=async()=>{const state=rememberSummaryView(input),main=document.querySelector('main');main.inert=true;
       try{await setBankSpeed(car,input.value);status('Đã cập nhật tốc độ chung · '+groupLabel(car))}
-      catch(e){status(e.message)}finally{await refresh();main.inert=false}
+      catch(e){status(e.message)}finally{await refresh(state);main.inert=false}
      };cell.append(input);return;
     }
     if(sharedQty){cell.colSpan=view.filter(c=>c.group===car.group).length;cell.textContent='1 hộp / 2 thang / tầng · '+groupLabel(car);return}
@@ -431,9 +452,9 @@ function drawSection(section,cache,matrix,from,to,view){
     if(item.options){for(const [value,label] of item.options){if(partner&&parseInt(value,10)<partner.length)continue;input.add(new Option(f.key===controlKey?displayMode(value):label,value));}
      if(!item.options.some(o=>o[0]===item.value))input.add(new Option(item.value,item.value));}
     input.dataset.fieldKey=item.key;input.dataset.carIndex=String(from+j);input.value=item.value;input.disabled=item.locked;input.classList.toggle('inactive-value',inactiveValue(item,section));if(section==='V'&&!item.locked&&!inactiveValue(item,section))input.classList.add('feature-provided');input.setAttribute('aria-label',car.name+' · '+displayTitle);
-    input.onchange=async()=>{const main=document.querySelector('main');main.inert=true;
+    input.onchange=async()=>{const state=rememberSummaryView(input),main=document.querySelector('main');main.inert=true;
      try{if(partner)await selectGroupMode(car,input.value);else await editFeature(car,item,{key:f.key,value:input.value,section,featureGroup:item.featureTable||el('featureGroup').value});status(car.name+' ✓')}
-     catch(e){status(e.message)}finally{await refresh();main.inert=false}
+     catch(e){status(e.message)}finally{await refresh(state);main.inert=false}
     };cell.append(input);
    });
   }
