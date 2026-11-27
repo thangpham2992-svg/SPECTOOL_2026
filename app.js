@@ -1400,6 +1400,12 @@ function row(field,displayName='',compact=false){
    const mrlHandrailNames={'No':'No','3 pcs on 3 walls':'Three side walls','2 pcs on both side walls':'Both side walls','1 pc on rear wall':'Rear wall'};
    opt.textContent=$('model').value==='MRL'&&field.cell==='D65'?(mrlHandrailNames[option]||option):(window.SPEC_PROOFREAD?.(option||'— Chọn / Select —')??(option||'— Chọn / Select —'));input.append(opt)}
  }else input.placeholder='';
+ if(field.cell==='C7'){
+  value=String(changes.C7??(field.value==='AAA'?'':field.value??''));
+  changes.C7=value;
+  input.placeholder='Điền tên dự án';
+  input.classList.add('project-name-prompt');
+ }
  // MR Alpha Package Rev.AM: entrance/door height HH is fixed at 2100 mm.
  // Preserve the same SpecForm input for Check Spec and exports; never offer freetext.
  if($('model').value==='MR'&&field.cell==='D33'){

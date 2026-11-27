@@ -55,7 +55,7 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?v=R96&model='+frameModel;document.querySelector('main').append(frame);
+ frame.src='spec.html?v=R101&model='+frameModel;document.querySelector('main').append(frame);
  return {name,frame,ready};
 }
 function add(){
@@ -334,6 +334,8 @@ function draw(viewState){
   if(id==='P'){
    for(const f of cache.P[0]||[]){
     const label=make('label',f.title),input=make('input');input.value=project.get(f.key)??f.value;
+    if(f.key==='C7'){input.placeholder='Điền tên dự án';input.classList.add('project-name-prompt');}
+
     project.set(f.key,input.value);input.onchange=async()=>{project.set(f.key,input.value);
      try{await syncProject();status('Đã cập nhật thông tin công trình.')}catch(e){status(e.message)}};
     label.append(input);panel.append(label);

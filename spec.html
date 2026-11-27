@@ -1488,6 +1488,13 @@ body>.site-header{height:auto;min-height:46px;padding:7px 16px;box-sizing:border
 .workspace :is(#fields,#project-fields,.model-control) :is(input:not([readonly]):not([type=checkbox]),select):not(:disabled):not(.issue-input-focus):not(.cwt-below-minimum):focus{outline:1px solid #6fb180;outline-offset:0}
 
 </style>
+<style id="r101-project-name-prompt">
+.project-name-prompt::placeholder{color:#516f89;font-style:italic;opacity:1}
+.project-name-prompt:placeholder-shown:not(:focus)::placeholder{animation:project-name-pulse 2.4s ease-in-out infinite}
+.project-name-prompt:focus::placeholder{opacity:0;animation:none}
+@keyframes project-name-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media(prefers-reduced-motion:reduce){.project-name-prompt::placeholder{animation:none!important}}
+</style>
 </head>
 <body>
 <header class="site-header"><div class="brand"><i class="brand-bar" aria-hidden="true"></i><div class="brand-text">MITSUBISHI ELECTRIC <span class="brand-country">VIETNAM</span><span class="brand-sub">SALES ENGINEERING • TECHNICAL SPECIFICATION</span></div></div><span class="brand-side">SPEC ENGINEERING</span><button class="phone-fullscreen" type="button" aria-label="Toàn màn hình" title="Toàn màn hình" hidden>⛶</button></header>
@@ -2162,7 +2169,7 @@ patchDatabase(window.SPEC_ENGINE_DATABASE?.MRL);
 </script>
 <script src="mrl-v02-vertical-study.js?v=R80"></script>
 <script src="mrl-v02-min-travel.js?v=5.8.191"></script>
-<script src="app.js?v=R87"></script>
+<script src="app.js?v=R101"></script>
 
 <script>
 for(const [quick,main] of [["m-check","check"],["m-xlsx","final-xlsx"],["m-pdf","final-pdf"]]){const b=document.getElementById(quick),target=document.getElementById(main);b.addEventListener("click",()=>target.click());}
