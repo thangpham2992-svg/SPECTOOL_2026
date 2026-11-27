@@ -52,6 +52,7 @@ function displayRuns(value,english,mixed,hints){
  plain(rest);return runs;
 }
 function sameControlGroup(a,b){return a?.groupId!=null&&a.groupId===b?.groupId}
+const summaryCommercialFields=[['tiNo','T/I no.'],['specialPrice','Special price list'],['nonStandard','Non-Standard list'],['alphaPackage','Alpha Package']];
 function groupSheet(template,cars,featureNotes,wideExcel=false){
  const portrait=cars[0].orientation!=='landscape',labelA=portrait?20:25,labelB=portrait?12:15;
  const columnLetter=n=>{let s="";for(;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s};
@@ -109,6 +110,9 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
   line(values,'header');
  }
  line([[0,'Tên thang (Elev name)',2],...cars.map((c,i)=>[2+i,c.name])],'header');
+ const includeCommercial=wideExcel&&cars[0].commercialExpanded===true;
+ const extraRows=includeCommercial?summaryCommercialFields.length:0;
+ if(includeCommercial)for(const [key,label] of summaryCommercialFields)line([[0,label,2,'label'],...cars.map((c,i)=>[2+i,String(c.commercial?.[key]??'')])]);
  const vietnamese=text=>/[đĐ]|\p{Script=Latin}\p{M}/u.test(String(text??'').normalize('NFD'));
  function splitTranslation(value){
   if(!value)return null;
@@ -158,7 +162,7 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
   const featureHeading=/^\s*[-–—_]\s*Tính năng(?:\s|$)/iu.test(r.a)&&!r.b&&r.values.every(v=>!v);
   if(r.heading)inFeatures=/tính năng|features?/iu.test(r.a);
   if(featureHeading)inFeatures=true;
-  const rowNumber=lines.length+1-(cars.some(c=>c.hasLocations||c.location)?1:0);
+  const rowNumber=lines.length+1-(cars.some(c=>c.hasLocations||c.location)?1:0)-extraRows;
   const keepEachLift=rowNumber===45||rowNumber===46;
   const headingCells=()=>keepEachLift?[[0,r.a.trim(),2],...cars.map((_,i)=>[2+i,''])]:[[0,r.a.trim(),total]];
   if(r.heading){line(headingCells(),'section');continue}
@@ -230,6 +234,43 @@ function groupSheet(template,cars,featureNotes,wideExcel=false){
  }
  return template.replace(/orientation="landscape"/, 'orientation="'+(portrait?'portrait':'landscape')+'"').replace(/<dimension[^>]*\/>/,'<dimension ref="A1:'+last+lines.length+'"/>').replace(/<cols>.*?<\/cols>/s,'<cols><col min="1" max="1" width="'+labelA+'" customWidth="1"/><col min="2" max="2" width="'+labelB+'" customWidth="1"/><col min="3" max="'+(2+cars.length)+'" width="'+width+'" customWidth="1"/></cols>').replace(/<sheetData>.*?<\/sheetData>/s,'<sheetData>'+lines.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.join('')+'</mergeCells>').replace(/<pageMargins[^>]*\/>/,'<pageMargins left=".394" right=".394" top=".45" bottom=".45" header=".15" footer=".15"/>');
 }
+// R113: preserve internal commercial text verbatim; keep it out of customer PDF.
+async function styleSummaryIdentity(zip,sheet,cars,wideExcel){
+ const ns=sheet.documentElement.namespaceURI;
+ const styles=new DOMParser().parseFromString(await zip.file('xl/styles.xml').async('string'),'application/xml');
+ const get=(root,tag)=>root.getElementsByTagNameNS(ns,tag)[0];
+ const xfs=get(styles,'cellXfs'),fonts=get(styles,'fonts'),fills=get(styles,'fills');
+ const create=tag=>styles.createElementNS(ns,tag);
+ const append=(parent,node)=>{const i=parent.children.length;parent.appendChild(node);parent.setAttribute('count',String(parent.children.length));return i;};
+ const nameRow=cars.some(c=>c.hasLocations||c.location)?10:9;
+ const header=Array.from(sheet.getElementsByTagNameNS(ns,'row')).find(r=>Number(r.getAttribute('r'))===nameRow);
+ if(!header)return;
+ let fillId,fontId;const styleMap=new Map();
+ function leftStyle(id,commercial=false){
+  const key=id+':'+commercial;if(styleMap.has(key))return styleMap.get(key);
+  const xf=xfs.children[Number(id)||0].cloneNode(true);let align=get(xf,'alignment');if(!align){align=create('alignment');xf.appendChild(align)}align.setAttribute('horizontal','left');align.setAttribute('vertical','center');align.setAttribute('wrapText','1');xf.setAttribute('applyAlignment','1');
+  if(commercial){
+   if(fillId==null){const fill=create('fill'),pattern=create('patternFill'),fg=create('fgColor'),bg=create('bgColor');pattern.setAttribute('patternType','solid');fg.setAttribute('rgb','FFFFFF00');bg.setAttribute('indexed','64');pattern.append(fg,bg);fill.append(pattern);fillId=append(fills,fill);const font=fonts.children[4].cloneNode(true);let color=get(font,'color');if(!color){color=create('color');font.appendChild(color)}for(const a of Array.from(color.attributes))color.removeAttribute(a.name);color.setAttribute('rgb','FFFF0000');fontId=append(fonts,font);}
+   xf.setAttribute('fillId',String(fillId));xf.setAttribute('fontId',String(fontId));xf.setAttribute('applyFill','1');xf.setAttribute('applyFont','1');
+  }
+  const index=append(xfs,xf);styleMap.set(key,index);return index;
+ }
+ for(const c of Array.from(header.children))if(c.localName==='c')c.setAttribute('s',String(leftStyle(c.getAttribute('s'))));
+ if(wideExcel&&cars[0].commercialExpanded===true){
+  const rows=Array.from(sheet.getElementsByTagNameNS(ns,'row'));
+  for(const [offset,[key,label]] of summaryCommercialFields.entries()){
+   const row=rows.find(r=>Number(r.getAttribute('r'))===nameRow+offset+1);if(!row)continue;
+   row.removeAttribute('hidden');
+   const cells=Array.from(row.children).filter(c=>c.localName==='c');
+   for(const [i,c] of cells.entries()){
+    c.setAttribute('s',String(leftStyle(c.getAttribute('s'),true)));if(i===1)continue;
+    const text=i===0?label:String(cars[i-2]?.commercial?.[key]??'');
+    c.replaceChildren();c.setAttribute('t','inlineStr');const inline=sheet.createElementNS(ns,'is'),t=sheet.createElementNS(ns,'t');t.setAttribute('xml:space','preserve');t.textContent=text;inline.appendChild(t);c.appendChild(inline);
+   }
+  }
+ }
+ zip.file('xl/styles.xml',new XMLSerializer().serializeToString(styles));
+}
 async function buildPairBook(cars,compactHidden=true,splitForPrint=false){
  if(!cars.length||cars.length>16382)throw Error("Số cột thang không hợp lệ / Invalid elevator column count.");
  const zip=await JSZip.loadAsync(pairTemplate,{base64:true}),read=p=>zip.file(p).async('string');
@@ -257,6 +298,7 @@ async function buildPairBook(cars,compactHidden=true,splitForPrint=false){
   await window.SPEC_EXPORT.normalizeExportPunctuation(zip,sheet);
   await window.SPEC_EXPORT.emphasizeExportCodes(zip,sheet);
   await window.SPEC_EXPORT.normalizeReportTitle(zip,sheet);
+  await styleSummaryIdentity(zip,sheet,group,!splitForPrint);
   if(i){
    const drawingPath='xl/drawings/drawing'+n+'.xml';
    zip.file(drawingPath,await read('xl/drawings/drawing1.xml'));

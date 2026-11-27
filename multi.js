@@ -3,6 +3,9 @@ const el=id=>document.getElementById(id), cars=[], pending=new Map(), openGroups
 const sections={P:'Công trình',I:'I. Thông số cơ bản',II:'II. Kích thước',III:'III. Thiết kế cabin',IV:'IV. Thiết kế cửa tầng',V:'V. Tính năng'};
 let section='I',detail=false,token=0,version=0,cache={},editing=null,created=0;
 let leadTimes=new Map();
+const commercialFields=[["tiNo","T/I no."],["specialPrice","Special price list"],["nonStandard","Non-Standard list"],["alphaPackage","Alpha Package"]];
+let commercialExpanded=false;
+function commercialValues(car){return Object.fromEntries(commercialFields.map(([key])=>[key,car.commercial?.[key]??"" ]));}
 const featureDisclosure=new Map();
 async function readLeadTime(car){
  try{const r=await request(car,'leadTime');return Number.isFinite(r?.days)&&r.days>0?r:null;}catch(e){return null;}
@@ -55,8 +58,8 @@ window.addEventListener('message',async e=>{
 function createFrame(name,frameModel){
  const frame=make('iframe');frame.title=name;frame.hidden=true;
  const ready=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
- frame.src='spec.html?v=R112&model='+frameModel;document.querySelector('main').append(frame);
- return {name,frame,ready,location:{text:""}};
+ frame.src='spec.html?v=R114&model='+frameModel;document.querySelector('main').append(frame);
+ return {name,frame,ready,location:{text:""},commercial:{}};
 }
 function add(){
  clearErrorMarks();
@@ -385,13 +388,24 @@ function drawSection(section,cache,matrix,from,to,view){
   input.onkeydown=e=>{if(e.key==='Enter')input.blur();if(e.key==='Escape'){input.value=loc.text;input.blur()}};
   input.onchange=()=>{loc.text=input.value.trim();draw()};th.append(input);locRow.append(th);i+=span;
  }
- const header=summaryTable.insertRow();header.className='elevator-header';header.append(make('th','Tên thang / Elevator'));
+ const header=summaryTable.insertRow();header.className='elevator-header';const nameLabel=make('th');header.append(nameLabel);
+ if(section==='I'){
+  const toggle=make('button','Tên thang / Elevator');toggle.type='button';toggle.className='commercial-toggle';toggle.setAttribute('aria-expanded',String(commercialExpanded));toggle.title='Mở / thu gọn thông tin bổ sung';const arrow=make('span',commercialExpanded?'▲':'▼');arrow.className='commercial-arrow';arrow.setAttribute('aria-hidden','true');toggle.append(arrow);toggle.onclick=()=>{commercialExpanded=!commercialExpanded;draw();el('part-I')?.querySelector('.commercial-toggle')?.focus({preventScroll:true})};nameLabel.append(toggle);
+ }else nameLabel.textContent='Tên thang / Elevator';
  for(const car of view){const th=make('th');th.append(section==='I'?titleInput(car):car.name);
   const index=cars.indexOf(car);
   if(section==='I'&&index>0){const copy=make('button','⧉');copy.type='button';copy.className='copy-column';copy.title='Sao chép cấu hình '+cars[index-1].name+' sang '+car.name;copy.setAttribute('aria-label',copy.title);copy.onclick=()=>copyColumn(cars[index-1],car);th.append(copy)}
   header.append(th)}
  summaryTable.className='name-header';matrix.append(summaryTable);
- if(section==='I'){const groupTable=summaryTableColumns(make('table'),view.length);
+ if(section==='I'){
+ if(commercialExpanded){
+  const extra=summaryTableColumns(make('table'),view.length);extra.className='commercial-info-table';
+  for(const [key,label] of commercialFields){
+   const row=extra.insertRow();row.insertCell().textContent=label;
+   for(const car of view){const td=row.insertCell(),input=make('textarea');input.rows=1;input.value=car.commercial?.[key]??'';input.placeholder='Nhập…';input.setAttribute('aria-label',label+' · '+car.name);input.dataset.commercialKey=key;input.oninput=()=>{(car.commercial??={})[key]=input.value};td.append(input);}
+  }matrix.append(extra);
+ }
+ const groupTable=summaryTableColumns(make('table'),view.length);
  matrix.append(groupTable);const groupRow=groupTable.insertRow();const groupTitle=groupRow.insertCell();groupTitle.textContent='Nhóm điều khiển';const hint=make('small',isMRL?'1C: từng thang độc lập. 2C / 3C / 4C: đúng 2 / 3 / 4 thang trong một nhóm.':'1C: từng thang độc lập. 2C: đúng 2 thang trong một nhóm.');hint.textContent+=' Quantity là tổng số thang trong cột. Ví dụ P1,P3 · 2 thang · 2C là một nhóm riêng.';groupTitle.title=hint.textContent;hint.textContent=isMRL?'1C: đơn · 2C/3C/4C: nhóm theo số thang':'1C: đơn · 2C: nhóm 2 thang';hint.style.display='block';groupTitle.append(hint);
  view.forEach((c,i)=>{
   if(c.group&&view[i-1]?.group===c.group)return;
@@ -825,7 +839,7 @@ async function run(format){
   format=choice;const orientation=el('exportOrientation').value==='landscape'?'landscape':'portrait';const paper=orientation==='portrait'?'A4 dọc':'A4 ngang';
 
   for(const car of cars){
-   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
+   try{book.push({bankLabel:!car.group&&internalBanks([car],groupFields.get(car)?.find(f=>f.key===controlKey)?.value)?internalLabel(car,parseInt(groupFields.get(car).find(f=>f.key===controlKey).value,10),columnCount(car)):'',onlyVi:el('only-vi').checked,orientation,model,operation:groupFields.get(car)?.find(f=>f.key===controlKey)?.value,name:car.name,commercialExpanded,commercial:commercialValues(car),location:car.location.text,locationId:locationId(car),hasLocations:cars.some(c=>c.location.text),groupId:car.group?cars.indexOf(car.group[0]):null,rows:await request(car,'pairRows',{includeTechDetails:el('export-tech-details').checked})})}
    catch(e){failures.push({car,errors:[e.message]})}
   }
   if(failures.length){if(preview&&!preview.closed)preview.close();await reportErrors(failures);main.inert=false;await checkPopup('Check Spec · Cần sửa lỗi',failures);return}
@@ -858,6 +872,7 @@ function validateSummaryDraft(d){
   typeof d.onlyVi!=='boolean'||typeof d.details!=='boolean')invalid();
  const locations=new Map();
  for(const [i,c] of d.cars.entries()){
+  if(c.commercial!==undefined&&(!c.commercial||typeof c.commercial!=='object'||Array.isArray(c.commercial)||commercialFields.some(([k])=>c.commercial[k]!==undefined&&typeof c.commercial[k]!=='string')))invalid();
   if(c.location!==undefined&&typeof c.location!=='string')invalid();
   if(c.locationId!==undefined&&(!Number.isInteger(c.locationId)||c.locationId<0||c.locationId>=d.cars.length))invalid();
   const id=c.locationId??i,text=c.location??'';if(locations.has(id)&&locations.get(id)!==text)invalid();locations.set(id,text);
@@ -872,8 +887,8 @@ function validateSummaryDraft(d){
 async function saveSummaryDraft(){
  const inputs=await Promise.all(cars.map(c=>request(c,'draft')));
  const d={format:'SpecWebTool.summary',version:1,model,project:[...project],onlyVi:el('only-vi').checked,
-  details:el('export-tech-details').checked,groups:summaryDraftGroups(),selected:cars.indexOf(current()),
-  cars:cars.map((c,i)=>({name:c.name,location:c.location.text,locationId:locationId(c),input:inputs[i]}))};
+  details:el('export-tech-details').checked,commercialExpanded,groups:summaryDraftGroups(),selected:cars.indexOf(current()),
+  cars:cars.map((c,i)=>({name:c.name,commercial:commercialValues(c),location:c.location.text,locationId:locationId(c),input:inputs[i]}))};
  const name=await request(cars[0],'draftName',project.get('C7')||'Cong trinh');
  const url=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));
  const a=make('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
@@ -884,7 +899,7 @@ async function openSummaryDraft(file){
  const next=[];
  try{
   for(const c of d.cars){
-   const car=createFrame(c.name,d.model);next.push(car);await request(car,'openDraft',c.input);
+   const car=createFrame(c.name,d.model);car.commercial=commercialValues(c);next.push(car);await request(car,'openDraft',c.input);
    for(const [key,value] of d.project)await request(car,'set',{section:'P',key,value});
   }
   restoreLocations(next,d.cars);
@@ -894,6 +909,7 @@ async function openSummaryDraft(file){
   ++version;const old=cars.splice(0,cars.length,...next);for(const car of old)car.frame.remove();
   setSummaryModel(d.model);cache=nextCache;created=cars.length;
  }catch(e){for(const c of next)if(!cars.includes(c))c.frame.remove();throw e}
+ commercialExpanded=d.commercialExpanded===true;
  project.clear();for(const [k,v] of d.project)project.set(k,v);
  const selected=Number.isInteger(d.selected)&&cars[d.selected]?d.selected:0;
  refreshColumnSelector(selected);section='I';detail=false;
